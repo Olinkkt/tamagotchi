@@ -429,6 +429,7 @@ fn draw(f: &mut Frame, app: &App) {
         "m" => p.sick,
         "c" => p.poops > 0,
         "d" => p.disc_call.is_some(),
+        "l" => p.asleep,
         _ => true,
     };
     let urgent = need.map(|n| n.0.to_string());
