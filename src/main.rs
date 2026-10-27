@@ -401,7 +401,8 @@ fn draw(f: &mut Frame, app: &App) {
         ]),
         None if p.stage == Stage::Egg => Line::from(Span::styled("It's an egg - give it a moment to hatch.", Style::new().fg(DIM))),
         None if p.asleep => Line::from(Span::styled("Shh, it's sleeping.", Style::new().fg(DIM))),
-        None => Line::from(Span::styled("All good! Play a game (p) to keep it happy.", Style::new().fg(GOOD))),
+        None if p.happy < MAX_HEARTS => Line::from(Span::styled("Doing fine. A game (p) would cheer it up.", Style::new().fg(GOOD))),
+        None => Line::from(Span::styled("All good - nothing to do right now.", Style::new().fg(GOOD))),
     };
     f.render_widget(Paragraph::new(hint).alignment(Alignment::Center), rows[2]);
 
