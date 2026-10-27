@@ -1,9 +1,12 @@
+mod config;
+mod games;
 mod pet;
 mod save;
 mod sprites;
 
 use std::time::{Duration, Instant};
 
+use config::Config;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use pet::{Pet, Stage, MAX_HEARTS};
 use ratatui::{
@@ -15,23 +18,17 @@ use ratatui::{
 };
 
 const MAX_CATCHUP_TICKS: u64 = 86_400;
-const GAME_ROUNDS: u8 = 5;
 
 pub fn fmt_age(secs: u64) -> String {
     let (d, h, m) = (secs / 86_400, secs / 3600 % 24, secs / 60 % 60);
     if d > 0 { format!("{d}d {h}h {m}m") } else if h > 0 { format!("{h}h {m}m") } else { format!("{m}m {}s", secs % 60) }
 }
 
-struct HigherLower {
-    current: u8,
-    round: u8,
-    wins: u8,
-    note: String,
-}
-
 enum Mode {
     Normal,
-    Game(HigherLower),
+    Chooser,
+    Game(games::Game),
+    Graveyard(Vec<String>),
 }
 
 struct App {
@@ -39,6 +36,8 @@ struct App {
     mode: Mode,
     message: String,
     log: Vec<String>,
+    cfg: Config,
+    tz: i64,
     speed: f64,
     tick_acc: f64,
     last: Instant,
@@ -48,25 +47,41 @@ struct App {
     fx: Option<(sprites::Fx, Instant)>,
     last_stage: Stage,
     confirm_reset: bool,
+    dev: bool,
+    dev_open: bool,
     quit: bool,
 }
 
 impl App {
     fn new() -> Self {
+        let args: Vec<String> = std::env::args().collect();
+        let has = |f: &str| args.iter().any(|a| a == f);
         let mut speed = std::env::var("TAMA_SPEED").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
-        if std::env::args().any(|a| a == "--fast") {
+        if has("--fast") {
             speed = 60.0;
+        }
+        let dev = has("--dev");
+        if has("--fast") || dev {
             save::use_test_slot();
         }
-        let (pet, away) = match save::load() {
-            Some(x) => x,
-            None => (Pet::new(save::now()), 0),
+        let (cfg, cfg_warning) = Config::load();
+        let tz = save::tz_offset();
+        let (pet, away, note) = match save::load() {
+            save::Loaded::Pet(p, away) => (p, away, "Welcome back!".to_string()),
+            save::Loaded::None => (Pet::new(save::now()), 0, "A new egg! Take good care of it.".to_string()),
+            save::Loaded::Corrupt(path) => (
+                Pet::new(save::now()),
+                0,
+                format!("Your save was unreadable, so it was moved to {} and a new egg started.", path.display()),
+            ),
         };
         let mut app = App {
             pet,
             mode: Mode::Normal,
-            message: "Welcome back!".into(),
+            message: cfg_warning.unwrap_or(note),
             log: Vec::new(),
+            cfg: cfg.clone(),
+            tz,
             speed,
             tick_acc: 0.0,
             last: Instant::now(),
@@ -76,11 +91,21 @@ impl App {
             fx: None,
             last_stage: Stage::Egg,
             confirm_reset: false,
+            dev,
+            dev_open: false,
             quit: false,
         };
+        app.pet.set_env(cfg, tz);
+        if app.pet.clock == 0 {
+            // Save from before the clock existed.
+            app.pet.clock = (save::now() - away) as i64;
+        }
         let ticks = ((away as f64 * speed) as u64).min(MAX_CATCHUP_TICKS);
         for _ in 0..ticks {
             app.pet.tick();
+        }
+        if speed == 1.0 {
+            app.pet.clock = save::now() as i64;
         }
         if ticks > 0 {
             app.message = format!("Away for {} - catching up...", fmt_age(away));
@@ -88,6 +113,12 @@ impl App {
         app.drain_events();
         app.last_stage = app.pet.stage;
         app
+    }
+
+    fn fresh_pet(&self) -> Pet {
+        let mut p = Pet::new(save::now());
+        p.set_env(self.cfg.clone(), self.tz);
+        p
     }
 
     fn trigger(&mut self, fx: sprites::Fx) {
@@ -151,6 +182,10 @@ impl App {
             }
             self.last_stage = self.pet.stage;
         }
+        if matches!(self.mode, Mode::Game(_) | Mode::Chooser) && (self.pet.asleep || !self.pet.alive()) {
+            self.mode = Mode::Normal;
+        }
+        self.tick_game();
         let calling = self.pet.needs_attention();
         if calling && !self.was_calling {
             print!("\x07");
@@ -166,55 +201,56 @@ impl App {
         }
     }
 
-    fn start_game(&mut self) {
-        if let Some(m) = self.pet.can_play() {
-            self.message = m.into();
-            return;
-        }
-        let current = self.pet.rand(9) as u8 + 1;
-        self.mode = Mode::Game(HigherLower { current, round: 1, wins: 0, note: "Will the next number be higher or lower?".into() });
+    fn tick_game(&mut self) {
+        let Mode::Game(g) = &mut self.mode else { return };
+        let outcome = g.tick(&mut self.pet);
+        self.handle_outcome(outcome);
     }
 
-    fn guess(&mut self, higher: bool) {
-        let before = self.snapshot();
-        let Mode::Game(g) = &mut self.mode else { return };
-        let mut next = self.pet.rand(9) as u8 + 1;
-        while next == g.current {
-            next = self.pet.rand(9) as u8 + 1;
-        }
-        let correct = (next > g.current) == higher;
-        if correct {
-            g.wins += 1;
-        }
-        g.note = format!("{} -> {next}: {}", g.current, if correct { "right!" } else { "wrong." });
-        g.current = next;
-        if g.round >= GAME_ROUNDS {
-            let wins = g.wins;
-            self.message = self.pet.finish_game(wins, GAME_ROUNDS);
-            self.mode = Mode::Normal;
-            self.react(before);
-        } else {
-            g.round += 1;
+    fn handle_outcome(&mut self, outcome: games::Outcome) {
+        match outcome {
+            games::Outcome::Continue => {}
+            games::Outcome::Quit => {
+                self.mode = Mode::Normal;
+                self.message = "Game abandoned.".into();
+            }
+            games::Outcome::Done { wins, rounds } => {
+                let before = self.snapshot();
+                self.message = self.pet.finish_game(wins, rounds);
+                self.mode = Mode::Normal;
+                self.react(before);
+            }
         }
     }
 
     fn on_key(&mut self, code: KeyCode) {
-        if let Mode::Game(_) = self.mode {
-            match code {
-                KeyCode::Char('h') | KeyCode::Up => self.guess(true),
-                KeyCode::Char('l') | KeyCode::Down => self.guess(false),
-                KeyCode::Esc | KeyCode::Char('q') => {
-                    self.mode = Mode::Normal;
-                    self.message = "Game abandoned.".into();
-                }
-                _ => {}
+        match &mut self.mode {
+            Mode::Game(g) => {
+                let outcome = g.key(code, &mut self.pet);
+                self.handle_outcome(outcome);
+                return;
             }
-            return;
+            Mode::Chooser => {
+                match code {
+                    KeyCode::Char(c @ '1'..='4') => {
+                        let g = games::Game::new(c as u8 - b'0', &mut self.pet);
+                        self.mode = Mode::Game(g);
+                    }
+                    KeyCode::Esc | KeyCode::Char('q') => self.mode = Mode::Normal,
+                    _ => {}
+                }
+                return;
+            }
+            Mode::Graveyard(_) => {
+                self.mode = Mode::Normal;
+                return;
+            }
+            Mode::Normal => {}
         }
         if self.confirm_reset {
             self.confirm_reset = false;
             if code == KeyCode::Char('y') {
-                self.pet = Pet::new(save::now());
+                self.pet = self.fresh_pet();
                 self.log.clear();
                 self.fx = None;
                 self.last_stage = Stage::Egg;
@@ -223,6 +259,13 @@ impl App {
             } else {
                 self.message = "Reset cancelled.".into();
             }
+            return;
+        }
+        if self.dev && code == KeyCode::Char('`') {
+            self.dev_open = !self.dev_open;
+            return;
+        }
+        if self.dev_open && self.on_dev_key(code) {
             return;
         }
         let before = self.snapshot();
@@ -235,7 +278,14 @@ impl App {
             KeyCode::Char('f') => self.pet.feed_meal(),
             KeyCode::Char('s') => self.pet.feed_snack(),
             KeyCode::Char('p') => {
-                self.start_game();
+                match self.pet.can_play() {
+                    Some(m) => self.message = m.into(),
+                    None => self.mode = Mode::Chooser,
+                }
+                return;
+            }
+            KeyCode::Char('g') => {
+                self.mode = Mode::Graveyard(save::graveyard());
                 return;
             }
             KeyCode::Char('m') => self.pet.medicine(),
@@ -243,7 +293,8 @@ impl App {
             KeyCode::Char('d') => self.pet.scold(),
             KeyCode::Char('l') => self.pet.toggle_light(),
             KeyCode::Char('n') if !self.pet.alive() => {
-                self.pet = Pet::new(save::now());
+                self.pet = self.fresh_pet();
+                self.last_stage = Stage::Egg;
                 "A new egg appears!".into()
             }
             KeyCode::Char('q') | KeyCode::Esc => {
@@ -254,6 +305,82 @@ impl App {
         };
         self.message = msg;
         self.react(before);
+    }
+
+    /// Developer keys, active only with `--dev` while the panel is open. Returns true if handled.
+    fn on_dev_key(&mut self, code: KeyCode) -> bool {
+        let p = &mut self.pet;
+        let step = |v: u8, up: bool, max: u8| if up { v.saturating_add(1).min(max) } else { v.saturating_sub(1) };
+        let KeyCode::Char(c) = code else { return false };
+        let note = match c {
+            'h' | 'H' => {
+                p.hunger = step(p.hunger, c == 'H', MAX_HEARTS);
+                format!("hunger = {}", p.hunger)
+            }
+            'a' | 'A' => {
+                p.happy = step(p.happy, c == 'A', MAX_HEARTS);
+                format!("happy = {}", p.happy)
+            }
+            'd' | 'D' => {
+                p.discipline = if c == 'D' { p.discipline.saturating_add(10).min(100) } else { p.discipline.saturating_sub(10) };
+                format!("discipline = {}", p.discipline)
+            }
+            'w' | 'W' => {
+                p.weight = step(p.weight, c == 'W', 99);
+                format!("weight = {}", p.weight)
+            }
+            'm' | 'M' => {
+                p.mistakes = if c == 'M' { p.mistakes + 1 } else { p.mistakes.saturating_sub(1) };
+                format!("mistakes = {}", p.mistakes)
+            }
+            'p' => {
+                p.poops = (p.poops + 1).min(3);
+                format!("poops = {}", p.poops)
+            }
+            's' => {
+                p.dev_sick();
+                "made sick".into()
+            }
+            'n' => {
+                p.dev_naughty();
+                "naughty call started".into()
+            }
+            'g' => {
+                p.dev_grow();
+                "growing at next tick".into()
+            }
+            'k' => {
+                p.dev_kill();
+                "killed".into()
+            }
+            't' | 'T' => {
+                let secs = if c == 'T' { 8 * 3600 } else { 3600 };
+                for _ in 0..secs {
+                    p.tick();
+                }
+                format!("skipped {}h", secs / 3600)
+            }
+            'z' => {
+                p.dev_set_hour(22);
+                "clock set to 22:00".into()
+            }
+            'Z' => {
+                p.dev_set_hour(12);
+                "clock set to 12:00".into()
+            }
+            'f' => {
+                self.speed = match self.speed as u32 {
+                    1 => 10.0,
+                    10 => 60.0,
+                    60 => 600.0,
+                    _ => 1.0,
+                };
+                format!("speed = x{}", self.speed)
+            }
+            _ => return false,
+        };
+        self.message = format!("[dev] {note}");
+        true
     }
 }
 
@@ -319,6 +446,10 @@ fn draw(f: &mut Frame, app: &App) {
         Span::styled(p.species.clone(), Style::new().fg(TEXT).add_modifier(Modifier::BOLD)),
         Span::styled(format!("  ·  {}  ·  age {}", p.stage.label(), fmt_age(p.age)), Style::new().fg(DIM)),
     ]);
+    let mut header = header;
+    if app.dev {
+        header.spans.push(Span::styled("   DEV", Style::new().fg(Color::Rgb(20, 20, 30)).bg(WARN).add_modifier(Modifier::BOLD)));
+    }
     f.render_widget(Paragraph::new(header).block(panel("tamagotchi")), rows[0]);
 
     let cols = Layout::horizontal([Constraint::Min(34), Constraint::Length(30)]).split(rows[1]);
@@ -330,19 +461,35 @@ fn draw(f: &mut Frame, app: &App) {
         .border_style(Style::new().fg(BORDER));
     let inner = room_block.inner(cols[0]);
     let t = (app.started.elapsed().as_millis() / 350) as u32;
+    let centered = |lines: Vec<Line<'static>>| -> Vec<Line<'static>> {
+        let pad = (inner.height as usize).saturating_sub(lines.len()) / 2;
+        let mut v = vec![Line::from(""); pad];
+        v.extend(lines);
+        v
+    };
     let body: Vec<Line> = match &app.mode {
-        Mode::Game(g) => {
-            let pad = (inner.height as usize).saturating_sub(7) / 2;
-            let mut v = vec![Line::from(""); pad];
-            v.extend([
-                Line::from(Span::styled("HIGHER  or  LOWER", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),
-                Line::from(Span::styled(format!("round {}/{}   wins {}", g.round, GAME_ROUNDS, g.wins), Style::new().fg(DIM))),
+        Mode::Game(g) => centered(g.lines()),
+        Mode::Chooser => {
+            let mut v = vec![
+                Line::from(Span::styled("PICK A GAME", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),
                 Line::from(""),
-                Line::from(Span::styled(format!("  {}  ", g.current), Style::new().fg(Color::Rgb(20, 20, 30)).bg(WARN).add_modifier(Modifier::BOLD))),
-                Line::from(""),
-                Line::from(Span::styled(g.note.clone(), Style::new().fg(TEXT))),
-            ]);
-            v
+            ];
+            for (k, l) in games::CHOICES {
+                v.push(Line::from(key_chip(k, l)));
+            }
+            centered(v)
+        }
+        Mode::Graveyard(entries) => {
+            let mut v = vec![Line::from(Span::styled("GRAVEYARD", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))), Line::from("")];
+            if entries.is_empty() {
+                v.push(Line::from(Span::styled("No pets have passed away yet.", Style::new().fg(DIM))));
+            }
+            for e in entries.iter().take((inner.height as usize).saturating_sub(4)) {
+                v.push(Line::from(Span::styled(e.clone(), Style::new().fg(TEXT))));
+            }
+            v.push(Line::from(""));
+            v.push(Line::from(Span::styled("press any key to go back", Style::new().fg(DIM))));
+            centered(v)
         }
         Mode::Normal => sprites::render(p, t, app.current_fx(), inner.width as usize, inner.height as usize),
     };
@@ -384,10 +531,30 @@ fn draw(f: &mut Frame, app: &App) {
         chip("lonely", BAD);
     }
     stats.push(Line::from(""));
-    stats.push(Line::from(Span::styled("recent", Style::new().fg(DIM).add_modifier(Modifier::ITALIC))));
-    let room_left = (cols[1].height as usize).saturating_sub(2 + stats.len());
-    for e in app.log.iter().rev().take(room_left).rev() {
-        stats.push(Line::from(Span::styled(format!("· {e}"), Style::new().fg(DIM))));
+    if app.dev_open {
+        let help = [
+            format!("dev   x{}  {:02}h", app.speed, p.local_hour()),
+            "h/H hunger -/+".into(),
+            "a/A happy -/+".into(),
+            "d/D discipline -/+10".into(),
+            "w/W weight -/+".into(),
+            "m/M mistakes -/+".into(),
+            "p poop   s sick".into(),
+            "n naughty  g grow".into(),
+            "k kill".into(),
+            "t/T skip 1h / 8h".into(),
+            "z 22:00  Z 12:00".into(),
+            "f speed  ` close".into(),
+        ];
+        for h in help {
+            stats.push(Line::from(Span::styled(h, Style::new().fg(WARN))));
+        }
+    } else {
+        stats.push(Line::from(Span::styled("recent", Style::new().fg(DIM).add_modifier(Modifier::ITALIC))));
+        let room_left = (cols[1].height as usize).saturating_sub(2 + stats.len());
+        for e in app.log.iter().rev().take(room_left).rev() {
+            stats.push(Line::from(Span::styled(format!("· {e}"), Style::new().fg(DIM))));
+        }
     }
     f.render_widget(Paragraph::new(stats).wrap(Wrap { trim: true }).block(panel("status")), cols[1]);
 
@@ -416,10 +583,12 @@ fn draw(f: &mut Frame, app: &App) {
 
     // Menu
     let mut spans: Vec<Span<'static>> = Vec::new();
-    let items: &[(&str, &str)] = match app.mode {
-        Mode::Game(_) => &[("h", "higher"), ("l", "lower"), ("esc", "quit game")],
-        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("q", "quit")],
-        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("q", "quit")],
+    let items: &[(&str, &str)] = match &app.mode {
+        Mode::Game(g) => g.keys(),
+        Mode::Chooser => &[("1-4", "choose"), ("esc", "back")],
+        Mode::Graveyard(_) => &[("any key", "back")],
+        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("g", "graveyard"), ("q", "quit")],
+        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("g", "graveyard"), ("q", "quit")],
     };
     let useful = |k: &str| match k {
         "f" => p.hunger < MAX_HEARTS,
@@ -430,7 +599,7 @@ fn draw(f: &mut Frame, app: &App) {
         "l" => p.asleep,
         _ => true,
     };
-    let urgent = need.map(|n| n.0.to_string());
+    let urgent = if matches!(app.mode, Mode::Normal) { need.map(|n| n.0.to_string()) } else { None };
     let ink = Color::Rgb(20, 20, 30);
     for (k, l) in items {
         let mut chip = key_chip(k, l);
@@ -455,7 +624,7 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> std::io::Result<()> {
     while !app.quit {
         app.update();
         terminal.draw(|f| draw(f, app))?;
-        if event::poll(Duration::from_millis(100))? {
+        if event::poll(Duration::from_millis(50))? {
             if let Event::Key(k) = event::read()? {
                 if k.kind == KeyEventKind::Press {
                     app.on_key(k.code);

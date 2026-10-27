@@ -1,3 +1,4 @@
+use crate::config::Config;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -24,10 +25,6 @@ impl Stage {
 }
 
 pub const MAX_HEARTS: u8 = 4;
-const DAY: u64 = 86_400;
-const AWAKE_SECS: u64 = 16 * 3600;
-/// Seconds a need can go unanswered before it counts as a care mistake.
-const MISTAKE_AFTER: u64 = 900;
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Pet {
@@ -48,6 +45,13 @@ pub struct Pet {
     pub disc_call: Option<u64>,
     pub cause_of_death: Option<String>,
     pub buried: bool,
+    /// Pet's wall-clock time (unix seconds); advances one second per tick.
+    #[serde(default)]
+    pub clock: i64,
+    #[serde(skip)]
+    pub cfg: Config,
+    #[serde(skip)]
+    pub tz_offset: i64,
     hunger_t: u64,
     happy_t: u64,
     poop_t: u64,
@@ -82,6 +86,9 @@ impl Pet {
             disc_call: None,
             cause_of_death: None,
             buried: false,
+            clock: seed as i64,
+            cfg: Config::default(),
+            tz_offset: 0,
             hunger_t: 0,
             happy_t: 0,
             poop_t: 0,
@@ -104,6 +111,41 @@ impl Pet {
         x ^= x << 17;
         self.rng = x;
         x % n
+    }
+
+    /// Give the pet its config, the local UTC offset, and (optionally) re-sync its clock.
+    pub fn set_env(&mut self, cfg: Config, tz_offset: i64) {
+        self.cfg = cfg;
+        self.tz_offset = tz_offset;
+    }
+
+    // ---- developer helpers (used by --dev mode) ----
+
+    pub fn dev_kill(&mut self) {
+        if self.alive() {
+            self.die("dev command");
+        }
+    }
+
+    pub fn dev_sick(&mut self) {
+        self.get_sick();
+    }
+
+    pub fn dev_naughty(&mut self) {
+        self.disc_call = Some(0);
+    }
+
+    /// Make the next tick advance the pet to its next life stage.
+    pub fn dev_grow(&mut self) {
+        if self.alive() && self.stage != Stage::Adult {
+            self.stage_age = 1_000_000_000;
+        }
+    }
+
+    pub fn dev_set_hour(&mut self, hour: i64) {
+        let local = self.clock + self.tz_offset;
+        let day_start = local - local.rem_euclid(86_400);
+        self.clock = day_start + hour * 3600 - self.tz_offset;
     }
 
     pub fn alive(&self) -> bool {
@@ -173,6 +215,7 @@ impl Pet {
         }
         self.age += 1;
         self.stage_age += 1;
+        self.clock += 1;
         self.grow();
         if self.stage == Stage::Egg || !self.alive() {
             return;
@@ -191,13 +234,13 @@ impl Pet {
         self.poop();
         self.sickness();
         self.discipline_call();
-        if self.stage == Stage::Adult && self.stage_age >= 2 * DAY {
+        if self.stage == Stage::Adult && self.stage_age >= self.cfg.adult_lifespan_secs {
             self.die("old age");
         }
     }
 
     fn update_sleep(&mut self) {
-        let asleep = self.age % DAY >= AWAKE_SECS;
+        let asleep = self.in_sleep_hours();
         if asleep != self.asleep {
             self.asleep = asleep;
             self.light_on = true;
@@ -207,12 +250,21 @@ impl Pet {
         }
     }
 
+    pub fn local_hour(&self) -> i64 {
+        (self.clock + self.tz_offset).rem_euclid(86_400) / 3600
+    }
+
+    fn in_sleep_hours(&self) -> bool {
+        let (h, start, end) = (self.local_hour(), self.cfg.sleep_start_hour, self.cfg.sleep_end_hour);
+        if start > end { h >= start || h < end } else { h >= start && h < end }
+    }
+
     fn grow(&mut self) {
         let (limit, next): (u64, Stage) = match self.stage {
             Stage::Egg => (30, Stage::Baby),
-            Stage::Baby => (600, Stage::Child),
-            Stage::Child => (3600, Stage::Teen),
-            Stage::Teen => (7200, Stage::Adult),
+            Stage::Baby => (self.cfg.baby_secs, Stage::Child),
+            Stage::Child => (self.cfg.child_secs, Stage::Teen),
+            Stage::Teen => (self.cfg.teen_secs, Stage::Adult),
             _ => return,
         };
         if self.stage_age < limit {
@@ -243,10 +295,10 @@ impl Pet {
 
     fn hunger_interval(&self) -> u64 {
         match self.stage {
-            Stage::Baby => 240,
-            Stage::Child => 480,
-            Stage::Teen => 600,
-            _ => 720,
+            Stage::Baby => self.cfg.hunger_secs_baby,
+            Stage::Child => self.cfg.hunger_secs_child,
+            Stage::Teen => self.cfg.hunger_secs_teen,
+            _ => self.cfg.hunger_secs_adult,
         }
     }
 
@@ -258,13 +310,13 @@ impl Pet {
             self.hunger = self.hunger.saturating_sub(1);
         }
         self.happy_t += 1;
-        if self.happy_t >= hi * 5 / 4 {
+        if self.happy_t >= (hi as f64 * self.cfg.happy_decay_factor) as u64 {
             self.happy_t = 0;
             self.happy = self.happy.saturating_sub(1);
         }
         if self.hunger == 0 {
             self.hunger_zero += 1;
-            if self.hunger_zero == MISTAKE_AFTER {
+            if self.hunger_zero == self.cfg.mistake_after_secs {
                 self.mistake("ignored a hunger call");
             }
             if self.hunger_zero >= 12 * 3600 {
@@ -275,7 +327,7 @@ impl Pet {
         }
         if self.happy == 0 {
             self.happy_zero += 1;
-            if self.happy_zero == MISTAKE_AFTER {
+            if self.happy_zero == self.cfg.mistake_after_secs {
                 self.mistake("ignored an unhappy call");
             }
         } else {
@@ -287,7 +339,7 @@ impl Pet {
         self.poop_t += 1;
         if self.poop_t >= self.poop_next {
             self.poop_t = 0;
-            self.poop_next = 900 + self.rand(900);
+            self.poop_next = self.cfg.poop_min_secs + self.rand(self.cfg.poop_extra_secs.max(1));
             if self.poops < 3 {
                 self.poops += 1;
                 self.events.push(format!("{} pooped.", self.species));
@@ -308,13 +360,13 @@ impl Pet {
 
     fn sickness(&mut self) {
         if !self.sick {
-            if self.rand(20_000) == 0 {
+            if self.rand(self.cfg.sick_odds.max(1)) == 0 {
                 self.get_sick();
             }
             return;
         }
         self.sick_t += 1;
-        if self.sick_t == MISTAKE_AFTER {
+        if self.sick_t == self.cfg.mistake_after_secs {
             self.mistake("ignored an illness");
         }
         if self.sick_t >= 4 * 3600 {
@@ -325,7 +377,7 @@ impl Pet {
     fn discipline_call(&mut self) {
         match self.disc_call {
             None => {
-                if self.rand(1800) == 0 {
+                if self.rand(self.cfg.naughty_odds.max(1)) == 0 {
                     self.disc_call = Some(0);
                     self.events.push(format!("{} is being naughty!", self.species));
                 }
@@ -461,8 +513,26 @@ mod tests {
     }
 
     #[test]
+    fn sleeps_at_night_by_clock() {
+        let mut p = Pet::new(5);
+        for _ in 0..30 {
+            p.tick();
+        }
+        p.dev_set_hour(21);
+        p.clock += 3598;
+        p.tick();
+        assert!(!p.asleep);
+        p.tick();
+        assert!(p.asleep, "22:00 should be asleep");
+        p.dev_set_hour(8);
+        p.tick();
+        assert!(!p.asleep);
+    }
+
+    #[test]
     fn neglect_kills_eventually() {
         let mut p = Pet::new(7);
+        p.dev_set_hour(12);
         for _ in 0..(3 * 86_400) {
             p.tick();
         }
@@ -473,6 +543,7 @@ mod tests {
     #[test]
     fn care_keeps_it_alive_to_adulthood() {
         let mut p = Pet::new(9);
+        p.dev_set_hour(12);
         for t in 0..(4 * 3600 + 200) {
             p.tick();
             if t % 60 == 0 {
