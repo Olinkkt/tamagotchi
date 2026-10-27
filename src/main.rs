@@ -420,8 +420,8 @@ fn draw(f: &mut Frame, app: &App) {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let items: &[(&str, &str)] = match app.mode {
         Mode::Game(_) => &[("h", "higher"), ("l", "lower"), ("esc", "quit game")],
-        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("R", "reset"), ("q", "quit")],
-        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("R", "reset"), ("q", "quit")],
+        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("q", "quit")],
+        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("q", "quit")],
     };
     let useful = |k: &str| match k {
         "f" => p.hunger < MAX_HEARTS,
