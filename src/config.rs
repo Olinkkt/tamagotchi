@@ -22,6 +22,8 @@ pub struct Config {
     pub naughty_odds: u64,
     /// An overweight pet is this many times more likely to fall sick.
     pub overweight_sick_factor: u64,
+    /// Wiggle ears, wings, tuft, leaves and tail. Whole-body bobbing is unaffected.
+    pub animate_parts: bool,
     /// Seconds a need can go unanswered before it counts as a care mistake.
     pub mistake_after_secs: u64,
     /// How long each stage lasts, in seconds.
@@ -47,6 +49,7 @@ impl Default for Config {
             sick_odds: 20_000,
             naughty_odds: 1800,
             overweight_sick_factor: 3,
+            animate_parts: false,
             mistake_after_secs: 900,
             baby_secs: 600,
             child_secs: 3600,
