@@ -742,12 +742,28 @@ fn main() -> std::io::Result<()> {
     if args.iter().any(|a| a == "--update") {
         std::process::exit(update());
     }
+    if let Some(i) = args.iter().position(|a| a == "--animate") {
+        match args.get(i + 1).map(String::as_str) {
+            Some(v @ ("on" | "off")) => match Config::set_animate_parts(v == "on") {
+                Ok(()) => println!("Part animations (ears, wings, tail...) are now {v}. Restart tama to see it."),
+                Err(e) => {
+                    eprintln!("Could not change the setting: {e}");
+                    std::process::exit(1);
+                }
+            },
+            _ => {
+                let state = if Config::load().0.animate_parts { "on" } else { "off" };
+                println!("Part animations are {state}. Use `tama --animate on` or `tama --animate off`.");
+            }
+        }
+        return Ok(());
+    }
     if args.iter().any(|a| a == "--version" || a == "-V") {
         println!("tama {}", env!("CARGO_PKG_VERSION"));
         return Ok(());
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama --update   reinstall the newest version\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
+        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama --update   reinstall the newest version\n  tama --animate on|off   toggle ear/wing/tail animations\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
         return Ok(());
     }
     if args.iter().any(|a| a == "--gallery") {

@@ -87,3 +87,20 @@ impl Config {
         }
     }
 }
+
+impl Config {
+    /// Change one setting in config.json without touching the user's other edits.
+    pub fn set_animate_parts(on: bool) -> Result<(), String> {
+        let p = path().ok_or("no config directory on this system")?;
+        let mut value: serde_json::Value = match fs::read_to_string(&p) {
+            Ok(text) => serde_json::from_str(&text).map_err(|e| format!("config.json is not valid JSON ({e}); fix or delete it first"))?,
+            Err(_) => serde_json::to_value(Config::default()).map_err(|e| e.to_string())?,
+        };
+        value["animate_parts"] = serde_json::Value::Bool(on);
+        if let Some(dir) = p.parent() {
+            fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        let json = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
+        fs::write(&p, json).map_err(|e| e.to_string())
+    }
+}
