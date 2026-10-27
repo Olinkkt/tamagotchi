@@ -1,3 +1,4 @@
+mod cli;
 mod config;
 mod games;
 mod pet;
@@ -112,6 +113,7 @@ impl App {
         }
         app.drain_events();
         app.last_stage = app.pet.stage;
+        save::heartbeat();
         app
     }
 
@@ -197,6 +199,7 @@ impl App {
         }
         if self.last_save.elapsed() > Duration::from_secs(10) {
             let _ = save::save(&self.pet);
+            save::heartbeat();
             self.last_save = Instant::now();
         }
     }
@@ -748,6 +751,9 @@ fn update() -> i32 {
 
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
+    if let Some(code) = cli::run(&args) {
+        std::process::exit(code);
+    }
     if args.iter().any(|a| a == "--update") {
         std::process::exit(update());
     }
@@ -772,7 +778,7 @@ fn main() -> std::io::Result<()> {
         return Ok(());
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
+        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)')\n  tama feed|snack|clean|medicine|scold|light   care for the pet without opening the game\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
         return Ok(());
     }
     if args.iter().any(|a| a == "--gallery") {
@@ -784,5 +790,6 @@ fn main() -> std::io::Result<()> {
     let res = run(&mut terminal, &mut app);
     ratatui::restore();
     let _ = save::save(&app.pet);
+    save::release();
     res
 }

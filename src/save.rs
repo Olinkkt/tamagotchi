@@ -71,6 +71,31 @@ pub fn load() -> Loaded {
     }
 }
 
+fn lock_path() -> PathBuf {
+    dir().join(if TEST_SLOT.load(Ordering::Relaxed) { "tama-test.lock" } else { "tama.lock" })
+}
+
+/// Called by the game on every save so other commands know it is open.
+pub fn heartbeat() {
+    let _ = fs::create_dir_all(dir());
+    let _ = fs::write(lock_path(), now().to_string());
+}
+
+/// Called when the game quits cleanly.
+pub fn release() {
+    let _ = fs::remove_file(lock_path());
+}
+
+/// True if a game window has saved within the last 30 seconds.
+pub fn game_running() -> bool {
+    fs::metadata(lock_path())
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .map(|e| e.as_secs() < 30)
+        .unwrap_or(false)
+}
+
 fn graveyard_path() -> PathBuf {
     dir().join(if TEST_SLOT.load(Ordering::Relaxed) { "graveyard-test.txt" } else { "graveyard.txt" })
 }
