@@ -350,6 +350,37 @@ fn draw_poop(c: &mut Canvas, x: i32, t: u32) {
     }
 }
 
+/// Speech bubble with an icon for the action the pet wants.
+fn draw_bubble(c: &mut Canvas, x: i32, y: i32, key: char) {
+    let edge = (90, 90, 120);
+    c.rect(x, y, x + 8, y + 8, edge);
+    c.rect(x + 1, y + 1, x + 7, y + 7, WHITE);
+    c.pixels(&[(x + 1, y + 9), (x, y + 10), (x + 2, y + 9)], edge);
+    c.set(x + 1, y + 8, WHITE);
+    let (i, j) = (x + 2, y + 2);
+    match key {
+        'f' => {
+            c.rect(i, j + 1, i + 4, j + 4, (230, 60, 60));
+            c.pixels(&[(i + 2, j), (i + 3, j)], (80, 180, 80));
+        }
+        'm' => {
+            c.rect(i, j + 1, i + 4, j + 3, WHITE);
+            c.rect(i, j + 1, i + 2, j + 3, (230, 60, 60));
+        }
+        'd' => {
+            c.rect(i + 2, j, i + 2, j + 2, (235, 50, 50));
+            c.set(i + 2, j + 4, (235, 50, 50));
+        }
+        'c' => {
+            c.set(i + 2, j, (150, 95, 55));
+            c.rect(i + 1, j + 1, i + 3, j + 2, (150, 95, 55));
+            c.rect(i, j + 3, i + 4, j + 4, (110, 70, 40));
+        }
+        'l' => c.rect(i + 1, j, i + 3, j + 3, (250, 210, 80)),
+        _ => heart(c, i, j, (255, 110, 150)),
+    }
+}
+
 fn shadow_radius(stage: Stage) -> f32 {
     match stage {
         Stage::Egg | Stage::Baby => 5.0,
@@ -423,13 +454,10 @@ pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec
             draw_z(&mut scene, 22 + i * 4, 9 - phase * 2, (170, 195, 255));
         }
     }
-    if p.sick && !p.asleep && p.alive() && t % 2 == 0 {
-        scene.pixels(&[(23, 6), (23, 7)], (110, 190, 255));
-        scene.set(23, 8, (160, 215, 255));
-    }
-    if p.needs_attention() && t % 2 == 0 {
-        scene.rect(27, 1, 28, 5, (235, 60, 60));
-        scene.rect(27, 7, 28, 8, (235, 60, 60));
+    if let Some((key, _)) = p.top_need() {
+        if !p.asleep && p.alive() {
+            draw_bubble(&mut scene, 23, (t % 2) as i32, key);
+        }
     }
 
     match fx_kind {

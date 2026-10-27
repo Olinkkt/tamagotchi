@@ -117,6 +117,35 @@ impl Pet {
             && (self.hunger == 0 || self.happy == 0 || self.sick || self.disc_call.is_some())
     }
 
+    /// The single most urgent thing the player should do: (key, hint text).
+    pub fn top_need(&self) -> Option<(char, &'static str)> {
+        match self.stage {
+            Stage::Dead => return Some(('n', "It has passed away - hatch a new egg")),
+            Stage::Egg => return None,
+            _ => {}
+        }
+        if self.asleep {
+            return self.light_on.then_some(('l', "It's asleep with the light on - turn it off"));
+        }
+        if self.sick {
+            Some(('m', "Sick! Give it medicine"))
+        } else if self.hunger == 0 {
+            Some(('f', "Starving! Feed it a meal"))
+        } else if self.disc_call.is_some() {
+            Some(('d', "Naughty - scold it"))
+        } else if self.poops > 0 {
+            Some(('c', "Clean up the poop"))
+        } else if self.happy == 0 {
+            Some(('p', "Lonely - play a game with it"))
+        } else if self.hunger <= 1 {
+            Some(('f', "Getting hungry - feed it"))
+        } else if self.happy <= 1 {
+            Some(('p', "Getting sad - play with it"))
+        } else {
+            None
+        }
+    }
+
     fn mistake(&mut self, why: &str) {
         self.mistakes += 1;
         self.events.push(format!("Care mistake: {why}"));

@@ -285,6 +285,7 @@ fn draw(f: &mut Frame, app: &App) {
     let rows = Layout::vertical([
         Constraint::Length(3),
         Constraint::Min(12),
+        Constraint::Length(1),
         Constraint::Length(3),
         Constraint::Length(3),
     ])
@@ -369,6 +370,20 @@ fn draw(f: &mut Frame, app: &App) {
     }
     f.render_widget(Paragraph::new(stats).wrap(Wrap { trim: true }).block(panel("status")), cols[1]);
 
+    // Hint: what to do right now
+    let need = p.top_need();
+    let hint = match need {
+        Some((k, text)) => Line::from(vec![
+            Span::styled("→ ", Style::new().fg(WARN)),
+            Span::styled(format!("press {k}: "), Style::new().fg(WARN).add_modifier(Modifier::BOLD)),
+            Span::styled(text, Style::new().fg(TEXT)),
+        ]),
+        None if p.stage == Stage::Egg => Line::from(Span::styled("It's an egg - give it a moment to hatch.", Style::new().fg(DIM))),
+        None if p.asleep => Line::from(Span::styled("Shh, it's sleeping.", Style::new().fg(DIM))),
+        None => Line::from(Span::styled("All good! Play a game (p) to keep it happy.", Style::new().fg(GOOD))),
+    };
+    f.render_widget(Paragraph::new(hint).alignment(Alignment::Center), rows[2]);
+
     // Message
     f.render_widget(
         Paragraph::new(Line::from(vec![
@@ -376,7 +391,7 @@ fn draw(f: &mut Frame, app: &App) {
             Span::styled(app.message.clone(), Style::new().fg(TEXT)),
         ]))
         .block(panel("message")),
-        rows[2],
+        rows[3],
     );
 
     // Menu
@@ -386,14 +401,32 @@ fn draw(f: &mut Frame, app: &App) {
         Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("q", "quit")],
         Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("q", "quit")],
     };
+    let useful = |k: &str| match k {
+        "f" => p.hunger < MAX_HEARTS,
+        "s" => p.happy < MAX_HEARTS,
+        "m" => p.sick,
+        "c" => p.poops > 0,
+        "d" => p.disc_call.is_some(),
+        _ => true,
+    };
+    let urgent = need.map(|n| n.0.to_string());
+    let ink = Color::Rgb(20, 20, 30);
     for (k, l) in items {
-        spans.extend(key_chip(k, l));
+        let mut chip = key_chip(k, l);
+        if urgent.as_deref() == Some(*k) {
+            chip[0].style = Style::new().fg(ink).bg(WARN).add_modifier(Modifier::BOLD);
+            chip[1].style = Style::new().fg(WARN).add_modifier(Modifier::BOLD);
+        } else if !useful(k) {
+            chip[0].style = Style::new().fg(ink).bg(EMPTY);
+            chip[1].style = Style::new().fg(EMPTY);
+        }
+        spans.extend(chip);
     }
     f.render_widget(
         Paragraph::new(Line::from(spans)).alignment(Alignment::Center).block(
             Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(Style::new().fg(BORDER)),
         ),
-        rows[3],
+        rows[4],
     );
 }
 
