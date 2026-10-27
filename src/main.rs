@@ -10,7 +10,7 @@ use ratatui::{
     layout::{Alignment, Constraint, Layout},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
     DefaultTerminal, Frame,
 };
 
@@ -236,8 +236,48 @@ impl App {
     }
 }
 
-fn hearts(n: u8) -> String {
-    (0..MAX_HEARTS).map(|i| if i < n { '♥' } else { '♡' }).collect()
+const BORDER: Color = Color::Rgb(86, 90, 125);
+const DIM: Color = Color::Rgb(120, 124, 150);
+const TEXT: Color = Color::Rgb(220, 222, 240);
+const ACCENT: Color = Color::Rgb(255, 160, 190);
+const GOOD: Color = Color::Rgb(130, 210, 140);
+const WARN: Color = Color::Rgb(245, 200, 90);
+const BAD: Color = Color::Rgb(240, 95, 105);
+const EMPTY: Color = Color::Rgb(70, 72, 92);
+
+fn panel(title: &str) -> Block<'static> {
+    Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::new().fg(BORDER))
+        .title(Span::styled(format!(" {title} "), Style::new().fg(ACCENT).add_modifier(Modifier::BOLD)))
+}
+
+fn hearts(n: u8) -> Vec<Span<'static>> {
+    (0..MAX_HEARTS)
+        .map(|i| if i < n { Span::styled("♥ ", Style::new().fg(BAD)) } else { Span::styled("♥ ", Style::new().fg(EMPTY)) })
+        .collect()
+}
+
+fn bar(pct: u8, width: usize, color: Color) -> Vec<Span<'static>> {
+    let filled = (pct as usize * width).div_ceil(100).min(width);
+    vec![
+        Span::styled("█".repeat(filled), Style::new().fg(color)),
+        Span::styled("░".repeat(width - filled), Style::new().fg(EMPTY)),
+    ]
+}
+
+fn stat_row(label: &str, mut value: Vec<Span<'static>>) -> Line<'static> {
+    let mut spans = vec![Span::styled(format!("{label:<11}"), Style::new().fg(DIM))];
+    spans.append(&mut value);
+    Line::from(spans)
+}
+
+fn key_chip(key: &str, label: &str) -> Vec<Span<'static>> {
+    vec![
+        Span::styled(format!(" {key} "), Style::new().fg(Color::Rgb(20, 20, 30)).bg(ACCENT).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" {label}  "), Style::new().fg(TEXT)),
+    ]
 }
 
 fn draw(f: &mut Frame, app: &App) {
@@ -250,65 +290,111 @@ fn draw(f: &mut Frame, app: &App) {
     ])
     .split(f.area());
 
-    let title = format!(" {} - {} - age {} ", p.species, p.stage.label(), fmt_age(p.age));
-    f.render_widget(
-        Paragraph::new(Line::from(format!("mistakes: {}   weight: {}", p.mistakes, p.weight)))
-            .alignment(Alignment::Center)
-            .block(Block::default().borders(Borders::ALL).title(title)),
-        rows[0],
-    );
+    // Header
+    let mood_dot = if !p.alive() { ("●", DIM) } else if p.needs_attention() { ("●", BAD) } else { ("●", GOOD) };
+    let header = Line::from(vec![
+        Span::styled(format!("{} ", mood_dot.0), Style::new().fg(mood_dot.1)),
+        Span::styled(p.species.clone(), Style::new().fg(TEXT).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("  ·  {}  ·  age {}", p.stage.label(), fmt_age(p.age)), Style::new().fg(DIM)),
+    ]);
+    f.render_widget(Paragraph::new(header).block(panel("tamagotchi")), rows[0]);
 
-    let cols = Layout::horizontal([Constraint::Min(34), Constraint::Length(28)]).split(rows[1]);
+    let cols = Layout::horizontal([Constraint::Min(34), Constraint::Length(30)]).split(rows[1]);
 
+    // Room
+    let room_block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::new().fg(BORDER));
+    let inner = room_block.inner(cols[0]);
     let t = (app.started.elapsed().as_millis() / 350) as u32;
     let body: Vec<Line> = match &app.mode {
-        Mode::Game(g) => vec![
-            Line::from(""),
-            Line::from(format!("Higher or Lower!  round {}/{}  wins {}", g.round, GAME_ROUNDS, g.wins)),
-            Line::from(""),
-            Line::from(Span::styled(format!("[ {} ]", g.current), Style::new().add_modifier(Modifier::BOLD))),
-            Line::from(""),
-            Line::from(g.note.clone()),
-        ],
-        Mode::Normal => sprites::render(p, t, app.current_fx()),
+        Mode::Game(g) => {
+            let pad = (inner.height as usize).saturating_sub(7) / 2;
+            let mut v = vec![Line::from(""); pad];
+            v.extend([
+                Line::from(Span::styled("HIGHER  or  LOWER", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),
+                Line::from(Span::styled(format!("round {}/{}   wins {}", g.round, GAME_ROUNDS, g.wins), Style::new().fg(DIM))),
+                Line::from(""),
+                Line::from(Span::styled(format!("  {}  ", g.current), Style::new().fg(Color::Rgb(20, 20, 30)).bg(WARN).add_modifier(Modifier::BOLD))),
+                Line::from(""),
+                Line::from(Span::styled(g.note.clone(), Style::new().fg(TEXT))),
+            ]);
+            v
+        }
+        Mode::Normal => sprites::render(p, t, app.current_fx(), inner.width as usize, inner.height as usize),
     };
-    f.render_widget(
-        Paragraph::new(body).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL)),
-        cols[0],
-    );
+    f.render_widget(Paragraph::new(body).alignment(Alignment::Center).block(room_block), cols[0]);
 
+    // Stats
+    let discipline = bar(p.discipline, 10, if p.discipline >= 60 { GOOD } else { WARN });
     let mut stats = vec![
-        Line::from(format!("Hunger     {}", hearts(p.hunger))),
-        Line::from(format!("Happy      {}", hearts(p.happy))),
-        Line::from(format!("Discipline {}%", p.discipline)),
+        stat_row("Hunger", hearts(p.hunger)),
+        stat_row("Happy", hearts(p.happy)),
+        stat_row("Discipline", discipline),
+        stat_row("Weight", vec![Span::styled(format!("{}", p.weight), Style::new().fg(TEXT))]),
+        stat_row(
+            "Mistakes",
+            vec![Span::styled(
+                p.mistakes.to_string(),
+                Style::new().fg(if p.mistakes == 0 { GOOD } else if p.mistakes < 4 { WARN } else { BAD }),
+            )],
+        ),
         Line::from(""),
     ];
-    let mut flag = |text: &str, color: Color| stats.push(Line::from(Span::styled(text.to_string(), Style::new().fg(color))));
+    let mut chip = |text: &str, color: Color| stats.push(Line::from(Span::styled(format!("● {text}"), Style::new().fg(color))));
     if p.asleep {
-        flag("zzz sleeping", Color::Blue);
+        chip("sleeping", Color::Rgb(130, 150, 255));
     }
     if p.sick {
-        flag("sick - needs medicine", Color::Green);
+        chip("sick - give medicine", GOOD);
     }
     if p.disc_call.is_some() {
-        flag("naughty - scold it", Color::Red);
+        chip("naughty - scold it", BAD);
     }
     if p.poops > 0 {
-        flag("needs cleaning", Color::Yellow);
+        chip("needs cleaning", WARN);
     }
-    if p.needs_attention() {
-        flag("(!) needs attention", Color::Red);
+    if p.hunger == 0 && !p.asleep {
+        chip("starving!", BAD);
     }
-    f.render_widget(Paragraph::new(stats).block(Block::default().borders(Borders::ALL).title(" Stats ")), cols[1]);
+    if p.happy == 0 && !p.asleep {
+        chip("lonely", BAD);
+    }
+    stats.push(Line::from(""));
+    stats.push(Line::from(Span::styled("recent", Style::new().fg(DIM).add_modifier(Modifier::ITALIC))));
+    let room_left = (cols[1].height as usize).saturating_sub(2 + stats.len());
+    for e in app.log.iter().rev().take(room_left).rev() {
+        stats.push(Line::from(Span::styled(format!("· {e}"), Style::new().fg(DIM))));
+    }
+    f.render_widget(Paragraph::new(stats).wrap(Wrap { trim: true }).block(panel("status")), cols[1]);
 
-    f.render_widget(Paragraph::new(app.message.as_str()).block(Block::default().borders(Borders::ALL).title(" Message ")), rows[2]);
+    // Message
+    f.render_widget(
+        Paragraph::new(Line::from(vec![
+            Span::styled("▸ ", Style::new().fg(ACCENT)),
+            Span::styled(app.message.clone(), Style::new().fg(TEXT)),
+        ]))
+        .block(panel("message")),
+        rows[2],
+    );
 
-    let menu = match app.mode {
-        Mode::Game(_) => "[h/Up] higher  [l/Down] lower  [Esc] quit game",
-        Mode::Normal if p.stage == Stage::Dead => "[n] new egg  [q] quit",
-        Mode::Normal => "[f]eed [s]nack [p]lay [l]ight [m]edicine [c]lean [d]iscipline [q]uit",
+    // Menu
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let items: &[(&str, &str)] = match app.mode {
+        Mode::Game(_) => &[("h", "higher"), ("l", "lower"), ("esc", "quit game")],
+        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("q", "quit")],
+        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("q", "quit")],
     };
-    f.render_widget(Paragraph::new(menu).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL)), rows[3]);
+    for (k, l) in items {
+        spans.extend(key_chip(k, l));
+    }
+    f.render_widget(
+        Paragraph::new(Line::from(spans)).alignment(Alignment::Center).block(
+            Block::default().borders(Borders::ALL).border_type(BorderType::Rounded).border_style(Style::new().fg(BORDER)),
+        ),
+        rows[3],
+    );
 }
 
 fn run(terminal: &mut DefaultTerminal, app: &mut App) -> std::io::Result<()> {
@@ -356,7 +442,7 @@ fn gallery() {
     pets.push(dead);
     for p in &pets {
         println!("-- {} --", p.species);
-        for line in sprites::render(p, 0, None) {
+        for line in sprites::render(p, 0, None, 32, 10) {
             let mut out = String::new();
             for s in line.spans {
                 let (mut fg, mut bg) = (None, None);

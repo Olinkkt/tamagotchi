@@ -16,6 +16,7 @@ type C = (u8, u8, u8);
 
 const INK: C = (35, 25, 45);
 const WHITE: C = (245, 245, 255);
+const SHADOW: C = (1, 2, 3);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Fx {
@@ -360,7 +361,7 @@ fn shadow_radius(stage: Stage) -> f32 {
 
 /// Render the pet scene. `t` is the animation clock, `fx` an optional
 /// one-shot effect with its progress in 0..1.
-pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>) -> Vec<Line<'static>> {
+pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec<Line<'static>> {
     let egg_progress = p.stage_age as f32 / 30.0;
     let fx_kind = fx.map(|f| f.0);
     let fxp = fx.map(|f| f.1).unwrap_or(0.0);
@@ -401,7 +402,7 @@ pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>) -> Vec<Line<'static>> {
     }
 
     let mut scene = Canvas::new();
-    scene.ellipse(CX + dx as f32, 19.0, shadow_radius(p.stage), 1.0, (55, 55, 72));
+    scene.ellipse(CX + dx as f32, 19.0, shadow_radius(p.stage), 1.0, SHADOW);
     for i in 0..p.poops.min(3) as usize {
         draw_poop(&mut scene, [1, 5, 26][i], t);
     }
@@ -475,23 +476,59 @@ pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>) -> Vec<Line<'static>> {
         None => {}
     }
 
-    to_lines(&scene)
+    compose(&scene, w, h, p.asleep, t)
 }
 
-fn to_lines(c: &Canvas) -> Vec<Line<'static>> {
-    let rgb = |p: C| Color::Rgb(p.0, p.1, p.2);
-    (0..H / 2)
+fn wall(y: usize, ph: usize, night: bool) -> C {
+    let k = y as f32 / ph.max(1) as f32;
+    let (a, b) = if night { ((8, 10, 26), (22, 18, 44)) } else { ((34, 40, 74), (74, 58, 92)) };
+    mix(a, b, k)
+}
+
+fn floor(y: usize, floor_y: usize, ph: usize, night: bool) -> C {
+    let k = (y - floor_y) as f32 / (ph.saturating_sub(floor_y)).max(1) as f32;
+    let c = mix((122, 88, 66), (74, 52, 46), k);
+    if night { darken(c, 0.55) } else { c }
+}
+
+/// Place the pet canvas (scaled up to 3x when space allows) in a room that
+/// fills the whole `w` x `h` cell area: gradient wall, wooden floor, stars at night.
+fn compose(c: &Canvas, w: usize, h: usize, night: bool, t: u32) -> Vec<Line<'static>> {
+    let ph = h * 2;
+    let s = (w / W).min(ph / H).clamp(1, 3);
+    let ox = w.saturating_sub(W * s) / 2;
+    let oy = ph.saturating_sub(H * s) / 2;
+    let floor_y = oy + 18 * s;
+
+    let pix = |x: usize, y: usize| -> C {
+        let ground = y >= floor_y;
+        let bg = if ground {
+            if y < floor_y + s.max(1) { darken(floor(y, floor_y, ph, night), 0.35) } else { floor(y, floor_y, ph, night) }
+        } else {
+            let mut col = wall(y, ph, night);
+            if night {
+                let k = (x * 31 + y * 17) % 97;
+                if k == 0 && (t as usize + x) % 4 != 0 {
+                    col = (225, 225, 250);
+                }
+            }
+            col
+        };
+        if x >= ox && y >= oy && x < ox + W * s && y < oy + H * s {
+            if let Some(p) = c.get(((x - ox) / s) as i32, ((y - oy) / s) as i32) {
+                return if p == SHADOW { mix(bg, (0, 0, 0), 0.4) } else { p };
+            }
+        }
+        bg
+    };
+
+    (0..h)
         .map(|row| {
-            let spans: Vec<Span<'static>> = (0..W)
+            let spans: Vec<Span<'static>> = (0..w)
                 .map(|x| {
-                    let top = c.get(x as i32, row as i32 * 2);
-                    let bot = c.get(x as i32, row as i32 * 2 + 1);
-                    match (top, bot) {
-                        (None, None) => Span::raw(" "),
-                        (Some(t), None) => Span::styled("▀", Style::new().fg(rgb(t))),
-                        (None, Some(b)) => Span::styled("▄", Style::new().fg(rgb(b))),
-                        (Some(t), Some(b)) => Span::styled("▀", Style::new().fg(rgb(t)).bg(rgb(b))),
-                    }
+                    let (t, b) = (pix(x, row * 2), pix(x, row * 2 + 1));
+                    let rgb = |p: C| Color::Rgb(p.0, p.1, p.2);
+                    Span::styled("▀", Style::new().fg(rgb(t)).bg(rgb(b)))
                 })
                 .collect();
             Line::from(spans)
