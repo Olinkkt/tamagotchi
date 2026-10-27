@@ -1,0 +1,2 @@
+[alias]
+fast = "run --release -- --fast"

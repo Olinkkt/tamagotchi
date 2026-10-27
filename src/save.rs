@@ -18,8 +18,16 @@ fn dir() -> PathBuf {
     d
 }
 
+static TEST_SLOT: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Use a separate save file so fast-forward testing never touches the real pet.
+pub fn use_test_slot() {
+    TEST_SLOT.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
 fn save_path() -> PathBuf {
-    dir().join("save.json")
+    let test = TEST_SLOT.load(std::sync::atomic::Ordering::Relaxed);
+    dir().join(if test { "save-test.json" } else { "save.json" })
 }
 
 pub fn save(pet: &Pet) -> io::Result<()> {

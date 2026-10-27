@@ -49,7 +49,11 @@ struct App {
 
 impl App {
     fn new() -> Self {
-        let speed = std::env::var("TAMA_SPEED").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
+        let mut speed = std::env::var("TAMA_SPEED").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
+        if std::env::args().any(|a| a == "--fast") {
+            speed = 60.0;
+            save::use_test_slot();
+        }
         let (pet, away) = match save::load() {
             Some(x) => x,
             None => (Pet::new(save::now()), 0),
