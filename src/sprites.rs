@@ -308,10 +308,26 @@ fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
     Body { canvas: c, face, body, outline }
 }
 
-fn draw_face(c: &mut Canvas, f: &Face, mood: Mood, blink: bool, mouth_open: bool) {
+/// A spinning ring: the eyes of a pet whose memory is nearly full. `phase` moves the gap.
+fn draw_swirl(c: &mut Canvas, ex: i32, ey: i32, phase: usize) {
+    let ring = [(-1, 0), (0, 0), (1, 0), (1, 1), (1, 2), (0, 2), (-1, 2), (-1, 1)];
+    for (i, (dx, dy)) in ring.iter().enumerate() {
+        if i != phase % ring.len() {
+            c.set(ex + dx, ey + dy, INK);
+        }
+    }
+    c.set(ex, ey + 1, INK);
+}
+
+/// `dizzy` is `Some(animation clock)` while the machine's memory is nearly full.
+fn draw_face(c: &mut Canvas, f: &Face, mood: Mood, blink: bool, mouth_open: bool, dizzy: Option<u32>) {
     let ink = INK;
     let ey = f.eye_y;
     for (side, ex) in [(-1, MID - f.sep), (1, MID + f.sep)] {
+        if let Some(t) = dizzy {
+            draw_swirl(c, ex, ey, t as usize + if side < 0 { 0 } else { 4 });
+            continue;
+        }
         match (mood, blink) {
             (Mood::Sick | Mood::Dead, _) => {
                 c.pixels(&[(ex - 1, ey), (ex + 1, ey), (ex, ey + 1), (ex - 1, ey + 2), (ex + 1, ey + 2)], ink)
@@ -429,7 +445,7 @@ fn render_scene(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize, body
     let fx_kind = fx.map(|f| f.0);
     let fxp = fx.map(|f| f.1).unwrap_or(0.0);
 
-    let mood = if !p.alive() {
+    let mut mood = if !p.alive() {
         Mood::Dead
     } else if p.asleep {
         Mood::Sleep
@@ -443,12 +459,19 @@ fn render_scene(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize, body
         Mood::Neutral
     };
 
+    // The machine's state shows on a calm, awake pet: dizzy eyes for full memory, sleepy ones for a low battery.
+    let calm_awake = matches!(mood, Mood::Happy | Mood::Neutral | Mood::Sad) && p.stage != Stage::Egg;
+    let dizzy = (p.load.low_ram && calm_awake).then_some(t);
+    if p.load.low_battery && calm_awake {
+        mood = Mood::Sleep;
+    }
+
     let mouth_open = fx_kind == Some(Fx::Eat) && (0.3..0.9).contains(&fxp) && ((fxp * 8.0) as i32) % 2 == 0;
     let blink = !p.asleep && t % 9 == 8;
 
     let mut body = draw_body(p, egg_progress, t);
     if let Some(face) = &body.face {
-        draw_face(&mut body.canvas, face, mood, blink, mouth_open);
+        draw_face(&mut body.canvas, face, mood, blink, mouth_open, dizzy);
     }
 
     // Movement: idle wander and bob; shake when scolded, wobble when an egg is hatching.
@@ -472,6 +495,24 @@ fn render_scene(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize, body
     let flat = (fx_kind == Some(Fx::Evolve) && fxp < 0.6 && (fxp * 14.0) as i32 % 2 == 0).then_some(WHITE);
     scene.blit(&body.canvas, dx, dy, flat);
     let _ = (body.body, body.outline);
+
+    if p.load.busy_cpu && calm_awake {
+        // Sweat drops slide down the sides of the head.
+        if let Some(face) = &body.face {
+            let slide = (t % 3) as i32;
+            for (x, y) in [(MID - face.sep - 4, face.eye_y - 1 + slide), (MID + face.sep + 4, face.eye_y + slide)] {
+                scene.pixels(&[(x + dx, y + dy), (x + dx, y + dy + 1)], (110, 190, 255));
+                scene.set(x + dx, y + dy + 2, (180, 225, 255));
+            }
+        }
+    }
+    if p.load.low_battery && p.alive() && p.stage != Stage::Egg {
+        // A little battery with one red bar, top left.
+        scene.rect(1, 1, 7, 4, (200, 200, 215));
+        scene.rect(2, 2, 6, 3, (30, 30, 40));
+        scene.rect(2, 2, 2, 3, (235, 60, 60));
+        scene.rect(8, 2, 8, 3, (200, 200, 215));
+    }
 
     if p.stage == Stage::Dead {
         let gy = 1 + if body_motion { ((t / 2) % 3) as i32 } else { 0 };
@@ -594,4 +635,61 @@ fn compose(c: &Canvas, w: usize, h: usize, night: bool, t: u32) -> Vec<Line<'sta
             Line::from(spans)
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn adult() -> Pet {
+        let mut p = Pet::new(3);
+        p.stage = Stage::Adult;
+        p.species = "Mametchi".into();
+        p.hunger = 4;
+        p.happy = 4;
+        p
+    }
+
+    fn look(p: &Pet) -> Vec<Line<'static>> {
+        render_still(p, 0, None, 32, 10)
+    }
+
+    #[test]
+    fn a_busy_cpu_makes_the_pet_sweat() {
+        let calm = adult();
+        let mut busy = adult();
+        busy.load.busy_cpu = true;
+        assert_ne!(look(&calm), look(&busy));
+    }
+
+    #[test]
+    fn full_memory_gives_dizzy_eyes_that_spin() {
+        let calm = adult();
+        let mut dizzy = adult();
+        dizzy.load.low_ram = true;
+        assert_ne!(look(&calm), look(&dizzy));
+        assert_ne!(render_still(&dizzy, 0, None, 32, 10), render_still(&dizzy, 1, None, 32, 10), "the swirl should turn");
+    }
+
+    #[test]
+    fn a_low_battery_makes_the_pet_sleepy() {
+        let calm = adult();
+        let mut sleepy = adult();
+        sleepy.load.low_battery = true;
+        assert_ne!(look(&calm), look(&sleepy));
+    }
+
+    #[test]
+    fn eggs_and_the_dead_ignore_the_machine_state() {
+        let mut egg = Pet::new(3);
+        let calm_egg = look(&egg);
+        egg.load = crate::sysinfo::Strain { busy_cpu: true, low_ram: true, low_battery: true };
+        assert_eq!(calm_egg, look(&egg));
+        let mut dead = adult();
+        dead.stage = Stage::Dead;
+        let calm_dead = look(&dead);
+        dead.load.busy_cpu = true;
+        dead.load.low_ram = true;
+        assert_eq!(calm_dead, look(&dead));
+    }
 }

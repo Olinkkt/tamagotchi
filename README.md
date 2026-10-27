@@ -127,6 +127,20 @@ Saves, the graveyard and a lock file live in the user data folder (`~/.local/sha
 on Linux). Saves are written atomically, and an unreadable save is moved aside instead of
 being overwritten.
 
+## Your machine
+
+The pet reacts to how the computer is doing. This is only for show, with no effect on its needs:
+
+| Machine | Pet |
+|---|---|
+| CPU busy (1-minute load average at 80% of your cores or more) | sweat drops |
+| Memory nearly full (85% or more in use) | dizzy, spinning eyes |
+| Battery low (20% or less, and discharging) | sleepy eyes and a battery icon |
+
+The status panel and the status-bar tooltip say what is going on. This reads `/proc` and `/sys`,
+so it works on Linux; on other systems the pet just never notices. The thresholds are my
+guesses. Your own machine can be tried out with the dev panel (`u`, `r`, `b`).
+
 ## Shell hook
 
 Add this to `~/.zshrc` (zsh only for now) and your pet notices what you do in the terminal:
@@ -188,12 +202,13 @@ tama --dev        # separate test save; press ` for the dev panel
 ```
 
 The dev panel changes hunger/happy/discipline/weight/mistakes, adds poop, sickness or a naughty
-call, grows or kills the pet, skips time and sets the clock, and changes the speed.
+call, grows or kills the pet, skips time and sets the clock, changes the speed, and switches the
+machine reactions (CPU, RAM, battery) on and off.
 
 Shift+R (then `y`) throws the current pet away and starts a new egg.
 
 Source layout: `pet.rs` (the simulation), `sprites.rs` (pixel art), `main.rs` (UI and game
-loop), `games.rs` (mini-games), `cli.rs` (shell commands, status bar, notifications),
+loop), `games.rs` (mini-games), `sysinfo.rs` (machine load), `cli.rs` (shell commands, status bar, notifications),
 `save.rs` (files and lock), `config.rs`.
 
 Versions follow `MAJOR.MINOR.PATCH`; see `CLAUDE.md` for the rules.

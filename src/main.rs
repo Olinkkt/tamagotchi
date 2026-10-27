@@ -4,6 +4,7 @@ mod games;
 mod pet;
 mod save;
 mod sprites;
+mod sysinfo;
 
 use std::time::{Duration, Instant};
 
@@ -46,6 +47,8 @@ struct App {
     last: Instant,
     last_save: Instant,
     last_event_check: Instant,
+    last_sys_check: Instant,
+    dev_load_override: bool,
     was_calling: bool,
     started: Instant,
     fx: Option<(sprites::Fx, Instant)>,
@@ -101,6 +104,7 @@ impl App {
         if ticks > 0 {
             app.message = format!("Welcome back! You were away {}.", fmt_age(away));
         }
+        app.pet.load = sysinfo::read();
         app.apply_queued_events();
         app.drain_events();
         app.last_stage = app.pet.stage;
@@ -121,6 +125,8 @@ impl App {
             last: Instant::now(),
             last_save: Instant::now(),
             last_event_check: Instant::now(),
+            last_sys_check: Instant::now(),
+            dev_load_override: false,
             was_calling: false,
             started: Instant::now(),
             fx: None,
@@ -211,6 +217,10 @@ impl App {
         if self.last_event_check.elapsed() >= Duration::from_secs(2) {
             self.last_event_check = Instant::now();
             self.apply_queued_events();
+        }
+        if !self.dev_load_override && self.last_sys_check.elapsed() >= Duration::from_secs(5) {
+            self.last_sys_check = Instant::now();
+            self.pet.load = sysinfo::read();
         }
         self.drain_events();
         if self.pet.stage != self.last_stage {
@@ -390,6 +400,15 @@ impl App {
             'k' => {
                 p.dev_kill();
                 "killed".into()
+            }
+            'u' | 'r' | 'b' => {
+                match c {
+                    'u' => p.load.busy_cpu = !p.load.busy_cpu,
+                    'r' => p.load.low_ram = !p.load.low_ram,
+                    _ => p.load.low_battery = !p.load.low_battery,
+                }
+                self.dev_load_override = true;
+                format!("cpu {}  ram {}  battery {} (auto-detect off)", p.load.busy_cpu, p.load.low_ram, p.load.low_battery)
             }
             't' | 'T' => {
                 let secs = if c == 'T' { 8 * 3600 } else { 3600 };
@@ -617,6 +636,15 @@ fn draw(f: &mut Frame, app: &App) {
     if p.overweight() {
         chip("overweight - play games", WARN);
     }
+    if p.load.busy_cpu {
+        chip("sweating - the CPU is busy", Color::Rgb(110, 190, 255));
+    }
+    if p.load.low_ram {
+        chip("dizzy - memory is nearly full", Color::Rgb(190, 150, 255));
+    }
+    if p.load.low_battery {
+        chip("sleepy - the battery is low", Color::Rgb(130, 150, 255));
+    }
     if p.hunger == 0 && !p.asleep {
         chip("starving!", BAD);
     }
@@ -635,6 +663,7 @@ fn draw(f: &mut Frame, app: &App) {
             "p poop   s sick".into(),
             "n naughty  g grow".into(),
             "k kill".into(),
+            "u cpu  r ram  b battery".into(),
             "t/T skip 1h / 8h".into(),
             "z 22:00  Z 12:00".into(),
             "f speed  ` close".into(),
@@ -942,6 +971,15 @@ mod tests {
         let app = app_with(Stage::Adult, |_| {});
         let screen = render(&app, 140, 40);
         assert!(screen[38].contains("medicine") && screen[38].contains("graveyard"), "{}", screen[38]);
+    }
+
+    #[test]
+    fn the_status_panel_names_what_the_machine_is_doing_to_the_pet() {
+        let app = app_with(Stage::Adult, |p| p.load = sysinfo::Strain { busy_cpu: true, low_ram: true, low_battery: true });
+        let screen = render(&app, 140, 40).join("\n");
+        assert!(screen.contains("sweating") && screen.contains("dizzy") && screen.contains("sleepy"), "{screen}");
+        let calm = render(&app_with(Stage::Adult, |_| {}), 140, 40).join("\n");
+        assert!(!calm.contains("sweating") && !calm.contains("dizzy"));
     }
 
     #[test]
