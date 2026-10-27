@@ -22,7 +22,7 @@ pub struct Config {
     pub naughty_odds: u64,
     /// An overweight pet is this many times more likely to fall sick.
     pub overweight_sick_factor: u64,
-    /// Wiggle ears, wings, tuft, leaves and tail. Whole-body bobbing is unaffected.
+    /// Show (and wiggle) the ears, wings, tuft, leaves and tail. When off those parts are not drawn at all.
     pub animate_parts: bool,
     /// Seconds a need can go unanswered before it counts as a care mistake.
     pub mistake_after_secs: u64,

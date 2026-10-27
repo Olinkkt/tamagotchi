@@ -157,16 +157,16 @@ fn heart(c: &mut Canvas, x: i32, y: i32, col: C) {
 
 fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
     let mut c = Canvas::new();
-    // Optional part animation (ears, wings, tuft, leaves, tail); off unless `animate_parts` is set.
+    // Optional parts (ears, wings, tuft, leaves, tail): drawn, and animated, only when `animate_parts` is set.
     let anim = p.cfg.animate_parts;
     let wig = ((t / 2) % 2) as f32;
     let arm = (t % 2) as f32;
     let wigi = (t / 2 % 2) as i32;
-    let (wl, wr) = if anim { (wig, 1.0 - wig) } else { (0.0, 0.0) };
-    let flap = if anim { arm } else { 0.0 };
-    let wag = if anim { wig } else { 0.0 };
-    let sway = if anim { wigi } else { 0 };
-    let (leaf_l, leaf_r) = if anim { (4.5 + wig, 5.5 - wig) } else { (5.0, 5.0) };
+    let (wl, wr) = (wig, 1.0 - wig);
+    let flap = arm;
+    let wag = wig;
+    let sway = wigi;
+    let (leaf_l, leaf_r) = (4.5 + wig, 5.5 - wig);
     let tint = |col: C| if p.sick { mix(col, (120, 190, 90), 0.45) } else { col };
     let mut face = None;
     let body;
@@ -218,8 +218,10 @@ fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
         (Stage::Teen, _) => {
             body = tint((115, 175, 255));
             let acc = darken(body, 0.2);
-            c.ellipse(CX - 5.0, 5.5 + wl, 1.6, 2.8, acc);
-            c.ellipse(CX + 5.0, 5.5 + wr, 1.6, 2.8, acc);
+            if anim {
+                c.ellipse(CX - 5.0, 5.5 + wl, 1.6, 2.8, acc);
+                c.ellipse(CX + 5.0, 5.5 + wr, 1.6, 2.8, acc);
+            }
             c.ellipse(CX, 11.5, 6.5, 6.5, body);
             c.ellipse(CX, 14.5, 4.0, 3.5, mix(body, WHITE, 0.5));
             c.ellipse(CX - 3.5, 17.0, 2.4, 1.0, acc);
@@ -229,8 +231,10 @@ fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
         (Stage::Adult, "Mametchi") => {
             body = tint((135, 215, 135));
             let acc = darken(body, 0.2);
-            c.ellipse(CX - 3.5, 3.5 + wl, 1.6, 2.5, acc);
-            c.ellipse(CX + 3.5, 3.5 + wr, 1.6, 2.5, acc);
+            if anim {
+                c.ellipse(CX - 3.5, 3.5 + wl, 1.6, 2.5, acc);
+                c.ellipse(CX + 3.5, 3.5 + wr, 1.6, 2.5, acc);
+            }
             c.ellipse(CX, 10.5, 6.0, 7.5, body);
             c.ellipse(CX - 6.5, 12.0, 1.3, 2.2, acc);
             c.ellipse(CX + 6.5, 12.0, 1.3, 2.2, acc);
@@ -244,8 +248,10 @@ fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
             let orange = tint((255, 140, 50));
             c.pixels(&[(15, 4), (15, 3), (16, 3), (14, 3)], orange);
             c.ellipse(CX, 11.5, 7.5, 6.5, body);
-            c.ellipse(CX - 7.5, 12.0 - flap, 1.5, 2.5, darken(body, 0.15));
-            c.ellipse(CX + 7.5, 12.0 - flap, 1.5, 2.5, darken(body, 0.15));
+            if anim {
+                c.ellipse(CX - 7.5, 12.0 - flap, 1.5, 2.5, darken(body, 0.15));
+                c.ellipse(CX + 7.5, 12.0 - flap, 1.5, 2.5, darken(body, 0.15));
+            }
             c.ellipse(CX, 11.5, 2.6, 1.6, orange);
             c.ellipse(CX - 3.5, 17.0, 2.2, 1.0, orange);
             c.ellipse(CX + 3.5, 17.0, 2.2, 1.0, orange);
@@ -254,7 +260,9 @@ fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
         (Stage::Adult, "Tarakotchi") => {
             body = tint((255, 155, 75));
             let acc = darken(body, 0.25);
-            c.pixels(&[(15 + sway, 3), (15 + sway, 2), (16 + sway, 2), (14 + sway, 2), (13 + sway, 3), (17 + sway, 3)], acc);
+            if anim {
+                c.pixels(&[(15 + sway, 3), (15 + sway, 2), (16 + sway, 2), (14 + sway, 2), (13 + sway, 3), (17 + sway, 3)], acc);
+            }
             c.ellipse(CX, 11.0, 7.0, 7.0, body);
             c.ellipse(CX, 14.0, 3.0, 1.5, (255, 140, 160));
             c.pixels(&[(10, 9), (11, 10), (20, 9), (19, 10), (9, 12), (21, 12)], acc);
@@ -265,9 +273,11 @@ fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
         (Stage::Adult, "Ichigotchi") => {
             body = tint((240, 85, 95));
             let green = tint((90, 190, 90));
-            c.rect(15, 2, 15, 4, green);
-            c.ellipse(CX - 3.0, leaf_l, 2.6, 1.3, green);
-            c.ellipse(CX + 3.0, leaf_r, 2.6, 1.3, green);
+            if anim {
+                c.rect(15, 2, 15, 4, green);
+                c.ellipse(CX - 3.0, leaf_l, 2.6, 1.3, green);
+                c.ellipse(CX + 3.0, leaf_r, 2.6, 1.3, green);
+            }
             c.ellipse(CX, 11.5, 6.5, 6.5, body);
             c.pixels(&[(11, 15), (19, 15), (10, 11), (20, 11), (15, 16), (12, 12), (18, 12)], (255, 225, 110));
             c.ellipse(CX - 3.0, 17.0, 2.2, 1.0, darken(body, 0.25));
@@ -278,8 +288,10 @@ fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
             body = tint((85, 205, 205));
             let acc = darken(body, 0.2);
             c.pixels(&[(15, 3), (15, 2), (14, 2), (13, 1)], acc);
-            c.ellipse(CX + 6.5, 15.0 - wag, 2.2, 2.2, body);
-            c.ellipse(CX + 8.5, 12.5 - wag * 1.5, 1.2, 1.4, body);
+            if anim {
+                c.ellipse(CX + 6.5, 15.0 - wag, 2.2, 2.2, body);
+                c.ellipse(CX + 8.5, 12.5 - wag * 1.5, 1.2, 1.4, body);
+            }
             c.ellipse(CX, 11.0, 5.0, 7.0, body);
             c.ellipse(CX, 13.5, 3.0, 4.0, mix(body, WHITE, 0.5));
             face = Some(Face { eye_y: 8, sep: 2, mouth_y: 12 });
@@ -403,6 +415,16 @@ fn shadow_radius(stage: Stage) -> f32 {
 /// Render the pet scene. `t` is the animation clock, `fx` an optional
 /// one-shot effect with its progress in 0..1.
 pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec<Line<'static>> {
+    render_scene(p, t, fx, w, h, true)
+}
+
+/// Like `render`, but the whole sprite stays put (no wander, bob or egg wobble),
+/// so only the part animations can differ between two frames. Used by `--gallery`.
+pub fn render_still(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec<Line<'static>> {
+    render_scene(p, t, fx, w, h, false)
+}
+
+fn render_scene(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize, body_motion: bool) -> Vec<Line<'static>> {
     let egg_progress = p.stage_age as f32 / 30.0;
     let fx_kind = fx.map(|f| f.0);
     let fxp = fx.map(|f| f.1).unwrap_or(0.0);
@@ -431,13 +453,13 @@ pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec
 
     // Movement: idle wander and bob; shake when scolded, wobble when an egg is hatching.
     let wander = [0, 1, 2, 2, 1, 0, -1, -2, -2, -1];
-    let (mut dx, dy) = match p.stage {
+    let (mut dx, dy) = if !body_motion { (0, 0) } else { match p.stage {
         Stage::Dead => (0, 0),
         Stage::Egg => (if egg_progress > 0.35 { [0, 1, 0, -1][(t % 4) as usize] } else { 0 }, 0),
         _ if p.asleep => (0, ((t / 3) % 2) as i32),
         _ if p.sick || p.hunger == 0 => (0, (t % 2) as i32),
         _ => (wander[((t / 3) % 10) as usize], (t % 2) as i32),
-    };
+    } };
     if fx_kind == Some(Fx::Scold) {
         dx = if (fxp * 20.0) as i32 % 2 == 0 { 1 } else { -1 };
     }
@@ -452,7 +474,7 @@ pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec
     let _ = (body.body, body.outline);
 
     if p.stage == Stage::Dead {
-        let gy = 1 + ((t / 2) % 3) as i32;
+        let gy = 1 + if body_motion { ((t / 2) % 3) as i32 } else { 0 };
         scene.ellipse(CX, gy as f32 + 3.0, 3.0, 3.0, (235, 235, 248));
         scene.rect(MID - 3, gy + 3, MID + 3, gy + 6, (235, 235, 248));
         scene.pixels(&[(MID - 3, gy + 7), (MID - 1, gy + 7), (MID + 1, gy + 7), (MID + 3, gy + 7)], (235, 235, 248));

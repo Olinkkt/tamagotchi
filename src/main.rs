@@ -659,8 +659,8 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> std::io::Result<()> {
     Ok(())
 }
 
-/// `--gallery`: print every character as two animation frames side by side,
-/// using your real config, so the effect of `tama --animate` is visible.
+/// `--gallery`: print every character once, following the `animate_parts` setting
+/// (the ears, wings, tail etc. only appear when it is on).
 fn gallery() {
     let cases: [(Stage, &str); 10] = [
         (Stage::Egg, "Egg"),
@@ -675,7 +675,7 @@ fn gallery() {
         (Stage::Adult, "Nyorotchi"),
     ];
     let (cfg, _) = Config::load();
-    println!("Part animations: {}  (change with `tama --animate on|off`)\n", if cfg.animate_parts { "on" } else { "off" });
+    println!("Animated parts (ears, wings, tuft, leaves, tail): {}  (change with `tama --animate on|off`)\n", if cfg.animate_parts { "on" } else { "off" });
     let mut pets: Vec<Pet> = cases
         .iter()
         .map(|(stage, name)| {
@@ -689,6 +689,7 @@ fn gallery() {
         .collect();
     let mut dead = Pet::new(1);
     dead.stage = Stage::Dead;
+    dead.species = "Departed".into();
     pets.push(dead);
     let ansi = |spans: &[Span]| -> String {
         let mut out = String::new();
@@ -707,11 +708,8 @@ fn gallery() {
     for p in &mut pets {
         p.set_env(cfg.clone(), 0);
         println!("-- {} --", p.species);
-        println!("{:<34}{}", "frame A", "frame B");
-        let a = sprites::render(p, 0, None, 32, 10);
-        let b = sprites::render(p, 3, None, 32, 10);
-        for (la, lb) in a.iter().zip(&b) {
-            println!("{}  {}", ansi(&la.spans), ansi(&lb.spans));
+        for line in sprites::render_still(p, 0, None, 32, 10) {
+            println!("{}", ansi(&line.spans));
         }
     }
 }
@@ -756,7 +754,7 @@ fn main() -> std::io::Result<()> {
     if let Some(i) = args.iter().position(|a| a == "--animate") {
         match args.get(i + 1).map(String::as_str) {
             Some(v @ ("on" | "off")) => match Config::set_animate_parts(v == "on") {
-                Ok(()) => println!("Part animations (ears, wings, tail...) are now {v}. Restart tama to see it."),
+                Ok(()) => println!("Animated parts (ears, wings, tuft, leaves, tail) are now {v}. Restart tama to see it."),
                 Err(e) => {
                     eprintln!("Could not change the setting: {e}");
                     std::process::exit(1);
@@ -764,7 +762,7 @@ fn main() -> std::io::Result<()> {
             },
             _ => {
                 let state = if Config::load().0.animate_parts { "on" } else { "off" };
-                println!("Part animations are {state}. Use `tama --animate on` or `tama --animate off`.");
+                println!("Animated parts (ears, wings, tuft, leaves, tail) are {state}. Use `tama --animate on` or `tama --animate off`.");
             }
         }
         return Ok(());
@@ -774,7 +772,7 @@ fn main() -> std::io::Result<()> {
         return Ok(());
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama --update   reinstall the newest version\n  tama --animate on|off   toggle ear/wing/tail animations\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
+        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
         return Ok(());
     }
     if args.iter().any(|a| a == "--gallery") {
