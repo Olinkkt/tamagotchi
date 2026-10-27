@@ -659,7 +659,8 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> std::io::Result<()> {
     Ok(())
 }
 
-/// `--gallery`: print every character, plain, to stdout (handy for art tweaks).
+/// `--gallery`: print every character as two animation frames side by side,
+/// using your real config, so the effect of `tama --animate` is visible.
 fn gallery() {
     let cases: [(Stage, &str); 10] = [
         (Stage::Egg, "Egg"),
@@ -673,6 +674,8 @@ fn gallery() {
         (Stage::Adult, "Ichigotchi"),
         (Stage::Adult, "Nyorotchi"),
     ];
+    let (cfg, _) = Config::load();
+    println!("Part animations: {}  (change with `tama --animate on|off`)\n", if cfg.animate_parts { "on" } else { "off" });
     let mut pets: Vec<Pet> = cases
         .iter()
         .map(|(stage, name)| {
@@ -687,20 +690,28 @@ fn gallery() {
     let mut dead = Pet::new(1);
     dead.stage = Stage::Dead;
     pets.push(dead);
-    for p in &pets {
-        println!("-- {} --", p.species);
-        for line in sprites::render(p, 0, None, 32, 10) {
-            let mut out = String::new();
-            for s in line.spans {
-                let (mut fg, mut bg) = (None, None);
-                if let Some(Color::Rgb(r, g, b)) = s.style.fg { fg = Some((r, g, b)); }
-                if let Some(Color::Rgb(r, g, b)) = s.style.bg { bg = Some((r, g, b)); }
-                if let Some((r, g, b)) = fg { out.push_str(&format!("\x1b[38;2;{r};{g};{b}m")); }
-                if let Some((r, g, b)) = bg { out.push_str(&format!("\x1b[48;2;{r};{g};{b}m")); }
-                out.push_str(&s.content);
-                out.push_str("\x1b[0m");
+    let ansi = |spans: &[Span]| -> String {
+        let mut out = String::new();
+        for s in spans {
+            if let Some(Color::Rgb(r, g, b)) = s.style.fg {
+                out.push_str(&format!("\x1b[38;2;{r};{g};{b}m"));
             }
-            println!("{out}");
+            if let Some(Color::Rgb(r, g, b)) = s.style.bg {
+                out.push_str(&format!("\x1b[48;2;{r};{g};{b}m"));
+            }
+            out.push_str(&s.content);
+            out.push_str("\x1b[0m");
+        }
+        out
+    };
+    for p in &mut pets {
+        p.set_env(cfg.clone(), 0);
+        println!("-- {} --", p.species);
+        println!("{:<34}{}", "frame A", "frame B");
+        let a = sprites::render(p, 0, None, 32, 10);
+        let b = sprites::render(p, 3, None, 32, 10);
+        for (la, lb) in a.iter().zip(&b) {
+            println!("{}  {}", ansi(&la.spans), ansi(&lb.spans));
         }
     }
 }
