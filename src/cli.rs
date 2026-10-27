@@ -164,15 +164,18 @@ fn act(cmd: &str) -> i32 {
     0
 }
 
+/// The arguments for `osascript` that show a notification. Kept free of platform checks
+/// so the quoting can be tested on any system.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn osascript_args(title: &str, body: &str) -> Vec<String> {
+    let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
+    vec!["-e".to_string(), format!("display notification \"{}\" with title \"{}\"", esc(body), esc(title))]
+}
+
 /// Show a desktop notification. The error says what is missing.
 fn notify(title: &str, body: &str) -> Result<(), String> {
     #[cfg(target_os = "macos")]
-    let result = {
-        let esc = |s: &str| s.replace('\\', "\\\\").replace('"', "\\\"");
-        Command::new("osascript")
-            .args(["-e", &format!("display notification \"{}\" with title \"{}\"", esc(body), esc(title))])
-            .status()
-    };
+    let result = Command::new("osascript").args(osascript_args(title, body)).status();
     #[cfg(not(target_os = "macos"))]
     let result = Command::new("notify-send").args(["-a", "tama", title, body]).status();
     match result {
@@ -272,6 +275,65 @@ mod tests {
         assert!(should_notify(Some(('f', RENOTIFY_AFTER)), 'f'));
         assert!(should_notify(Some(('f', Duration::from_secs(5))), 'm'));
         assert!(!should_notify(Some(('n', RENOTIFY_AFTER * 10)), 'n'));
+    }
+
+    fn saved_adult(hunger: u8) -> Pet {
+        let mut p = Pet::new(save::now());
+        p.stage = Stage::Adult;
+        p.species = "Mametchi".into();
+        p.hunger = hunger;
+        p.happy = 4;
+        p.clock = save::now() as i64;
+        p
+    }
+
+    #[test]
+    fn care_commands_change_the_pet_and_save_it() {
+        save::with_temp_dir(|| {
+            save::save(&saved_adult(1)).unwrap();
+            assert_eq!(act("feed"), 0);
+            let p = load_caught_up().unwrap();
+            assert!(p.hunger >= 2, "feeding should have been saved, hunger is {}", p.hunger);
+        });
+    }
+
+    #[test]
+    fn care_commands_refuse_while_the_game_is_open() {
+        save::with_temp_dir(|| {
+            save::save(&saved_adult(1)).unwrap();
+            save::heartbeat();
+            assert_eq!(act("feed"), 1);
+            save::release();
+            assert_eq!(load_caught_up().unwrap().hunger, 1, "nothing should have been changed");
+        });
+    }
+
+    #[test]
+    fn commands_without_a_save_say_so() {
+        save::with_temp_dir(|| {
+            assert_eq!(act("feed"), 1);
+            assert_eq!(status(false), 1);
+            let v: serde_json::Value = serde_json::from_str(&waybar_json(None)).unwrap();
+            assert_eq!(v["class"], "none");
+        });
+    }
+
+    #[test]
+    fn a_pet_that_died_while_away_is_buried_by_a_care_command() {
+        save::with_temp_dir(|| {
+            let mut p = saved_adult(2);
+            p.dev_kill();
+            save::save(&p).unwrap();
+            assert_eq!(act("feed"), 0);
+            assert_eq!(save::graveyard().len(), 1);
+        });
+    }
+
+    #[test]
+    fn osascript_quoting_escapes_quotes_and_backslashes() {
+        let args = osascript_args("a\"b", "c\\d");
+        assert_eq!(args[0], "-e");
+        assert_eq!(args[1], "display notification \"c\\\\d\" with title \"a\\\"b\"");
     }
 
     #[test]

@@ -62,6 +62,9 @@ impl Default for Config {
 }
 
 fn path() -> Option<PathBuf> {
+    if let Some(d) = crate::save::dir_override() {
+        return Some(d.join("config.json"));
+    }
     dirs::config_dir().map(|d| d.join("tamagotchi").join("config.json"))
 }
 
@@ -102,5 +105,55 @@ impl Config {
         }
         let json = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
         fs::write(&p, json).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::save::with_temp_dir;
+
+    #[test]
+    fn missing_fields_fall_back_to_defaults() {
+        let c: Config = serde_json::from_str(r#"{"sleep_start_hour": 20}"#).unwrap();
+        assert_eq!(c.sleep_start_hour, 20);
+        assert_eq!(c.hunger_secs_baby, Config::default().hunger_secs_baby);
+    }
+
+    #[test]
+    fn first_run_writes_defaults_and_a_broken_file_warns() {
+        with_temp_dir(|| {
+            let (c, warning) = Config::load();
+            assert!(warning.is_none());
+            assert_eq!(c.sleep_start_hour, Config::default().sleep_start_hour);
+            assert!(path().unwrap().exists(), "defaults should be written for the user to edit");
+
+            fs::write(path().unwrap(), "{nope").unwrap();
+            let (c, warning) = Config::load();
+            assert!(warning.is_some());
+            assert_eq!(c.sleep_start_hour, Config::default().sleep_start_hour);
+        });
+    }
+
+    #[test]
+    fn toggling_animate_parts_keeps_the_users_other_edits() {
+        with_temp_dir(|| {
+            fs::write(path().unwrap(), r#"{"sleep_start_hour": 21}"#).unwrap();
+            Config::set_animate_parts(true).unwrap();
+            let (c, _) = Config::load();
+            assert!(c.animate_parts);
+            assert_eq!(c.sleep_start_hour, 21);
+            Config::set_animate_parts(false).unwrap();
+            assert!(!Config::load().0.animate_parts);
+        });
+    }
+
+    #[test]
+    fn toggling_refuses_to_overwrite_a_broken_file() {
+        with_temp_dir(|| {
+            fs::write(path().unwrap(), "{nope").unwrap();
+            assert!(Config::set_animate_parts(true).is_err());
+            assert_eq!(fs::read_to_string(path().unwrap()).unwrap(), "{nope");
+        });
     }
 }

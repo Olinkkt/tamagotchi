@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
     path::PathBuf,
-    sync::atomic::{AtomicBool, Ordering},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -22,7 +25,18 @@ pub fn tz_offset() -> i64 {
     chrono::Local::now().offset().local_minus_utc() as i64
 }
 
+/// Lets tests (and nothing else) point every file at a temporary directory.
+static DATA_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// The override directory, if one is set. `config.rs` follows it too, so tests never touch real files.
+pub(crate) fn dir_override() -> Option<PathBuf> {
+    DATA_DIR.lock().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
 fn dir() -> PathBuf {
+    if let Some(d) = dir_override() {
+        return d;
+    }
     let mut d = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
     d.push("tamagotchi");
     d
@@ -125,4 +139,107 @@ pub fn bury(pet: &Pet) -> io::Result<()> {
 pub fn graveyard() -> Vec<String> {
     let text = fs::read_to_string(graveyard_path()).unwrap_or_default();
     text.lines().rev().map(str::to_owned).collect()
+}
+
+/// Run `f` with every save, lock, graveyard and config file redirected to a fresh temporary
+/// directory. Tests that touch files go through here, one at a time.
+#[cfg(test)]
+pub(crate) fn with_temp_dir<R>(f: impl FnOnce() -> R) -> R {
+    static GATE: Mutex<()> = Mutex::new(());
+    static COUNTER: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+    let _gate = GATE.lock().unwrap_or_else(|e| e.into_inner());
+    let d = std::env::temp_dir().join(format!(
+        "tama-test-{}-{}",
+        std::process::id(),
+        COUNTER.fetch_add(1, Ordering::Relaxed)
+    ));
+    let _ = fs::remove_dir_all(&d);
+    fs::create_dir_all(&d).unwrap();
+    *DATA_DIR.lock().unwrap_or_else(|e| e.into_inner()) = Some(d.clone());
+    TEST_SLOT.store(false, Ordering::Relaxed);
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
+    *DATA_DIR.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    let _ = fs::remove_dir_all(&d);
+    match result {
+        Ok(v) => v,
+        Err(e) => std::panic::resume_unwind(e),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pet::Stage;
+
+    #[test]
+    fn save_round_trips_and_leaves_no_temp_file() {
+        with_temp_dir(|| {
+            let mut p = Pet::new(1);
+            p.stage = Stage::Adult;
+            p.species = "Mametchi".into();
+            p.age = 1234;
+            save(&p).unwrap();
+            assert!(!dir().join("save.json.tmp").exists());
+            match load() {
+                Loaded::Pet(q, away) => {
+                    assert_eq!(q.species, "Mametchi");
+                    assert_eq!(q.age, 1234);
+                    assert!(away < 5);
+                }
+                _ => panic!("expected the saved pet"),
+            }
+        });
+    }
+
+    #[test]
+    fn an_unreadable_save_is_moved_aside_not_overwritten() {
+        with_temp_dir(|| {
+            fs::write(save_path(), "not json at all").unwrap();
+            match load() {
+                Loaded::Corrupt(aside) => assert!(aside.exists()),
+                _ => panic!("expected the corrupt-save path"),
+            }
+            assert!(matches!(load(), Loaded::None));
+        });
+    }
+
+    #[test]
+    fn the_test_slot_uses_separate_files() {
+        with_temp_dir(|| {
+            save(&Pet::new(1)).unwrap();
+            use_test_slot();
+            assert!(matches!(load(), Loaded::None), "the test slot must not see the real save");
+            save(&Pet::new(2)).unwrap();
+            assert!(dir().join("save-test.json").exists());
+            assert!(dir().join("save.json").exists());
+        });
+    }
+
+    #[test]
+    fn the_lock_tracks_whether_a_game_is_running() {
+        with_temp_dir(|| {
+            assert!(!game_running());
+            heartbeat();
+            assert!(game_running());
+            release();
+            assert!(!game_running());
+        });
+    }
+
+    #[test]
+    fn the_graveyard_lists_newest_first() {
+        with_temp_dir(|| {
+            let mut p = Pet::new(1);
+            p.species = "Marutchi".into();
+            p.cause_of_death = Some("starvation".into());
+            bury(&p).unwrap();
+            p.species = "Mametchi".into();
+            p.cause_of_death = Some("old age".into());
+            bury(&p).unwrap();
+            let g = graveyard();
+            assert_eq!(g.len(), 2);
+            assert!(g[0].contains("Mametchi") && g[0].contains("old age"));
+            assert!(g[1].contains("Marutchi") && g[1].contains("starvation"));
+        });
+    }
 }

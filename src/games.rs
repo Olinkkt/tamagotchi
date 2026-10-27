@@ -448,3 +448,132 @@ impl Pong {
         out
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pet() -> Pet {
+        Pet::new(12345)
+    }
+
+    #[test]
+    fn higher_lower_finishes_on_the_fifth_guess() {
+        let mut p = pet();
+        let mut g = Game::new(1, &mut p);
+        for guess in 1..=5 {
+            let out = g.key(KeyCode::Char('h'), &mut p);
+            if guess < 5 {
+                assert!(matches!(out, Outcome::Continue), "guess {guess} should not end the game");
+            } else {
+                match out {
+                    Outcome::Done { wins, rounds } => {
+                        assert_eq!(rounds, 5);
+                        assert!(wins <= 5);
+                    }
+                    _ => panic!("the fifth guess should end the game"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn escape_quits_every_game() {
+        for kind in 1..=4 {
+            let mut p = pet();
+            let mut g = Game::new(kind, &mut p);
+            assert!(matches!(g.key(KeyCode::Esc, &mut p), Outcome::Quit), "game {kind}");
+        }
+    }
+
+    #[test]
+    fn reaction_pressing_too_early_loses_the_round() {
+        let mut p = pet();
+        let mut r = Reaction::new(&mut p);
+        r.key(KeyCode::Char(' '));
+        assert_eq!(r.note, "Too early!");
+        assert_eq!(r.wins, 0);
+    }
+
+    #[test]
+    fn reaction_a_quick_press_after_go_wins() {
+        let mut p = pet();
+        let mut r = Reaction::new(&mut p);
+        r.phase = RPhase::Go(Instant::now());
+        r.key(KeyCode::Char(' '));
+        assert_eq!(r.wins, 1);
+    }
+
+    #[test]
+    fn reaction_ends_after_three_rounds() {
+        let mut p = pet();
+        let mut r = Reaction::new(&mut p);
+        for round in 1..=REACTION_ROUNDS {
+            r.key(KeyCode::Char(' '));
+            r.phase = RPhase::Pause(Instant::now() - Duration::from_secs(1));
+            let out = r.tick(&mut p);
+            if round < REACTION_ROUNDS {
+                assert!(matches!(out, Outcome::Continue));
+            } else {
+                assert!(matches!(out, Outcome::Done { wins: 0, rounds: 3 }));
+            }
+        }
+    }
+
+    #[test]
+    fn memory_repeating_the_pattern_wins_the_round_and_a_wrong_key_loses_it() {
+        let mut p = pet();
+        let mut m = Memory::new(&mut p);
+        m.phase = MPhase::Input(0);
+        for n in m.seq.clone() {
+            m.key(KeyCode::Char((b'0' + n) as char));
+        }
+        assert_eq!(m.wins, 1);
+        assert_eq!(m.note, "Correct!");
+
+        let mut m = Memory::new(&mut p);
+        m.phase = MPhase::Input(0);
+        let wrong = (m.seq[0] % 4) + 1;
+        m.key(KeyCode::Char((b'0' + wrong) as char));
+        assert!(m.note.starts_with("Wrong"));
+        assert_eq!(m.wins, 0);
+    }
+
+    #[test]
+    fn memory_ignores_keys_while_the_pattern_is_showing() {
+        let mut p = pet();
+        let mut m = Memory::new(&mut p);
+        m.key(KeyCode::Char('1'));
+        assert_eq!(m.wins, 0);
+        assert!(matches!(m.phase, MPhase::Show { .. }));
+    }
+
+    #[test]
+    fn pong_always_ends_and_never_reports_more_than_the_goal() {
+        let mut p = pet();
+        let mut pong = Pong::new(&mut p);
+        for _ in 0..5000 {
+            pong.last = Instant::now() - Duration::from_millis(500);
+            if let Outcome::Done { wins, rounds } = pong.tick() {
+                assert_eq!(rounds, PONG_GOAL);
+                assert!(wins <= PONG_GOAL);
+                return;
+            }
+        }
+        panic!("pong never ended");
+    }
+
+    #[test]
+    fn pong_paddle_stays_inside_the_court() {
+        let mut p = pet();
+        let mut pong = Pong::new(&mut p);
+        for _ in 0..30 {
+            pong.key(KeyCode::Up);
+        }
+        assert_eq!(pong.py, 0);
+        for _ in 0..30 {
+            pong.key(KeyCode::Down);
+        }
+        assert_eq!(pong.py, PH - PADDLE);
+    }
+}
