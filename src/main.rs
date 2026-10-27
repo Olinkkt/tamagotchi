@@ -399,10 +399,7 @@ fn draw(f: &mut Frame, app: &App) {
             Span::styled(format!("press {k}: "), Style::new().fg(WARN).add_modifier(Modifier::BOLD)),
             Span::styled(text, Style::new().fg(TEXT)),
         ]),
-        None if p.stage == Stage::Egg => Line::from(Span::styled("It's an egg - give it a moment to hatch.", Style::new().fg(DIM))),
-        None if p.asleep => Line::from(Span::styled("Shh, it's sleeping.", Style::new().fg(DIM))),
-        None if p.happy < MAX_HEARTS => Line::from(Span::styled("Doing fine. A game (p) would cheer it up.", Style::new().fg(GOOD))),
-        None => Line::from(Span::styled("All good - nothing to do right now.", Style::new().fg(GOOD))),
+        None => Line::from(""),
     };
     f.render_widget(Paragraph::new(hint).alignment(Alignment::Center), rows[2]);
 
