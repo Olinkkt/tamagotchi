@@ -44,6 +44,9 @@ struct App {
     last: Instant,
     last_save: Instant,
     was_calling: bool,
+    started: Instant,
+    fx: Option<(sprites::Fx, Instant)>,
+    last_stage: Stage,
     quit: bool,
 }
 
@@ -68,6 +71,9 @@ impl App {
             last: Instant::now(),
             last_save: Instant::now(),
             was_calling: false,
+            started: Instant::now(),
+            fx: None,
+            last_stage: Stage::Egg,
             quit: false,
         };
         let ticks = ((away as f64 * speed) as u64).min(MAX_CATCHUP_TICKS);
@@ -78,7 +84,44 @@ impl App {
             app.message = format!("Away for {} - catching up...", fmt_age(away));
         }
         app.drain_events();
+        app.last_stage = app.pet.stage;
         app
+    }
+
+    fn trigger(&mut self, fx: sprites::Fx) {
+        self.fx = Some((fx, Instant::now()));
+    }
+
+    fn snapshot(&self) -> (u8, u8, u8, bool, u8, bool) {
+        let p = &self.pet;
+        (p.hunger, p.happy, p.doses, p.sick, p.poops, p.disc_call.is_some())
+    }
+
+    /// Pick an animation by comparing pet state before and after an action.
+    fn react(&mut self, before: (u8, u8, u8, bool, u8, bool)) {
+        let after = self.snapshot();
+        let fx = if after.0 > before.0 {
+            Some(sprites::Fx::Eat)
+        } else if after.1 > before.1 {
+            Some(sprites::Fx::Hearts)
+        } else if after.2 < before.2 || (before.3 && !after.3) {
+            Some(sprites::Fx::Heal)
+        } else if after.4 < before.4 {
+            Some(sprites::Fx::Clean)
+        } else if (before.5 && !after.5) || after.1 < before.1 {
+            Some(sprites::Fx::Scold)
+        } else {
+            None
+        };
+        if let Some(fx) = fx {
+            self.trigger(fx);
+        }
+    }
+
+    fn current_fx(&self) -> Option<(sprites::Fx, f32)> {
+        let (fx, at) = self.fx?;
+        let p = at.elapsed().as_secs_f32() / fx.duration_secs();
+        (p < 1.0).then_some((fx, p))
     }
 
     fn drain_events(&mut self) {
@@ -100,6 +143,12 @@ impl App {
             self.pet.tick();
         }
         self.drain_events();
+        if self.pet.stage != self.last_stage {
+            if self.pet.alive() {
+                self.trigger(sprites::Fx::Evolve);
+            }
+            self.last_stage = self.pet.stage;
+        }
         let calling = self.pet.needs_attention();
         if calling && !self.was_calling {
             print!("\x07");
@@ -125,6 +174,7 @@ impl App {
     }
 
     fn guess(&mut self, higher: bool) {
+        let before = self.snapshot();
         let Mode::Game(g) = &mut self.mode else { return };
         let mut next = self.pet.rand(9) as u8 + 1;
         while next == g.current {
@@ -140,6 +190,7 @@ impl App {
             let wins = g.wins;
             self.message = self.pet.finish_game(wins, GAME_ROUNDS);
             self.mode = Mode::Normal;
+            self.react(before);
         } else {
             g.round += 1;
         }
@@ -158,6 +209,7 @@ impl App {
             }
             return;
         }
+        let before = self.snapshot();
         let msg = match code {
             KeyCode::Char('f') => self.pet.feed_meal(),
             KeyCode::Char('s') => self.pet.feed_snack(),
@@ -180,6 +232,7 @@ impl App {
             _ => return,
         };
         self.message = msg;
+        self.react(before);
     }
 }
 
@@ -191,8 +244,7 @@ fn draw(f: &mut Frame, app: &App) {
     let p = &app.pet;
     let rows = Layout::vertical([
         Constraint::Length(3),
-        Constraint::Min(9),
-        Constraint::Length(5),
+        Constraint::Min(12),
         Constraint::Length(3),
         Constraint::Length(3),
     ])
@@ -200,66 +252,63 @@ fn draw(f: &mut Frame, app: &App) {
 
     let title = format!(" {} - {} - age {} ", p.species, p.stage.label(), fmt_age(p.age));
     f.render_widget(
-        Paragraph::new(Line::from(vec![
-            Span::raw(format!("mistakes: {}  ", p.mistakes)),
-            Span::raw(format!("weight: {}  ", p.weight)),
-            Span::raw(format!("discipline: {}%", p.discipline)),
-        ]))
-        .alignment(Alignment::Center)
-        .block(Block::default().borders(Borders::ALL).title(title)),
+        Paragraph::new(Line::from(format!("mistakes: {}   weight: {}", p.mistakes, p.weight)))
+            .alignment(Alignment::Center)
+            .block(Block::default().borders(Borders::ALL).title(title)),
         rows[0],
     );
 
-    let anim = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() / 600).unwrap_or(0)) % 2 == 0;
-    let mut body: Vec<Line> = Vec::new();
-    let mut top = String::new();
-    if p.asleep {
-        top.push_str("z Z z  ");
-    }
-    if p.sick {
-        top.push_str("[sick]  ");
-    }
-    body.push(Line::from(Span::styled(top, Style::new().fg(Color::Magenta))));
-    match &app.mode {
-        Mode::Game(g) => {
-            body.push(Line::from(format!("Higher or Lower!  round {}/{}  wins {}", g.round, GAME_ROUNDS, g.wins)));
-            body.push(Line::from(""));
-            body.push(Line::from(Span::styled(format!("   [ {} ]", g.current), Style::new().add_modifier(Modifier::BOLD))));
-            body.push(Line::from(""));
-            body.push(Line::from(g.note.clone()));
-        }
-        Mode::Normal => {
-            for l in sprites::sprite(p, anim) {
-                body.push(Line::from(Span::styled(l, Style::new().fg(if p.alive() { Color::Green } else { Color::DarkGray }))));
-            }
-            if p.poops > 0 {
-                body.push(Line::from(Span::styled("💩 ".repeat(p.poops as usize), Style::new().fg(Color::Yellow))));
-            }
-        }
-    }
-    if p.needs_attention() {
-        body.push(Line::from(Span::styled("(!) needs attention", Style::new().fg(Color::Red).add_modifier(Modifier::BOLD))));
-    }
+    let cols = Layout::horizontal([Constraint::Min(34), Constraint::Length(28)]).split(rows[1]);
+
+    let t = (app.started.elapsed().as_millis() / 350) as u32;
+    let body: Vec<Line> = match &app.mode {
+        Mode::Game(g) => vec![
+            Line::from(""),
+            Line::from(format!("Higher or Lower!  round {}/{}  wins {}", g.round, GAME_ROUNDS, g.wins)),
+            Line::from(""),
+            Line::from(Span::styled(format!("[ {} ]", g.current), Style::new().add_modifier(Modifier::BOLD))),
+            Line::from(""),
+            Line::from(g.note.clone()),
+        ],
+        Mode::Normal => sprites::render(p, t, app.current_fx()),
+    };
     f.render_widget(
         Paragraph::new(body).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL)),
-        rows[1],
+        cols[0],
     );
 
-    let stats = vec![
+    let mut stats = vec![
         Line::from(format!("Hunger     {}", hearts(p.hunger))),
         Line::from(format!("Happy      {}", hearts(p.happy))),
-        Line::from(format!("Discipline {}", if p.disc_call.is_some() { "calling!" } else { "ok" })),
+        Line::from(format!("Discipline {}%", p.discipline)),
+        Line::from(""),
     ];
-    f.render_widget(Paragraph::new(stats).block(Block::default().borders(Borders::ALL).title(" Stats ")), rows[2]);
+    let mut flag = |text: &str, color: Color| stats.push(Line::from(Span::styled(text.to_string(), Style::new().fg(color))));
+    if p.asleep {
+        flag("zzz sleeping", Color::Blue);
+    }
+    if p.sick {
+        flag("sick - needs medicine", Color::Green);
+    }
+    if p.disc_call.is_some() {
+        flag("naughty - scold it", Color::Red);
+    }
+    if p.poops > 0 {
+        flag("needs cleaning", Color::Yellow);
+    }
+    if p.needs_attention() {
+        flag("(!) needs attention", Color::Red);
+    }
+    f.render_widget(Paragraph::new(stats).block(Block::default().borders(Borders::ALL).title(" Stats ")), cols[1]);
 
-    f.render_widget(Paragraph::new(app.message.as_str()).block(Block::default().borders(Borders::ALL).title(" Message ")), rows[3]);
+    f.render_widget(Paragraph::new(app.message.as_str()).block(Block::default().borders(Borders::ALL).title(" Message ")), rows[2]);
 
     let menu = match app.mode {
         Mode::Game(_) => "[h/Up] higher  [l/Down] lower  [Esc] quit game",
         Mode::Normal if p.stage == Stage::Dead => "[n] new egg  [q] quit",
         Mode::Normal => "[f]eed [s]nack [p]lay [l]ight [m]edicine [c]lean [d]iscipline [q]uit",
     };
-    f.render_widget(Paragraph::new(menu).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL)), rows[4]);
+    f.render_widget(Paragraph::new(menu).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL)), rows[3]);
 }
 
 fn run(terminal: &mut DefaultTerminal, app: &mut App) -> std::io::Result<()> {
@@ -277,7 +326,57 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> std::io::Result<()> {
     Ok(())
 }
 
+/// `--gallery`: print every character, plain, to stdout (handy for art tweaks).
+fn gallery() {
+    let cases: [(Stage, &str); 10] = [
+        (Stage::Egg, "Egg"),
+        (Stage::Baby, "Babytchi"),
+        (Stage::Child, "Marutchi"),
+        (Stage::Teen, "Tonmarutchi"),
+        (Stage::Teen, "Hashitamatchi"),
+        (Stage::Adult, "Mametchi"),
+        (Stage::Adult, "Kuchipatchi"),
+        (Stage::Adult, "Tarakotchi"),
+        (Stage::Adult, "Ichigotchi"),
+        (Stage::Adult, "Nyorotchi"),
+    ];
+    let mut pets: Vec<Pet> = cases
+        .iter()
+        .map(|(stage, name)| {
+            let mut p = Pet::new(1);
+            p.stage = *stage;
+            p.species = name.to_string();
+            p.happy = 4;
+            p.hunger = 4;
+            p
+        })
+        .collect();
+    let mut dead = Pet::new(1);
+    dead.stage = Stage::Dead;
+    pets.push(dead);
+    for p in &pets {
+        println!("-- {} --", p.species);
+        for line in sprites::render(p, 0, None) {
+            let mut out = String::new();
+            for s in line.spans {
+                let (mut fg, mut bg) = (None, None);
+                if let Some(Color::Rgb(r, g, b)) = s.style.fg { fg = Some((r, g, b)); }
+                if let Some(Color::Rgb(r, g, b)) = s.style.bg { bg = Some((r, g, b)); }
+                if let Some((r, g, b)) = fg { out.push_str(&format!("\x1b[38;2;{r};{g};{b}m")); }
+                if let Some((r, g, b)) = bg { out.push_str(&format!("\x1b[48;2;{r};{g};{b}m")); }
+                out.push_str(&s.content);
+                out.push_str("\x1b[0m");
+            }
+            println!("{out}");
+        }
+    }
+}
+
 fn main() -> std::io::Result<()> {
+    if std::env::args().any(|a| a == "--gallery") {
+        gallery();
+        return Ok(());
+    }
     let mut app = App::new();
     let mut terminal = ratatui::init();
     let res = run(&mut terminal, &mut app);
