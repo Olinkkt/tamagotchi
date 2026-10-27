@@ -91,6 +91,8 @@ tama status          one line for a status bar, e.g. (T_T) Marutchi ♡♡♡♡
 tama status --waybar JSON for waybar: short text, a hover tooltip, and a class
 tama feed|snack|clean|medicine|scold|light
                      care for the pet without opening the game (refused while it is open)
+tama hook zsh        print a shell snippet so commits feed the pet and failed commands upset it
+tama event commit|fail  tell the pet about a shell event (the hook calls this)
 tama watch           desktop notifications when the pet needs you
 tama watch --test    send one test notification
 tama --animate on|off  show or hide the animated ears, wings, tuft, leaves and tail
@@ -116,6 +118,7 @@ usual config folder.
 | `baby_secs`, `child_secs`, `teen_secs`, `adult_lifespan_secs` | stage lengths |
 | `sleep_start_hour`, `sleep_end_hour` | sleeping hours, 24h clock |
 | `away_slowdown`, `away_safe` | see "While the game is closed" |
+| `commit_meal_gap_secs`, `fails_per_sad_heart` | see "Shell hook" |
 | `animate_parts` | show and wiggle the ears, wings, tuft, leaves and tail |
 
 The balance numbers are first guesses and not play-tested over many days.
@@ -123,6 +126,21 @@ The balance numbers are first guesses and not play-tested over many days.
 Saves, the graveyard and a lock file live in the user data folder (`~/.local/share/tamagotchi`
 on Linux). Saves are written atomically, and an unreadable save is moved aside instead of
 being overwritten.
+
+## Shell hook
+
+Add this to `~/.zshrc` (zsh only for now) and your pet notices what you do in the terminal:
+
+```sh
+eval "$(tama hook zsh)"
+```
+
+- A successful `git commit` feeds it one hunger heart, at most once per 10 minutes.
+- Every 5th failed command (Ctrl-C does not count) costs it one happy heart.
+
+The hook only appends a line to a small queue file, so it is instant and works whether or not
+the game is open; the game, or the next `tama feed`-style command, applies the queue. Both
+numbers are in the config.
 
 ## Status bar and notifications
 

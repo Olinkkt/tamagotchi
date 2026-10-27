@@ -29,6 +29,10 @@ pub struct Config {
     /// While the game is closed the pet is looked after loosely: hunger and happiness never drop
     /// below one heart, and it cannot fall sick, act up or die. Growing up still carries on.
     pub away_safe: bool,
+    /// A git commit feeds the pet, but at most once per this many seconds (see `tama hook`).
+    pub commit_meal_gap_secs: i64,
+    /// This many failed shell commands make the pet lose one happy heart.
+    pub fails_per_sad_heart: u8,
     /// Seconds a need can go unanswered before it counts as a care mistake.
     pub mistake_after_secs: u64,
     /// How long each stage lasts, in seconds.
@@ -57,6 +61,8 @@ impl Default for Config {
             animate_parts: false,
             away_slowdown: 3,
             away_safe: true,
+            commit_meal_gap_secs: 600,
+            fails_per_sad_heart: 5,
             mistake_after_secs: 900,
             baby_secs: 600,
             child_secs: 3600,

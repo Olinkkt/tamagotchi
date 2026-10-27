@@ -98,6 +98,12 @@ pub struct Pet {
     pub disc_call: Option<u64>,
     pub cause_of_death: Option<String>,
     pub buried: bool,
+    /// Failed shell commands since the pet last got sad about them.
+    #[serde(default)]
+    pub fail_count: u8,
+    /// `clock` when a git commit last fed the pet.
+    #[serde(default)]
+    pub last_commit_meal: Option<i64>,
     #[serde(default)]
     pub quirk: Quirk,
     /// Pet's wall-clock time (unix seconds); advances one second per tick.
@@ -144,6 +150,8 @@ impl Pet {
             disc_call: None,
             cause_of_death: None,
             buried: false,
+            fail_count: 0,
+            last_commit_meal: None,
             quirk: Quirk::Easygoing,
             clock: seed as i64,
             cfg: Config::default(),
@@ -209,6 +217,39 @@ impl Pet {
         let local = self.clock + self.tz_offset;
         let day_start = local - local.rem_euclid(86_400);
         self.clock = day_start + hour * 3600 - self.tz_offset;
+    }
+
+    /// React to something that happened in the user's shell: a git commit feeds the pet (at
+    /// most once per `commit_meal_gap_secs`), and every few failed commands make it sad.
+    /// Returns a message if the pet noticed.
+    pub fn apply_event(&mut self, kind: &str) -> Option<String> {
+        if !self.alive() || self.stage == Stage::Egg {
+            return None;
+        }
+        match kind {
+            "commit" => {
+                let due = self.last_commit_meal.map_or(true, |t| self.clock - t >= self.cfg.commit_meal_gap_secs);
+                if self.hunger < MAX_HEARTS && due {
+                    self.hunger += 1;
+                    self.last_commit_meal = Some(self.clock);
+                    Some("Thanks for the commit! Hunger +1.".into())
+                } else {
+                    None
+                }
+            }
+            "fail" => {
+                self.fail_count += 1;
+                if self.fail_count >= self.cfg.fails_per_sad_heart.max(1) {
+                    self.fail_count = 0;
+                    if self.happy > 0 {
+                        self.happy -= 1;
+                        return Some("So many failed commands... Happy -1.".into());
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
     }
 
     pub fn alive(&self) -> bool {
@@ -720,6 +761,44 @@ mod tests {
             p.tick();
         }
         assert_eq!(p.stage, Stage::Adult);
+    }
+
+    #[test]
+    fn a_commit_feeds_the_pet_but_not_again_straight_away() {
+        let mut p = awake_adult();
+        p.hunger = 2;
+        assert!(p.apply_event("commit").is_some());
+        assert_eq!(p.hunger, 3);
+        assert!(p.apply_event("commit").is_none(), "too soon for another meal");
+        assert_eq!(p.hunger, 3);
+        p.clock += p.cfg.commit_meal_gap_secs;
+        assert!(p.apply_event("commit").is_some());
+        assert_eq!(p.hunger, 4);
+        p.clock += p.cfg.commit_meal_gap_secs;
+        assert!(p.apply_event("commit").is_none(), "already full");
+    }
+
+    #[test]
+    fn enough_failed_commands_cost_one_happy_heart() {
+        let mut p = awake_adult();
+        for _ in 0..(p.cfg.fails_per_sad_heart - 1) {
+            assert!(p.apply_event("fail").is_none());
+        }
+        assert_eq!(p.happy, 4);
+        assert!(p.apply_event("fail").is_some());
+        assert_eq!(p.happy, 3);
+        assert_eq!(p.fail_count, 0);
+    }
+
+    #[test]
+    fn shell_events_are_ignored_for_eggs_and_the_dead() {
+        let mut egg = Pet::new(1);
+        assert!(egg.apply_event("commit").is_none());
+        let mut dead = awake_adult();
+        dead.dev_kill();
+        assert!(dead.apply_event("fail").is_none());
+        let mut p = awake_adult();
+        assert!(p.apply_event("nonsense").is_none());
     }
 
     #[test]

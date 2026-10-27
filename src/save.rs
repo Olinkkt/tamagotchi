@@ -131,6 +131,41 @@ pub fn claim_game() -> Result<(), ()> {
     Ok(())
 }
 
+fn events_path() -> PathBuf {
+    dir().join(if TEST_SLOT.load(Ordering::Relaxed) { "events-test.queue" } else { "events.queue" })
+}
+
+/// Queue something that happened in the user's shell (see `tama hook`). Appending a line never
+/// races with the game saving, so the game or the next care command picks it up later.
+pub fn queue_event(kind: &str) {
+    use io::Write;
+    let _ = fs::create_dir_all(dir());
+    if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(events_path()) {
+        let _ = writeln!(f, "{kind}");
+    }
+}
+
+fn parse_events(text: &str) -> Vec<String> {
+    text.lines().map(str::trim).filter(|l| !l.is_empty()).map(String::from).collect()
+}
+
+/// Queued events, left in the queue.
+pub fn peek_events() -> Vec<String> {
+    parse_events(&fs::read_to_string(events_path()).unwrap_or_default())
+}
+
+/// Queued events, removed from the queue. The file is renamed first, so an event queued
+/// while this runs starts a fresh file instead of being lost.
+pub fn take_events() -> Vec<String> {
+    let taking = events_path().with_extension("taking");
+    if fs::rename(events_path(), &taking).is_err() {
+        return Vec::new();
+    }
+    let events = parse_events(&fs::read_to_string(&taking).unwrap_or_default());
+    let _ = fs::remove_file(&taking);
+    events
+}
+
 fn graveyard_path() -> PathBuf {
     dir().join(if TEST_SLOT.load(Ordering::Relaxed) { "graveyard-test.txt" } else { "graveyard.txt" })
 }
@@ -265,6 +300,21 @@ mod tests {
             fs::write(lock_path(), format!("{} {}", u32::MAX - 1, now())).unwrap();
             assert!(!game_running());
             assert!(claim_game().is_ok());
+        });
+    }
+
+    #[test]
+    fn queued_events_are_peeked_then_taken_exactly_once() {
+        with_temp_dir(|| {
+            assert!(peek_events().is_empty());
+            queue_event("commit");
+            queue_event("fail");
+            assert_eq!(peek_events(), vec!["commit", "fail"]);
+            assert_eq!(peek_events().len(), 2, "peeking must not consume");
+            assert_eq!(take_events(), vec!["commit", "fail"]);
+            assert!(take_events().is_empty());
+            queue_event("commit");
+            assert_eq!(take_events(), vec!["commit"]);
         });
     }
 

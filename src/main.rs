@@ -19,6 +19,8 @@ use ratatui::{
 };
 
 const MAX_CATCHUP_TICKS: u64 = 86_400;
+/// Most shell events applied at once, so a runaway script cannot stall the game.
+const MAX_QUEUED_EVENTS: usize = 200;
 
 pub fn fmt_age(secs: u64) -> String {
     let (d, h, m) = (secs / 86_400, secs / 3600 % 24, secs / 60 % 60);
@@ -43,6 +45,7 @@ struct App {
     tick_acc: f64,
     last: Instant,
     last_save: Instant,
+    last_event_check: Instant,
     was_calling: bool,
     started: Instant,
     fx: Option<(sprites::Fx, Instant)>,
@@ -98,6 +101,7 @@ impl App {
         if ticks > 0 {
             app.message = format!("Welcome back! You were away {}.", fmt_age(away));
         }
+        app.apply_queued_events();
         app.drain_events();
         app.last_stage = app.pet.stage;
         save::heartbeat();
@@ -116,6 +120,7 @@ impl App {
             tick_acc: 0.0,
             last: Instant::now(),
             last_save: Instant::now(),
+            last_event_check: Instant::now(),
             was_calling: false,
             started: Instant::now(),
             fx: None,
@@ -125,6 +130,22 @@ impl App {
             dev_open: false,
             quit: false,
         }
+    }
+
+    /// Apply things that happened in the shell (git commits, failed commands).
+    fn apply_queued_events(&mut self) {
+        let events = save::take_events();
+        if events.is_empty() {
+            return;
+        }
+        let before = self.snapshot();
+        for e in events.iter().take(MAX_QUEUED_EVENTS) {
+            if let Some(m) = self.pet.apply_event(e) {
+                self.message = m.clone();
+                self.log.push(m);
+            }
+        }
+        self.react(before);
     }
 
     fn fresh_pet(&self) -> Pet {
@@ -186,6 +207,10 @@ impl App {
         while self.tick_acc >= 1.0 {
             self.tick_acc -= 1.0;
             self.pet.tick();
+        }
+        if self.last_event_check.elapsed() >= Duration::from_secs(2) {
+            self.last_event_check = Instant::now();
+            self.apply_queued_events();
         }
         self.drain_events();
         if self.pet.stage != self.last_stage {
@@ -834,7 +859,7 @@ fn main() -> std::io::Result<()> {
         return Ok(());
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|clean|medicine|scold|light   care for the pet without opening the game\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
+        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|clean|medicine|scold|light   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
         return Ok(());
     }
     if args.iter().any(|a| a == "--gallery") {
