@@ -74,8 +74,56 @@ pub fn status_line(p: &Pet) -> String {
     }
 }
 
-fn status() -> i32 {
-    match load_caught_up() {
+/// The narrowest useful text for a status bar: the face, plus `!` when the pet needs something.
+pub fn short_text(p: &Pet) -> String {
+    match p.stage {
+        Stage::Dead => "(x_x)".to_string(),
+        Stage::Egg => "(.)".to_string(),
+        _ if p.top_need().is_some() => format!("({}) !", face(p)),
+        _ => format!("({})", face(p)),
+    }
+}
+
+/// The full details, shown as a hover tooltip.
+fn tooltip(p: &Pet) -> String {
+    if !p.alive() {
+        return format!("{} has passed away", p.species);
+    }
+    let mut s = format!("{} ({})", p.species, p.stage.label());
+    if p.stage != Stage::Egg {
+        s.push_str(&format!("\nhunger {}   happy {}", hearts(p.hunger), hearts(p.happy)));
+    }
+    if let Some((_, text)) = p.top_need() {
+        s.push_str(&format!("\n{text}"));
+    }
+    s
+}
+
+/// JSON for a waybar custom module with `"return-type": "json"`.
+fn waybar_json(p: Option<&Pet>) -> String {
+    let (text, tip, class) = match p {
+        None => ("(?)".to_string(), "No pet yet - run tama".to_string(), "none"),
+        Some(p) => {
+            let class = if !p.alive() {
+                "dead"
+            } else if p.top_need().is_some() {
+                "alert"
+            } else {
+                "ok"
+            };
+            (short_text(p), tooltip(p), class)
+        }
+    };
+    serde_json::json!({ "text": text, "tooltip": tip, "class": class }).to_string()
+}
+
+fn status(waybar: bool) -> i32 {
+    let pet = load_caught_up();
+    if waybar {
+        println!("{}", waybar_json(pet.as_ref()));
+        return 0;
+    }
+    match pet {
         Some(p) => {
             println!("{}", status_line(&p));
             0
@@ -195,7 +243,7 @@ pub fn run(args: &[String]) -> Option<i32> {
         save::use_test_slot();
     }
     Some(match cmd {
-        "status" => status(),
+        "status" => status(args.iter().any(|a| a == "--waybar")),
         "watch" => watch(args.iter().any(|a| a == "--test")),
         _ => act(cmd),
     })
@@ -224,6 +272,31 @@ mod tests {
         assert!(should_notify(Some(('f', RENOTIFY_AFTER)), 'f'));
         assert!(should_notify(Some(('f', Duration::from_secs(5))), 'm'));
         assert!(!should_notify(Some(('n', RENOTIFY_AFTER * 10)), 'n'));
+    }
+
+    #[test]
+    fn short_text_is_just_the_face_and_an_alert_mark() {
+        let mut p = Pet::new(1);
+        p.stage = Stage::Adult;
+        p.hunger = 3;
+        p.happy = 4;
+        assert_eq!(short_text(&p), "(^_^)");
+        p.hunger = 0;
+        assert_eq!(short_text(&p), "(T_T) !");
+    }
+
+    #[test]
+    fn waybar_json_has_text_tooltip_and_class() {
+        let mut p = Pet::new(1);
+        p.stage = Stage::Adult;
+        p.species = "Mametchi".into();
+        p.hunger = 0;
+        let v: serde_json::Value = serde_json::from_str(&waybar_json(Some(&p))).unwrap();
+        assert_eq!(v["text"], "(T_T) !");
+        assert_eq!(v["class"], "alert");
+        assert!(v["tooltip"].as_str().unwrap().contains("Mametchi (Adult)\nhunger"));
+        let none: serde_json::Value = serde_json::from_str(&waybar_json(None)).unwrap();
+        assert_eq!(none["class"], "none");
     }
 
     #[test]
