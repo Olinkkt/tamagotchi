@@ -317,7 +317,7 @@ impl App {
             }
             Mode::Chooser => {
                 match code {
-                    KeyCode::Char(c @ '1'..='4') => {
+                    KeyCode::Char(c @ '1'..='6') => {
                         let g = games::Game::new(c as u8 - b'0', &mut self.pet);
                         self.mode = Mode::Game(g);
                     }
@@ -535,10 +535,6 @@ fn stat_row(label: &str, mut value: Vec<Span<'static>>) -> Line<'static> {
     Line::from(spans)
 }
 
-fn key_chip(key: &str, label: &str) -> Vec<Span<'static>> {
-    key_chip_sized(key, label, 0)
-}
-
 /// A shorter label for narrow terminals.
 fn short_label(label: &str) -> &str {
     match label {
@@ -699,7 +695,11 @@ fn draw(f: &mut Frame, app: &App) {
                 Line::from(""),
             ];
             for (k, l) in games::CHOICES {
-                v.push(Line::from(key_chip(k, l)));
+                // Every row is the same width, so the centred block lines up.
+                v.push(Line::from(vec![
+                    Span::styled(format!(" {k} "), Style::new().fg(Color::Rgb(20, 20, 30)).bg(ACCENT).add_modifier(Modifier::BOLD)),
+                    Span::styled(format!(" {l:<20}"), Style::new().fg(TEXT)),
+                ]));
             }
             centered(v)
         }
@@ -842,7 +842,7 @@ fn draw(f: &mut Frame, app: &App) {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let items: &[(&str, &str)] = match &app.mode {
         Mode::Game(g) => g.keys(),
-        Mode::Chooser => &[("1-4", "choose"), ("esc", "back")],
+        Mode::Chooser => &[("1-6", "choose"), ("esc", "back")],
         Mode::Graveyard(_) | Mode::Awards => &[("any key", "back")],
         Mode::Shop => &[("1-4", "buy"), ("esc", "back")],
         Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("a", "awards"), ("g", "graveyard"), ("q", "quit")],
@@ -1186,6 +1186,19 @@ mod tests {
             app.on_key(KeyCode::Char('x'));
             assert!(matches!(app.mode, Mode::Normal));
         });
+    }
+
+    #[test]
+    fn the_catch_basket_and_the_pong_court_are_fully_visible_at_the_smallest_size() {
+        for (kind, mark) in [(5u8, "╰"), (4u8, "█")] {
+            let mut app = app_with(Stage::Adult, |_| {});
+            let g = games::Game::new(kind, &mut app.pet);
+            app.mode = Mode::Game(g);
+            let screen = render(&app, 64, 22).join("\n");
+            assert!(screen.contains(mark), "game {kind} lost its {mark} at 64x22:\n{screen}");
+            let bottom_wall = "─".repeat(28);
+            assert!(screen.contains(&bottom_wall), "game {kind} lost its bottom edge at 64x22:\n{screen}");
+        }
     }
 
     #[test]

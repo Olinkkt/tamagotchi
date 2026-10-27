@@ -48,6 +48,8 @@ one care mistake.
 2. **Reaction**: press space within 500 ms of "GO", three rounds.
 3. **Memory**: repeat patterns of 3, 4 and 5 with keys 1 to 4.
 4. **Pong**: return the ball five times; one miss ends it.
+5. **Catch**: move the basket (arrow keys) under five pieces of falling food.
+6. **Rock-paper-scissors**: five rounds against the pet (keys `r`, `p`, `s`); a draw is no win.
 
 ### Coins, shop and awards
 

@@ -18,12 +18,21 @@ pub enum Outcome {
     Quit,
 }
 
-pub const CHOICES: [(&str, &str); 4] = [("1", "higher/lower"), ("2", "reaction"), ("3", "memory"), ("4", "pong")];
+pub const CHOICES: [(&str, &str); 6] =
+    [("1", "higher/lower"), ("2", "reaction"), ("3", "memory"), ("4", "pong"), ("5", "catch"), ("6", "rock-paper-scissors")];
 
 const INK: Color = Color::Rgb(20, 20, 30);
 
 fn title(t: &str) -> Line<'static> {
     Line::from(Span::styled(t.to_string(), Style::new().fg(ACCENT).add_modifier(Modifier::BOLD)))
+}
+
+/// A title and a short status on one line, for the games that need every row for the field.
+fn heading(name: &str, info: String) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(format!("{name}  "), Style::new().fg(ACCENT).add_modifier(Modifier::BOLD)),
+        Span::styled(info, Style::new().fg(DIM)),
+    ])
 }
 
 fn dim(t: String) -> Line<'static> {
@@ -39,6 +48,8 @@ pub enum Game {
     Reaction(Reaction),
     Memory(Memory),
     Pong(Pong),
+    Catch(Catch),
+    Rps(Rps),
 }
 
 impl Game {
@@ -47,6 +58,8 @@ impl Game {
             1 => Game::HigherLower(HigherLower::new(pet)),
             2 => Game::Reaction(Reaction::new(pet)),
             3 => Game::Memory(Memory::new(pet)),
+            5 => Game::Catch(Catch::new(pet)),
+            6 => Game::Rps(Rps::new()),
             _ => Game::Pong(Pong::new(pet)),
         }
     }
@@ -60,6 +73,8 @@ impl Game {
             Game::Reaction(g) => g.key(code),
             Game::Memory(g) => g.key(code),
             Game::Pong(g) => g.key(code),
+            Game::Catch(g) => g.key(code),
+            Game::Rps(g) => g.key(code, pet),
         }
     }
 
@@ -70,6 +85,8 @@ impl Game {
             Game::Reaction(g) => g.tick(pet),
             Game::Memory(g) => g.tick(pet),
             Game::Pong(g) => g.tick(),
+            Game::Catch(g) => g.tick(pet),
+            Game::Rps(_) => Outcome::Continue,
         }
     }
 
@@ -79,6 +96,8 @@ impl Game {
             Game::Reaction(g) => g.lines(),
             Game::Memory(g) => g.lines(),
             Game::Pong(g) => g.lines(),
+            Game::Catch(g) => g.lines(),
+            Game::Rps(g) => g.lines(),
         }
     }
 
@@ -88,6 +107,8 @@ impl Game {
             Game::Reaction(_) => &[("space", "react"), ("esc", "quit game")],
             Game::Memory(_) => &[("1-4", "repeat the pattern"), ("esc", "quit game")],
             Game::Pong(_) => &[("↑/↓", "move paddle"), ("esc", "quit game")],
+            Game::Catch(_) => &[("←/→", "move basket"), ("esc", "quit game")],
+            Game::Rps(_) => &[("r", "rock"), ("p", "paper"), ("s", "scissors"), ("esc", "quit game")],
         }
     }
 }
@@ -348,7 +369,8 @@ impl Memory {
 // ---------------------------------------------------------------- pong
 
 const PW: i32 = 28;
-const PH: i32 = 10;
+/// Field height: a title line, this many rows and a bottom wall must fit the smallest window's 10-row room.
+const PH: i32 = 8;
 const PADDLE: i32 = 3;
 /// Return the ball this many times to win outright.
 const PONG_GOAL: u8 = 5;
@@ -422,11 +444,7 @@ impl Pong {
 
     fn lines(&self) -> Vec<Line<'static>> {
         let wall = Style::new().fg(EMPTY);
-        let mut out = vec![
-            title("PONG"),
-            dim(format!("returns {}/{}   (miss = game over)", self.hits, PONG_GOAL)),
-            Line::from(Span::styled("─".repeat(PW as usize), wall)),
-        ];
+        let mut out = vec![heading("PONG", format!("returns {}/{}  (a miss ends it)", self.hits, PONG_GOAL))];
         for y in 0..PH {
             let row: Vec<Span<'static>> = (0..PW)
                 .map(|x| {
@@ -446,6 +464,140 @@ impl Pong {
         out.push(Line::from(Span::styled("─".repeat(PW as usize), wall)));
         let _ = BAD;
         out
+    }
+}
+
+// ---------------------------------------------------------------- catch
+
+/// Five pieces of food fall one after another; catch them in the basket.
+const CATCH_ITEMS: u8 = 5;
+const BASKET: i32 = 5;
+
+pub struct Catch {
+    bx: i32,
+    ix: i32,
+    iy: i32,
+    item: u8,
+    caught: u8,
+    last: Instant,
+    step_ms: u64,
+}
+
+impl Catch {
+    fn new(pet: &mut Pet) -> Self {
+        Catch { bx: PW / 2 - 2, ix: pet.rand(PW as u64) as i32, iy: 0, item: 1, caught: 0, last: Instant::now(), step_ms: 130 }
+    }
+
+    fn key(&mut self, code: KeyCode) -> Outcome {
+        match code {
+            KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('h') => self.bx = (self.bx - 2).max(0),
+            KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('l') => self.bx = (self.bx + 2).min(PW - BASKET),
+            _ => {}
+        }
+        Outcome::Continue
+    }
+
+    fn tick(&mut self, pet: &mut Pet) -> Outcome {
+        if self.last.elapsed() < Duration::from_millis(self.step_ms) {
+            return Outcome::Continue;
+        }
+        self.last = Instant::now();
+        self.iy += 1;
+        if self.iy < PH - 1 {
+            return Outcome::Continue;
+        }
+        if (self.bx..self.bx + BASKET).contains(&self.ix) {
+            self.caught += 1;
+        }
+        if self.item >= CATCH_ITEMS {
+            return Outcome::Done { wins: self.caught, rounds: CATCH_ITEMS };
+        }
+        self.item += 1;
+        self.ix = pet.rand(PW as u64) as i32;
+        self.iy = 0;
+        self.step_ms = (self.step_ms * 92 / 100).max(60);
+        Outcome::Continue
+    }
+
+    fn lines(&self) -> Vec<Line<'static>> {
+        let wall = Style::new().fg(EMPTY);
+        let mut out = vec![heading("CATCH", format!("food {}/{}  caught {}", self.item, CATCH_ITEMS, self.caught))];
+        for y in 0..PH {
+            let row: Vec<Span<'static>> = (0..PW)
+                .map(|x| {
+                    if y == PH - 1 && (self.bx..self.bx + BASKET).contains(&x) {
+                        let glyph = if x == self.bx {
+                            "╰"
+                        } else if x == self.bx + BASKET - 1 {
+                            "╯"
+                        } else {
+                            "─"
+                        };
+                        Span::styled(glyph, Style::new().fg(ACCENT))
+                    } else if x == self.ix && y == self.iy {
+                        Span::styled("●", Style::new().fg(BAD))
+                    } else {
+                        Span::raw(" ")
+                    }
+                })
+                .collect();
+            out.push(Line::from(row));
+        }
+        out.push(Line::from(Span::styled("─".repeat(PW as usize), wall)));
+        out
+    }
+}
+
+// ---------------------------------------------------------------- rock-paper-scissors
+
+const RPS_ROUNDS: u8 = 5;
+const RPS_NAMES: [&str; 3] = ["rock", "paper", "scissors"];
+
+/// 0 = draw, 1 = the first player wins, 2 = the second wins (0 rock, 1 paper, 2 scissors).
+fn rps_result(mine: usize, theirs: usize) -> usize {
+    (mine + 3 - theirs) % 3
+}
+
+pub struct Rps {
+    round: u8,
+    wins: u8,
+    note: String,
+}
+
+impl Rps {
+    fn new() -> Self {
+        Rps { round: 1, wins: 0, note: "Pick rock, paper or scissors.".into() }
+    }
+
+    fn key(&mut self, code: KeyCode, pet: &mut Pet) -> Outcome {
+        let mine = match code {
+            KeyCode::Char('r') => 0,
+            KeyCode::Char('p') => 1,
+            KeyCode::Char('s') => 2,
+            _ => return Outcome::Continue,
+        };
+        let theirs = pet.rand(3) as usize;
+        let result = rps_result(mine, theirs);
+        if result == 1 {
+            self.wins += 1;
+        }
+        self.note = format!("You: {}  Pet: {}  ->  {}", RPS_NAMES[mine], RPS_NAMES[theirs], ["a draw", "you win!", "it wins."][result]);
+        if self.round >= RPS_ROUNDS {
+            return Outcome::Done { wins: self.wins, rounds: RPS_ROUNDS };
+        }
+        self.round += 1;
+        Outcome::Continue
+    }
+
+    fn lines(&self) -> Vec<Line<'static>> {
+        vec![
+            title("ROCK  PAPER  SCISSORS"),
+            dim(format!("round {}/{}   wins {}", self.round, RPS_ROUNDS, self.wins)),
+            Line::from(""),
+            text(self.note.clone()),
+            Line::from(""),
+            dim("a draw counts as no win".to_string()),
+        ]
     }
 }
 
@@ -575,5 +727,100 @@ mod tests {
             pong.key(KeyCode::Down);
         }
         assert_eq!(pong.py, PH - PADDLE);
+    }
+
+    #[test]
+    fn rock_paper_scissors_follows_the_rules() {
+        // (mine, theirs) -> 1 means I win
+        for (mine, theirs) in [(0, 2), (1, 0), (2, 1)] {
+            assert_eq!(rps_result(mine, theirs), 1, "{} beats {}", RPS_NAMES[mine], RPS_NAMES[theirs]);
+            assert_eq!(rps_result(theirs, mine), 2, "{} loses to {}", RPS_NAMES[theirs], RPS_NAMES[mine]);
+        }
+        for a in 0..3 {
+            assert_eq!(rps_result(a, a), 0);
+        }
+    }
+
+    #[test]
+    fn rock_paper_scissors_ends_after_five_rounds_and_ignores_other_keys() {
+        let mut p = pet();
+        let mut g = Rps::new();
+        assert!(matches!(g.key(KeyCode::Char('x'), &mut p), Outcome::Continue));
+        assert_eq!(g.round, 1, "an unrelated key must not use up a round");
+        for round in 1..=RPS_ROUNDS {
+            let out = g.key(KeyCode::Char('r'), &mut p);
+            if round < RPS_ROUNDS {
+                assert!(matches!(out, Outcome::Continue));
+            } else {
+                assert!(matches!(out, Outcome::Done { rounds: 5, .. }));
+            }
+        }
+    }
+
+    #[test]
+    fn catch_a_fruit_over_the_basket_is_caught_and_one_beside_it_is_missed() {
+        let mut p = pet();
+        let mut c = Catch::new(&mut p);
+        c.ix = c.bx + 1;
+        c.iy = PH - 2;
+        c.last = Instant::now() - Duration::from_millis(500);
+        c.tick(&mut p);
+        assert_eq!(c.caught, 1);
+        assert_eq!(c.item, 2, "the next piece of food starts falling");
+
+        c.ix = if c.bx > 10 { 0 } else { PW - 1 };
+        c.iy = PH - 2;
+        c.last = Instant::now() - Duration::from_millis(500);
+        c.tick(&mut p);
+        assert_eq!(c.caught, 1, "missed");
+    }
+
+    #[test]
+    fn catch_always_ends_after_five_pieces_of_food() {
+        let mut p = pet();
+        let mut c = Catch::new(&mut p);
+        for _ in 0..5000 {
+            c.last = Instant::now() - Duration::from_millis(500);
+            if let Outcome::Done { wins, rounds } = c.tick(&mut p) {
+                assert_eq!(rounds, CATCH_ITEMS);
+                assert!(wins <= CATCH_ITEMS);
+                return;
+            }
+        }
+        panic!("catch never ended");
+    }
+
+    #[test]
+    fn the_basket_stays_inside_the_field() {
+        let mut p = pet();
+        let mut c = Catch::new(&mut p);
+        for _ in 0..30 {
+            c.key(KeyCode::Left);
+        }
+        assert_eq!(c.bx, 0);
+        for _ in 0..30 {
+            c.key(KeyCode::Right);
+        }
+        assert_eq!(c.bx, PW - BASKET);
+    }
+
+    #[test]
+    fn every_game_fits_the_smallest_room() {
+        // The room is 10 rows tall in the smallest supported window (64x22).
+        for kind in 1..=6 {
+            let mut p = pet();
+            let g = Game::new(kind, &mut p);
+            assert!(g.lines().len() <= 10, "game {kind} needs {} rows", g.lines().len());
+        }
+    }
+
+    #[test]
+    fn the_picker_offers_six_games_and_each_one_starts() {
+        assert_eq!(CHOICES.len(), 6);
+        for kind in 1..=6 {
+            let mut p = pet();
+            let g = Game::new(kind, &mut p);
+            assert!(!g.lines().is_empty() && !g.keys().is_empty(), "game {kind}");
+        }
     }
 }
