@@ -80,26 +80,7 @@ impl App {
                 format!("Your save was unreadable, so it was moved to {} and a new egg started.", path.display()),
             ),
         };
-        let mut app = App {
-            pet,
-            mode: Mode::Normal,
-            message: cfg_warning.unwrap_or(note),
-            log: Vec::new(),
-            cfg: cfg.clone(),
-            tz,
-            speed,
-            tick_acc: 0.0,
-            last: Instant::now(),
-            last_save: Instant::now(),
-            was_calling: false,
-            started: Instant::now(),
-            fx: None,
-            last_stage: Stage::Egg,
-            confirm_reset: false,
-            dev,
-            dev_open: false,
-            quit: false,
-        };
+        let mut app = App::from_parts(pet, cfg.clone(), tz, speed, dev, cfg_warning.unwrap_or(note));
         app.pet.set_env(cfg, tz);
         if app.pet.clock == 0 {
             // Save from before the clock existed.
@@ -121,6 +102,29 @@ impl App {
         app.last_stage = app.pet.stage;
         save::heartbeat();
         app
+    }
+
+    fn from_parts(pet: Pet, cfg: Config, tz: i64, speed: f64, dev: bool, message: String) -> Self {
+        App {
+            pet,
+            mode: Mode::Normal,
+            message,
+            log: Vec::new(),
+            cfg,
+            tz,
+            speed,
+            tick_acc: 0.0,
+            last: Instant::now(),
+            last_save: Instant::now(),
+            was_calling: false,
+            started: Instant::now(),
+            fx: None,
+            last_stage: Stage::Egg,
+            confirm_reset: false,
+            dev,
+            dev_open: false,
+            quit: false,
+        }
     }
 
     fn fresh_pet(&self) -> Pet {
@@ -431,13 +435,52 @@ fn stat_row(label: &str, mut value: Vec<Span<'static>>) -> Line<'static> {
 }
 
 fn key_chip(key: &str, label: &str) -> Vec<Span<'static>> {
-    vec![
-        Span::styled(format!(" {key} "), Style::new().fg(Color::Rgb(20, 20, 30)).bg(ACCENT).add_modifier(Modifier::BOLD)),
-        Span::styled(format!(" {label}  "), Style::new().fg(TEXT)),
-    ]
+    key_chip_sized(key, label, 0)
 }
 
+/// A shorter label for narrow terminals.
+fn short_label(label: &str) -> &str {
+    match label {
+        "medicine" => "med",
+        "graveyard" => "grave",
+        "new egg" => "new",
+        "quit game" => "quit",
+        "repeat the pattern" => "repeat",
+        "move paddle" => "move",
+        "higher/lower" => "hi/lo",
+        other => other,
+    }
+}
+
+/// `size` 0 is the full chip, 1 uses a short label with less padding, 2 is the key alone.
+fn key_chip_sized(key: &str, label: &str, size: u8) -> Vec<Span<'static>> {
+    let key_span = Span::styled(format!(" {key} "), Style::new().fg(Color::Rgb(20, 20, 30)).bg(ACCENT).add_modifier(Modifier::BOLD));
+    let label_span = match size {
+        0 => Span::styled(format!(" {label}  "), Style::new().fg(TEXT)),
+        1 => Span::styled(format!("{} ", short_label(label)), Style::new().fg(TEXT)),
+        _ => Span::styled(" ", Style::new().fg(TEXT)),
+    };
+    vec![key_span, label_span]
+}
+
+/// The smallest window the layout is designed for.
+const MIN_W: u16 = 64;
+const MIN_H: u16 = 22;
+
 fn draw(f: &mut Frame, app: &App) {
+    let area = f.area();
+    if area.width < MIN_W || area.height < MIN_H {
+        let lines = vec![
+            Line::from(Span::styled("tama needs a bigger window", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),
+            Line::from(Span::styled(format!("at least {MIN_W}x{MIN_H}, this one is {}x{}", area.width, area.height), Style::new().fg(TEXT))),
+            Line::from(Span::styled("(q quits)", Style::new().fg(DIM))),
+        ];
+        let pad = (area.height as usize).saturating_sub(lines.len()) / 2;
+        let mut v = vec![Line::from(""); pad];
+        v.extend(lines);
+        f.render_widget(Paragraph::new(v).alignment(Alignment::Center).wrap(Wrap { trim: true }), area);
+        return;
+    }
     let p = &app.pet;
     let rows = Layout::vertical([
         Constraint::Length(3),
@@ -634,16 +677,23 @@ fn draw(f: &mut Frame, app: &App) {
     };
     let urgent = if matches!(app.mode, Mode::Normal) { need.map(|n| n.0.to_string()) } else { None };
     let ink = Color::Rgb(20, 20, 30);
-    for (k, l) in items {
-        let mut chip = key_chip(k, l);
-        if urgent.as_deref() == Some(*k) {
-            chip[0].style = Style::new().fg(ink).bg(WARN).add_modifier(Modifier::BOLD);
-            chip[1].style = Style::new().fg(WARN).add_modifier(Modifier::BOLD);
-        } else if !useful(k) {
-            chip[0].style = Style::new().fg(ink).bg(EMPTY);
-            chip[1].style = Style::new().fg(EMPTY);
+    let room = rows[4].width.saturating_sub(2) as usize;
+    for size in 0..=2u8 {
+        spans.clear();
+        for (k, l) in items {
+            let mut chip = key_chip_sized(k, l, size);
+            if urgent.as_deref() == Some(*k) {
+                chip[0].style = Style::new().fg(ink).bg(WARN).add_modifier(Modifier::BOLD);
+                chip[1].style = Style::new().fg(WARN).add_modifier(Modifier::BOLD);
+            } else if !useful(k) {
+                chip[0].style = Style::new().fg(ink).bg(EMPTY);
+                chip[1].style = Style::new().fg(EMPTY);
+            }
+            spans.extend(chip);
         }
-        spans.extend(chip);
+        if Line::from(spans.clone()).width() <= room {
+            break;
+        }
     }
     f.render_widget(
         Paragraph::new(Line::from(spans)).alignment(Alignment::Center).block(
@@ -798,4 +848,84 @@ fn main() -> std::io::Result<()> {
     let _ = save::save(&app.pet);
     save::release();
     res
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{backend::TestBackend, Terminal};
+
+    fn app_with(stage: Stage, tweak: impl FnOnce(&mut Pet)) -> App {
+        let mut pet = Pet::new(7);
+        pet.stage = stage;
+        pet.species = match stage {
+            Stage::Egg => "Egg",
+            Stage::Baby => "Babytchi",
+            Stage::Child => "Marutchi",
+            Stage::Teen => "Tonmarutchi",
+            Stage::Adult => "Mametchi",
+            Stage::Dead => "Marutchi",
+        }
+        .into();
+        tweak(&mut pet);
+        App::from_parts(pet, Config::default(), 0, 1.0, false, "hello".into())
+    }
+
+    fn render(app: &App, w: u16, h: u16) -> Vec<String> {
+        let mut terminal = Terminal::new(TestBackend::new(w, h)).unwrap();
+        terminal.draw(|f| draw(f, app)).unwrap();
+        let buf = terminal.backend().buffer().clone();
+        (0..h).map(|y| (0..w).map(|x| buf[(x, y)].symbol().to_string()).collect::<String>()).collect()
+    }
+
+    #[test]
+    fn every_stage_and_state_draws_at_any_size_without_panicking() {
+        let stages = [Stage::Egg, Stage::Baby, Stage::Child, Stage::Teen, Stage::Adult, Stage::Dead];
+        let sizes = [(200, 60), (120, 40), (100, 30), (80, 24), (64, 22), (63, 22), (64, 21), (40, 12), (10, 3), (1, 1)];
+        for stage in stages {
+            for tweak in 0..4 {
+                let app = app_with(stage, |p| match tweak {
+                    1 => p.sick = true,
+                    2 => p.asleep = true,
+                    3 => {
+                        p.hunger = 0;
+                        p.poops = 3;
+                        p.disc_call = Some(0);
+                    }
+                    _ => {}
+                });
+                for (w, h) in sizes {
+                    render(&app, w, h);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_menu_stays_fully_visible_on_an_80_column_terminal() {
+        let app = app_with(Stage::Adult, |_| {});
+        let screen = render(&app, 80, 24);
+        let menu = &screen[22];
+        for key in ["f", "s", "p", "l", "m", "c", "d", "g", "q"] {
+            assert!(menu.contains(&format!(" {key} ")), "missing the {key} key in: {menu}");
+        }
+        assert!(menu.contains("feed") && menu.contains("quit"), "labels should still show at 80 columns: {menu}");
+    }
+
+    #[test]
+    fn a_wide_terminal_gets_the_full_menu_labels() {
+        let app = app_with(Stage::Adult, |_| {});
+        let screen = render(&app, 140, 40);
+        assert!(screen[38].contains("medicine") && screen[38].contains("graveyard"), "{}", screen[38]);
+    }
+
+    #[test]
+    fn a_window_that_is_too_small_says_so() {
+        let app = app_with(Stage::Adult, |_| {});
+        let screen = render(&app, 40, 12).join("\n");
+        assert!(screen.contains("bigger window"), "{screen}");
+        assert!(screen.contains("40x12"), "{screen}");
+        let ok = render(&app, 64, 22).join("\n");
+        assert!(!ok.contains("bigger window"));
+    }
 }
