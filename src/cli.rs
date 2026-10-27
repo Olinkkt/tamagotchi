@@ -126,7 +126,7 @@ fn notify(title: &str, body: &str) -> Result<(), String> {
             .status()
     };
     #[cfg(not(target_os = "macos"))]
-    let result = Command::new("notify-send").args([title, body]).status();
+    let result = Command::new("notify-send").args(["-a", "tama", title, body]).status();
     match result {
         Ok(s) if s.success() => Ok(()),
         Ok(s) => Err(format!("the notifier exited with {s}")),
