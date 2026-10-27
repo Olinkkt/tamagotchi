@@ -92,7 +92,7 @@ fn lock_path() -> PathBuf {
 /// Called by the game on every save so other commands know it is open.
 pub fn heartbeat() {
     let _ = fs::create_dir_all(dir());
-    let _ = fs::write(lock_path(), now().to_string());
+    let _ = fs::write(lock_path(), format!("{} {}", std::process::id(), now()));
 }
 
 /// Called when the game quits cleanly.
@@ -100,14 +100,35 @@ pub fn release() {
     let _ = fs::remove_file(lock_path());
 }
 
-/// True if a game window has saved within the last 30 seconds.
+/// Whether the process that wrote the lock still exists. Where that cannot be checked
+/// (no /proc), assume it does and rely on the lock's age alone.
+fn process_alive(pid: u32) -> bool {
+    !std::path::Path::new("/proc").exists() || std::path::Path::new(&format!("/proc/{pid}")).exists()
+}
+
+/// True if a game window is open: its lock was refreshed within the last 30 seconds
+/// and the process that wrote it is still alive.
 pub fn game_running() -> bool {
-    fs::metadata(lock_path())
+    let fresh = fs::metadata(lock_path())
         .and_then(|m| m.modified())
         .ok()
         .and_then(|t| t.elapsed().ok())
         .map(|e| e.as_secs() < 30)
-        .unwrap_or(false)
+        .unwrap_or(false);
+    if !fresh {
+        return false;
+    }
+    let pid = fs::read_to_string(lock_path()).ok().and_then(|t| t.split_whitespace().next()?.parse::<u32>().ok());
+    pid.map(process_alive).unwrap_or(true)
+}
+
+/// Take the lock for a new game window. Fails if another window already holds it.
+pub fn claim_game() -> Result<(), ()> {
+    if game_running() {
+        return Err(());
+    }
+    heartbeat();
+    Ok(())
 }
 
 fn graveyard_path() -> PathBuf {
@@ -223,6 +244,27 @@ mod tests {
             assert!(game_running());
             release();
             assert!(!game_running());
+        });
+    }
+
+    #[test]
+    fn a_second_game_window_cannot_claim_the_lock() {
+        with_temp_dir(|| {
+            assert!(claim_game().is_ok());
+            assert!(claim_game().is_err(), "the first window still holds the lock");
+            release();
+            assert!(claim_game().is_ok(), "released, so it can be taken again");
+        });
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_lock_left_by_a_crashed_game_does_not_block_a_new_one() {
+        with_temp_dir(|| {
+            // A fresh lock, but written by a process that no longer exists.
+            fs::write(lock_path(), format!("{} {}", u32::MAX - 1, now())).unwrap();
+            assert!(!game_running());
+            assert!(claim_game().is_ok());
         });
     }
 

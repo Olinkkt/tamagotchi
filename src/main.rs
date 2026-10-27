@@ -65,6 +65,10 @@ impl App {
         if has("--fast") || dev {
             save::use_test_slot();
         }
+        if save::claim_game().is_err() {
+            eprintln!("tama is already open in another window.");
+            std::process::exit(1);
+        }
         let (cfg, cfg_warning) = Config::load();
         let tz = save::tz_offset();
         let (pet, away, note) = match save::load() {
