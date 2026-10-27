@@ -47,6 +47,7 @@ struct App {
     started: Instant,
     fx: Option<(sprites::Fx, Instant)>,
     last_stage: Stage,
+    confirm_reset: bool,
     quit: bool,
 }
 
@@ -74,6 +75,7 @@ impl App {
             started: Instant::now(),
             fx: None,
             last_stage: Stage::Egg,
+            confirm_reset: false,
             quit: false,
         };
         let ticks = ((away as f64 * speed) as u64).min(MAX_CATCHUP_TICKS);
@@ -209,8 +211,27 @@ impl App {
             }
             return;
         }
+        if self.confirm_reset {
+            self.confirm_reset = false;
+            if code == KeyCode::Char('y') {
+                self.pet = Pet::new(save::now());
+                self.log.clear();
+                self.fx = None;
+                self.last_stage = Stage::Egg;
+                self.message = "Reset! A fresh egg appears.".into();
+                let _ = save::save(&self.pet);
+            } else {
+                self.message = "Reset cancelled.".into();
+            }
+            return;
+        }
         let before = self.snapshot();
         let msg = match code {
+            KeyCode::Char('R') => {
+                self.confirm_reset = true;
+                self.message = "Reset your pet? Press y to confirm, any other key to cancel.".into();
+                return;
+            }
             KeyCode::Char('f') => self.pet.feed_meal(),
             KeyCode::Char('s') => self.pet.feed_snack(),
             KeyCode::Char('p') => {
@@ -398,8 +419,8 @@ fn draw(f: &mut Frame, app: &App) {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let items: &[(&str, &str)] = match app.mode {
         Mode::Game(_) => &[("h", "higher"), ("l", "lower"), ("esc", "quit game")],
-        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("q", "quit")],
-        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("q", "quit")],
+        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("R", "reset"), ("q", "quit")],
+        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("R", "reset"), ("q", "quit")],
     };
     let useful = |k: &str| match k {
         "f" => p.hunger < MAX_HEARTS,
