@@ -24,6 +24,59 @@ impl Stage {
     }
 }
 
+/// A per-pet personality, picked at random when the egg is laid.
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Quirk {
+    #[default]
+    Easygoing,
+    Greedy,
+    Playful,
+    Hardy,
+    Mischievous,
+}
+
+impl Quirk {
+    fn pick(n: u64) -> Quirk {
+        match n % 5 {
+            0 => Quirk::Easygoing,
+            1 => Quirk::Greedy,
+            2 => Quirk::Playful,
+            3 => Quirk::Hardy,
+            _ => Quirk::Mischievous,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Quirk::Easygoing => "easygoing",
+            Quirk::Greedy => "greedy",
+            Quirk::Playful => "playful",
+            Quirk::Hardy => "hardy",
+            Quirk::Mischievous => "mischievous",
+        }
+    }
+
+    pub fn description(self) -> &'static str {
+        match self {
+            Quirk::Easygoing => "no strong habits",
+            Quirk::Greedy => "gets hungry faster",
+            Quirk::Playful => "gets bored faster, loves games",
+            Quirk::Hardy => "rarely gets sick",
+            Quirk::Mischievous => "acts up more often",
+        }
+    }
+}
+
+/// Heaviest weight that is still healthy at each stage.
+fn healthy_max_weight(stage: Stage) -> u8 {
+    match stage {
+        Stage::Egg | Stage::Baby => 10,
+        Stage::Child => 18,
+        Stage::Teen => 28,
+        _ => 38,
+    }
+}
+
 pub const MAX_HEARTS: u8 = 4;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -45,6 +98,8 @@ pub struct Pet {
     pub disc_call: Option<u64>,
     pub cause_of_death: Option<String>,
     pub buried: bool,
+    #[serde(default)]
+    pub quirk: Quirk,
     /// Pet's wall-clock time (unix seconds); advances one second per tick.
     #[serde(default)]
     pub clock: i64,
@@ -68,7 +123,7 @@ pub struct Pet {
 
 impl Pet {
     pub fn new(seed: u64) -> Self {
-        Pet {
+        let mut pet = Pet {
             species: "Egg".into(),
             stage: Stage::Egg,
             age: 0,
@@ -86,6 +141,7 @@ impl Pet {
             disc_call: None,
             cause_of_death: None,
             buried: false,
+            quirk: Quirk::Easygoing,
             clock: seed as i64,
             cfg: Config::default(),
             tz_offset: 0,
@@ -100,7 +156,10 @@ impl Pet {
             light_t: 0,
             rng: seed | 1,
             events: Vec::new(),
-        }
+        };
+        let n = pet.rand(5);
+        pet.quirk = Quirk::pick(n);
+        pet
     }
 
     /// xorshift64; returns a value in 0..n.
@@ -183,6 +242,8 @@ impl Pet {
             Some(('f', "Getting hungry - feed it"))
         } else if self.happy <= 1 {
             Some(('p', "Getting sad - play with it"))
+        } else if self.overweight() {
+            Some(('p', "Overweight - play a game to burn it off"))
         } else {
             None
         }
@@ -260,29 +321,28 @@ impl Pet {
     }
 
     fn grow(&mut self) {
-        let (limit, next): (u64, Stage) = match self.stage {
-            Stage::Egg => (30, Stage::Baby),
-            Stage::Baby => (self.cfg.baby_secs, Stage::Child),
-            Stage::Child => (self.cfg.child_secs, Stage::Teen),
-            Stage::Teen => (self.cfg.teen_secs, Stage::Adult),
-            _ => return,
-        };
+        let Some((limit, next)) = self.next_stage() else { return };
         if self.stage_age < limit {
             return;
         }
         self.stage = next;
         self.stage_age = 0;
+        self.weight = self.weight.saturating_add(5).min(99);
         self.species = self.species_for(next).into();
         self.events.push(format!("Grew into a {} ({})!", next.label(), self.species));
     }
 
     fn species_for(&self, stage: Stage) -> &'static str {
+        Self::species_of(stage, self.mistakes, self.discipline)
+    }
+
+    fn species_of(stage: Stage, mistakes: u32, discipline: u8) -> &'static str {
         match stage {
             Stage::Baby => "Babytchi",
             Stage::Child => "Marutchi",
-            Stage::Teen if self.mistakes <= 2 => "Tonmarutchi",
+            Stage::Teen if mistakes <= 2 => "Tonmarutchi",
             Stage::Teen => "Hashitamatchi",
-            Stage::Adult => match (self.mistakes, self.discipline) {
+            Stage::Adult => match (mistakes, discipline) {
                 (0..=1, 75..) => "Mametchi",
                 (0..=2, _) => "Kuchipatchi",
                 (3..=4, _) => "Tarakotchi",
@@ -293,13 +353,56 @@ impl Pet {
         }
     }
 
-    fn hunger_interval(&self) -> u64 {
+    fn next_stage(&self) -> Option<(u64, Stage)> {
         match self.stage {
+            Stage::Egg => Some((30, Stage::Baby)),
+            Stage::Baby => Some((self.cfg.baby_secs, Stage::Child)),
+            Stage::Child => Some((self.cfg.child_secs, Stage::Teen)),
+            Stage::Teen => Some((self.cfg.teen_secs, Stage::Adult)),
+            _ => None,
+        }
+    }
+
+    pub fn overweight(&self) -> bool {
+        self.alive() && self.stage != Stage::Egg && self.weight > healthy_max_weight(self.stage)
+    }
+
+    /// Short lines describing what growth is coming and how care changes the outcome.
+    pub fn evolution_preview(&self) -> Vec<String> {
+        if !self.alive() || self.stage == Stage::Egg {
+            return Vec::new();
+        }
+        let Some((limit, next)) = self.next_stage() else {
+            let left = self.cfg.adult_lifespan_secs.saturating_sub(self.stage_age);
+            return vec![format!("Fully grown. About {} left.", crate::fmt_age(left))];
+        };
+        let mut out = vec![format!("Next: {} in {}", next.label(), crate::fmt_age(limit.saturating_sub(self.stage_age)))];
+        if matches!(next, Stage::Teen | Stage::Adult) {
+            let now = Self::species_of(next, self.mistakes, self.discipline);
+            out.push(format!("On track: {now}"));
+            if let Some((k, worse)) = (1..=3u32)
+                .map(|k| (k, Self::species_of(next, self.mistakes + k, self.discipline)))
+                .find(|(_, s)| *s != now)
+            {
+                let s = if k == 1 { "" } else { "s" };
+                out.push(format!("{k} more mistake{s} -> {worse}"));
+            }
+            let better = Self::species_of(next, self.mistakes, 100);
+            if better != now {
+                out.push(format!("75%+ discipline -> {better}"));
+            }
+        }
+        out
+    }
+
+    fn hunger_interval(&self) -> u64 {
+        let base = match self.stage {
             Stage::Baby => self.cfg.hunger_secs_baby,
             Stage::Child => self.cfg.hunger_secs_child,
             Stage::Teen => self.cfg.hunger_secs_teen,
             _ => self.cfg.hunger_secs_adult,
-        }
+        };
+        if self.quirk == Quirk::Greedy { base * 3 / 4 } else { base }
     }
 
     fn decay(&mut self) {
@@ -310,7 +413,9 @@ impl Pet {
             self.hunger = self.hunger.saturating_sub(1);
         }
         self.happy_t += 1;
-        if self.happy_t >= (hi as f64 * self.cfg.happy_decay_factor) as u64 {
+        let happy_secs = (hi as f64 * self.cfg.happy_decay_factor) as u64;
+        let happy_secs = if self.quirk == Quirk::Playful { happy_secs * 3 / 4 } else { happy_secs };
+        if self.happy_t >= happy_secs {
             self.happy_t = 0;
             self.happy = self.happy.saturating_sub(1);
         }
@@ -360,7 +465,14 @@ impl Pet {
 
     fn sickness(&mut self) {
         if !self.sick {
-            if self.rand(self.cfg.sick_odds.max(1)) == 0 {
+            let mut odds = self.cfg.sick_odds.max(1);
+            if self.quirk == Quirk::Hardy {
+                odds *= 2;
+            }
+            if self.overweight() {
+                odds = (odds / self.cfg.overweight_sick_factor.max(1)).max(1);
+            }
+            if self.rand(odds) == 0 {
                 self.get_sick();
             }
             return;
@@ -377,7 +489,8 @@ impl Pet {
     fn discipline_call(&mut self) {
         match self.disc_call {
             None => {
-                if self.rand(self.cfg.naughty_odds.max(1)) == 0 {
+                let odds = if self.quirk == Quirk::Mischievous { self.cfg.naughty_odds / 2 } else { self.cfg.naughty_odds };
+                if self.rand(odds.max(1)) == 0 {
                     self.disc_call = Some(0);
                     self.events.push(format!("{} is being naughty!", self.species));
                 }
@@ -412,7 +525,7 @@ impl Pet {
         }
         self.hunger += 1;
         self.weight = self.weight.saturating_add(1).min(99);
-        "Nom nom! Hunger +1.".into()
+        if self.quirk == Quirk::Greedy { "Gobbles it up! Hunger +1.".into() } else { "Nom nom! Hunger +1.".into() }
     }
 
     pub fn feed_snack(&mut self) -> String {
@@ -423,7 +536,7 @@ impl Pet {
             return "Too happy to snack.".into();
         }
         self.happy += 1;
-        self.weight = self.weight.saturating_add(1).min(99);
+        self.weight = self.weight.saturating_add(2).min(99);
         if self.rand(10) == 0 {
             self.get_sick();
         }
@@ -437,12 +550,13 @@ impl Pet {
     pub fn finish_game(&mut self, wins: u8, rounds: u8) -> String {
         self.weight = self.weight.saturating_sub(1).max(1);
         if wins * 2 > rounds {
-            self.happy = (self.happy + 1).min(MAX_HEARTS);
+            let bonus = if self.quirk == Quirk::Playful { 2 } else { 1 };
+            self.happy = (self.happy + bonus).min(MAX_HEARTS);
             if wins == rounds && self.mistakes > 0 {
                 self.mistakes -= 1;
                 return "Perfect game! Happy +1 and a care mistake forgiven.".into();
             }
-            "You won! Happy +1.".into()
+            if self.quirk == Quirk::Playful { "You won! It loves games: Happy +2.".into() } else { "You won! Happy +1.".into() }
         } else {
             "You lost... no happiness gained.".into()
         }
@@ -510,6 +624,48 @@ mod tests {
             p.tick();
         }
         assert_eq!(p.stage, Stage::Baby);
+    }
+
+    #[test]
+    fn overweight_pet_is_flagged_and_hinted() {
+        let mut p = Pet::new(3);
+        p.dev_set_hour(12);
+        for _ in 0..40 {
+            p.tick();
+        }
+        assert_eq!(p.stage, Stage::Baby);
+        p.weight = 11;
+        assert!(p.overweight());
+        p.hunger = 4;
+        p.happy = 4;
+        p.sick = false;
+        p.disc_call = None;
+        p.poops = 0;
+        assert_eq!(p.top_need().map(|n| n.0), Some('p'));
+        p.weight = 5;
+        assert!(!p.overweight());
+    }
+
+    #[test]
+    fn preview_warns_about_mistakes_and_discipline() {
+        let mut p = Pet::new(4);
+        p.stage = Stage::Teen;
+        p.mistakes = 1;
+        p.discipline = 50;
+        let text = p.evolution_preview().join(" | ");
+        assert!(text.contains("On track: Kuchipatchi"), "{text}");
+        assert!(text.contains("1 more mistake -> Kuchipatchi") || text.contains("more mistake"), "{text}");
+        assert!(text.contains("75%+ discipline -> Mametchi"), "{text}");
+    }
+
+    #[test]
+    fn greedy_gets_hungry_sooner() {
+        let mut a = Pet::new(8);
+        a.stage = Stage::Adult;
+        a.quirk = Quirk::Easygoing;
+        let mut b = a.clone();
+        b.quirk = Quirk::Greedy;
+        assert!(b.hunger_interval() < a.hunger_interval());
     }
 
     #[test]

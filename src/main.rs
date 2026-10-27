@@ -447,6 +447,10 @@ fn draw(f: &mut Frame, app: &App) {
         Span::styled(format!("  ·  {}  ·  age {}", p.stage.label(), fmt_age(p.age)), Style::new().fg(DIM)),
     ]);
     let mut header = header;
+    if p.stage != Stage::Egg && p.alive() {
+        header.spans.push(Span::styled(format!("  ·  {}", p.quirk.label()), Style::new().fg(ACCENT)));
+    }
+    let mut header = header;
     if app.dev {
         header.spans.push(Span::styled("   DEV", Style::new().fg(Color::Rgb(20, 20, 30)).bg(WARN).add_modifier(Modifier::BOLD)));
     }
@@ -501,7 +505,14 @@ fn draw(f: &mut Frame, app: &App) {
         stat_row("Hunger", hearts(p.hunger)),
         stat_row("Happy", hearts(p.happy)),
         stat_row("Discipline", discipline),
-        stat_row("Weight", vec![Span::styled(format!("{}", p.weight), Style::new().fg(TEXT))]),
+        stat_row(
+            "Weight",
+            vec![if p.overweight() {
+                Span::styled(format!("{} (heavy)", p.weight), Style::new().fg(WARN))
+            } else {
+                Span::styled(format!("{}", p.weight), Style::new().fg(TEXT))
+            }],
+        ),
         stat_row(
             "Mistakes",
             vec![Span::styled(
@@ -509,6 +520,8 @@ fn draw(f: &mut Frame, app: &App) {
                 Style::new().fg(if p.mistakes == 0 { GOOD } else if p.mistakes < 4 { WARN } else { BAD }),
             )],
         ),
+        stat_row("Trait", vec![Span::styled(p.quirk.label(), Style::new().fg(ACCENT))]),
+        Line::from(Span::styled(format!("  {}", p.quirk.description()), Style::new().fg(DIM))),
         Line::from(""),
     ];
     let mut chip = |text: &str, color: Color| stats.push(Line::from(Span::styled(format!("● {text}"), Style::new().fg(color))));
@@ -523,6 +536,9 @@ fn draw(f: &mut Frame, app: &App) {
     }
     if p.poops > 0 {
         chip("needs cleaning", WARN);
+    }
+    if p.overweight() {
+        chip("overweight - play games", WARN);
     }
     if p.hunger == 0 && !p.asleep {
         chip("starving!", BAD);
@@ -550,6 +566,14 @@ fn draw(f: &mut Frame, app: &App) {
             stats.push(Line::from(Span::styled(h, Style::new().fg(WARN))));
         }
     } else {
+        let preview = p.evolution_preview();
+        if !preview.is_empty() {
+            stats.push(Line::from(Span::styled("growth", Style::new().fg(DIM).add_modifier(Modifier::ITALIC))));
+            for l in preview {
+                stats.push(Line::from(Span::styled(l, Style::new().fg(TEXT))));
+            }
+            stats.push(Line::from(""));
+        }
         stats.push(Line::from(Span::styled("recent", Style::new().fg(DIM).add_modifier(Modifier::ITALIC))));
         let room_left = (cols[1].height as usize).saturating_sub(2 + stats.len());
         for e in app.log.iter().rev().take(room_left).rev() {

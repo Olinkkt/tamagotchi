@@ -20,6 +20,8 @@ pub struct Config {
     pub sick_odds: u64,
     /// Chance of a naughty call is 1 in N per awake second.
     pub naughty_odds: u64,
+    /// An overweight pet is this many times more likely to fall sick.
+    pub overweight_sick_factor: u64,
     /// Seconds a need can go unanswered before it counts as a care mistake.
     pub mistake_after_secs: u64,
     /// How long each stage lasts, in seconds.
@@ -44,6 +46,7 @@ impl Default for Config {
             poop_extra_secs: 900,
             sick_odds: 20_000,
             naughty_odds: 1800,
+            overweight_sick_factor: 3,
             mistake_after_secs: 900,
             baby_secs: 600,
             child_secs: 3600,

@@ -155,8 +155,12 @@ fn heart(c: &mut Canvas, x: i32, y: i32, col: C) {
     c.set(x + 2, y + 3, col);
 }
 
-fn draw_body(p: &Pet, progress_egg: f32) -> Body {
+fn draw_body(p: &Pet, progress_egg: f32, t: u32) -> Body {
     let mut c = Canvas::new();
+    // Animation phases for ears, arms and tails.
+    let wig = ((t / 2) % 2) as f32;
+    let arm = (t % 2) as f32;
+    let wigi = (t / 2 % 2) as i32;
     let tint = |col: C| if p.sick { mix(col, (120, 190, 90), 0.45) } else { col };
     let mut face = None;
     let body;
@@ -199,6 +203,8 @@ fn draw_body(p: &Pet, progress_egg: f32) -> Body {
                 c.pixels(&[(MID + dx, 4), (MID + dx, 3)], acc);
             }
             c.set(MID, 2, acc);
+            c.ellipse(CX - 7.0, 12.0 + arm, 1.2, 2.0, acc);
+            c.ellipse(CX + 7.0, 13.0 - arm, 1.2, 2.0, acc);
             c.ellipse(CX, 11.5, 6.5, 6.5, body);
             c.ellipse(CX, 14.5, 4.0, 3.5, mix(body, WHITE, 0.4));
             c.ellipse(CX - 3.5, 17.0, 2.4, 1.0, acc);
@@ -208,8 +214,10 @@ fn draw_body(p: &Pet, progress_egg: f32) -> Body {
         (Stage::Teen, _) => {
             body = tint((115, 175, 255));
             let acc = darken(body, 0.2);
-            c.ellipse(CX - 5.0, 5.5, 1.6, 2.8, acc);
-            c.ellipse(CX + 5.0, 5.5, 1.6, 2.8, acc);
+            c.ellipse(CX - 5.0, 5.5 + wig, 1.6, 2.8, acc);
+            c.ellipse(CX + 5.0, 5.5 + (1.0 - wig), 1.6, 2.8, acc);
+            c.ellipse(CX - 7.0, 12.0 + arm, 1.2, 2.0, acc);
+            c.ellipse(CX + 7.0, 13.0 - arm, 1.2, 2.0, acc);
             c.ellipse(CX, 11.5, 6.5, 6.5, body);
             c.ellipse(CX, 14.5, 4.0, 3.5, mix(body, WHITE, 0.5));
             c.ellipse(CX - 3.5, 17.0, 2.4, 1.0, acc);
@@ -219,11 +227,11 @@ fn draw_body(p: &Pet, progress_egg: f32) -> Body {
         (Stage::Adult, "Mametchi") => {
             body = tint((135, 215, 135));
             let acc = darken(body, 0.2);
-            c.ellipse(CX - 3.5, 3.5, 1.6, 2.5, acc);
-            c.ellipse(CX + 3.5, 3.5, 1.6, 2.5, acc);
+            c.ellipse(CX - 3.5, 3.5 + wig, 1.6, 2.5, acc);
+            c.ellipse(CX + 3.5, 3.5 + (1.0 - wig), 1.6, 2.5, acc);
             c.ellipse(CX, 10.5, 6.0, 7.5, body);
-            c.ellipse(CX - 6.5, 12.0, 1.3, 2.2, acc);
-            c.ellipse(CX + 6.5, 12.0, 1.3, 2.2, acc);
+            c.ellipse(CX - 6.5, 12.0 + arm, 1.3, 2.2, acc);
+            c.ellipse(CX + 6.5, 13.0 - arm, 1.3, 2.2, acc);
             c.ellipse(CX, 13.0, 3.5, 4.0, mix(body, WHITE, 0.5));
             c.ellipse(CX - 3.0, 17.0, 2.4, 1.0, acc);
             c.ellipse(CX + 3.0, 17.0, 2.4, 1.0, acc);
@@ -234,8 +242,8 @@ fn draw_body(p: &Pet, progress_egg: f32) -> Body {
             let orange = tint((255, 140, 50));
             c.pixels(&[(15, 4), (15, 3), (16, 3), (14, 3)], orange);
             c.ellipse(CX, 11.5, 7.5, 6.5, body);
-            c.ellipse(CX - 7.5, 12.0, 1.5, 2.5, darken(body, 0.15));
-            c.ellipse(CX + 7.5, 12.0, 1.5, 2.5, darken(body, 0.15));
+            c.ellipse(CX - 7.5, 12.0 - arm, 1.5, 2.5, darken(body, 0.15));
+            c.ellipse(CX + 7.5, 12.0 - arm, 1.5, 2.5, darken(body, 0.15));
             c.ellipse(CX, 11.5, 2.6, 1.6, orange);
             c.ellipse(CX - 3.5, 17.0, 2.2, 1.0, orange);
             c.ellipse(CX + 3.5, 17.0, 2.2, 1.0, orange);
@@ -244,7 +252,10 @@ fn draw_body(p: &Pet, progress_egg: f32) -> Body {
         (Stage::Adult, "Tarakotchi") => {
             body = tint((255, 155, 75));
             let acc = darken(body, 0.25);
-            c.pixels(&[(15, 3), (15, 2), (16, 2), (14, 2), (13, 3), (17, 3)], acc);
+            let sway = wigi;
+            c.pixels(&[(15 + sway, 3), (15 + sway, 2), (16 + sway, 2), (14 + sway, 2), (13 + sway, 3), (17 + sway, 3)], acc);
+            c.ellipse(CX - 7.5, 12.0 + arm, 1.2, 2.0, acc);
+            c.ellipse(CX + 7.5, 13.0 - arm, 1.2, 2.0, acc);
             c.ellipse(CX, 11.0, 7.0, 7.0, body);
             c.ellipse(CX, 14.0, 3.0, 1.5, (255, 140, 160));
             c.pixels(&[(10, 9), (11, 10), (20, 9), (19, 10), (9, 12), (21, 12)], acc);
@@ -256,8 +267,10 @@ fn draw_body(p: &Pet, progress_egg: f32) -> Body {
             body = tint((240, 85, 95));
             let green = tint((90, 190, 90));
             c.rect(15, 2, 15, 4, green);
-            c.ellipse(CX - 3.0, 5.0, 2.6, 1.3, green);
-            c.ellipse(CX + 3.0, 5.0, 2.6, 1.3, green);
+            c.ellipse(CX - 3.0, 4.5 + wig, 2.6, 1.3, green);
+            c.ellipse(CX + 3.0, 5.5 - wig, 2.6, 1.3, green);
+            c.ellipse(CX - 7.0, 12.0 + arm, 1.2, 2.0, darken(body, 0.15));
+            c.ellipse(CX + 7.0, 13.0 - arm, 1.2, 2.0, darken(body, 0.15));
             c.ellipse(CX, 11.5, 6.5, 6.5, body);
             c.pixels(&[(11, 15), (19, 15), (10, 11), (20, 11), (15, 16), (12, 12), (18, 12)], (255, 225, 110));
             c.ellipse(CX - 3.0, 17.0, 2.2, 1.0, darken(body, 0.25));
@@ -268,8 +281,10 @@ fn draw_body(p: &Pet, progress_egg: f32) -> Body {
             body = tint((85, 205, 205));
             let acc = darken(body, 0.2);
             c.pixels(&[(15, 3), (15, 2), (14, 2), (13, 1)], acc);
-            c.ellipse(CX + 6.5, 15.0, 2.2, 2.2, body);
-            c.ellipse(CX + 8.5, 12.5, 1.2, 1.4, body);
+            let wag = wig * 1.0;
+            c.ellipse(CX + 6.5, 15.0 - wag, 2.2, 2.2, body);
+            c.ellipse(CX + 8.5, 12.5 - wag * 1.5, 1.2, 1.4, body);
+            c.ellipse(CX - 5.5, 12.0 + arm, 1.1, 1.8, acc);
             c.ellipse(CX, 11.0, 5.0, 7.0, body);
             c.ellipse(CX, 13.5, 3.0, 4.0, mix(body, WHITE, 0.5));
             face = Some(Face { eye_y: 8, sep: 2, mouth_y: 12 });
@@ -308,6 +323,10 @@ fn draw_face(c: &mut Canvas, f: &Face, mood: Mood, blink: bool, mouth_open: bool
                 c.set(ex, ey + 1, ink);
             }
         }
+    }
+    if f.sep >= 3 && matches!(mood, Mood::Sad | Mood::Sick) && !blink {
+        // Brows slope up toward the middle: worried.
+        c.pixels(&[(MID - f.sep - 1, ey - 1), (MID - f.sep, ey - 2), (MID + f.sep + 1, ey - 1), (MID + f.sep, ey - 2)], INK);
     }
     let my = f.mouth_y;
     let wide = f.sep >= 3;
@@ -414,7 +433,7 @@ pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec
     let mouth_open = fx_kind == Some(Fx::Eat) && (0.3..0.9).contains(&fxp) && ((fxp * 8.0) as i32) % 2 == 0;
     let blink = !p.asleep && t % 9 == 8;
 
-    let mut body = draw_body(p, egg_progress);
+    let mut body = draw_body(p, egg_progress, t);
     if let Some(face) = &body.face {
         draw_face(&mut body.canvas, face, mood, blink, mouth_open);
     }
