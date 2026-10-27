@@ -31,6 +31,8 @@ Run `tama`. One pet at a time; when it dies you can hatch a new egg with `n`.
 | `m` | medicine (a sick pet needs two doses) |
 | `c` | clean up poop |
 | `d` | scold, but only when it is being naughty |
+| `b` | shop (see below) |
+| `a` | awards: achievements and the adults you have raised |
 | `g` | graveyard: the pets you have lost |
 | `q` | quit (the pet keeps living) |
 
@@ -46,6 +48,23 @@ one care mistake.
 2. **Reaction**: press space within 500 ms of "GO", three rounds.
 3. **Memory**: repeat patterns of 3, 4 and 5 with keys 1 to 4.
 4. **Pong**: return the ball five times; one miss ends it.
+
+### Coins, shop and awards
+
+Winning a mini-game pays **4 coins**, and a perfect game **10**. Spend them in the shop (`b`,
+then `1` to `4`); nothing is charged if the item would do nothing right now:
+
+| Item | Price | Effect |
+|---|---|---|
+| Fancy meal | 8 | +2 hunger, a bit heavy |
+| Toy | 6 | +2 happy, burns weight |
+| Salad | 5 | +1 hunger, lighter |
+| Vitamins | 12 | no sickness for 3 hours |
+
+`a` shows ten achievements (for example "Spotless": reach adulthood with no care mistakes) and
+which of the five adult species you have raised. Coins, achievements and the collection belong
+to you, not to one pet, so they survive a pet dying; they live in `profile.json` next to the save.
+Prices and rewards are first guesses.
 
 ### Growing up
 
@@ -123,7 +142,7 @@ usual config folder.
 
 The balance numbers are first guesses and not play-tested over many days.
 
-Saves, the graveyard and a lock file live in the user data folder (`~/.local/share/tamagotchi`
+Saves, the profile, the graveyard and a lock file live in the user data folder (`~/.local/share/tamagotchi`
 on Linux). Saves are written atomically, and an unreadable save is moved aside instead of
 being overwritten.
 
@@ -202,13 +221,13 @@ tama --dev        # separate test save; press ` for the dev panel
 ```
 
 The dev panel changes hunger/happy/discipline/weight/mistakes, adds poop, sickness or a naughty
-call, grows or kills the pet, skips time and sets the clock, changes the speed, and switches the
+call, adds coins, grows or kills the pet, skips time and sets the clock, changes the speed, and switches the
 machine reactions (CPU, RAM, battery) on and off.
 
 Shift+R (then `y`) throws the current pet away and starts a new egg.
 
 Source layout: `pet.rs` (the simulation), `sprites.rs` (pixel art), `main.rs` (UI and game
-loop), `games.rs` (mini-games), `sysinfo.rs` (machine load), `cli.rs` (shell commands, status bar, notifications),
+loop), `games.rs` (mini-games), `profile.rs` (coins, achievements), `sysinfo.rs` (machine load), `cli.rs` (shell commands, status bar, notifications),
 `save.rs` (files and lock), `config.rs`.
 
 Versions follow `MAJOR.MINOR.PATCH`; see `CLAUDE.md` for the rules.

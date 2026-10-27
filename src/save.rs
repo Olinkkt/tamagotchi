@@ -1,4 +1,5 @@
 use crate::pet::Pet;
+use crate::profile::Profile;
 use serde::{Deserialize, Serialize};
 use std::{
     fs, io,
@@ -37,6 +38,14 @@ fn dir() -> PathBuf {
     if let Some(d) = dir_override() {
         return d;
     }
+    #[cfg(test)]
+    panic!("a test touched the real data folder; wrap it in save::with_temp_dir");
+    #[cfg(not(test))]
+    real_dir()
+}
+
+#[cfg_attr(test, allow(dead_code))]
+fn real_dir() -> PathBuf {
     let mut d = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
     d.push("tamagotchi");
     d
@@ -129,6 +138,27 @@ pub fn claim_game() -> Result<(), ()> {
     }
     heartbeat();
     Ok(())
+}
+
+fn profile_path() -> PathBuf {
+    dir().join(if TEST_SLOT.load(Ordering::Relaxed) { "profile-test.json" } else { "profile.json" })
+}
+
+/// Coins, achievements and the adults raised. An unreadable file is moved aside, not overwritten.
+pub fn load_profile() -> Profile {
+    let Ok(text) = fs::read_to_string(profile_path()) else { return Profile::default() };
+    serde_json::from_str(&text).unwrap_or_else(|_| {
+        let _ = fs::rename(profile_path(), profile_path().with_extension("json.corrupt"));
+        Profile::default()
+    })
+}
+
+pub fn save_profile(profile: &Profile) -> io::Result<()> {
+    fs::create_dir_all(dir())?;
+    let path = profile_path();
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, serde_json::to_string_pretty(profile)?)?;
+    fs::rename(&tmp, &path)
 }
 
 fn events_path() -> PathBuf {
@@ -300,6 +330,24 @@ mod tests {
             fs::write(lock_path(), format!("{} {}", u32::MAX - 1, now())).unwrap();
             assert!(!game_running());
             assert!(claim_game().is_ok());
+        });
+    }
+
+    #[test]
+    fn the_profile_round_trips_and_a_broken_one_is_moved_aside() {
+        with_temp_dir(|| {
+            assert_eq!(load_profile().coins, 0);
+            let mut p = Profile::default();
+            p.add_coins(12);
+            p.adults.push("Mametchi".into());
+            save_profile(&p).unwrap();
+            let q = load_profile();
+            assert_eq!((q.coins, q.adults.clone()), (12, vec!["Mametchi".to_string()]));
+            assert!(!dir().join("profile.json.tmp").exists());
+
+            fs::write(profile_path(), "{broken").unwrap();
+            assert_eq!(load_profile().coins, 0);
+            assert!(dir().join("profile.json.corrupt").exists(), "the broken file must be kept");
         });
     }
 

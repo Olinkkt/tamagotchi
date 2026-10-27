@@ -67,6 +67,49 @@ impl Quirk {
     }
 }
 
+/// Something that can be bought in the shop.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Item {
+    FancyMeal,
+    Toy,
+    Salad,
+    Vitamins,
+}
+
+/// How long vitamins keep the pet from falling sick.
+const VITAMIN_SECS: u64 = 3 * 3600;
+
+impl Item {
+    pub const ALL: [Item; 4] = [Item::FancyMeal, Item::Toy, Item::Salad, Item::Vitamins];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Item::FancyMeal => "Fancy meal",
+            Item::Toy => "Toy",
+            Item::Salad => "Salad",
+            Item::Vitamins => "Vitamins",
+        }
+    }
+
+    pub fn price(self) -> u32 {
+        match self {
+            Item::FancyMeal => 8,
+            Item::Toy => 6,
+            Item::Salad => 5,
+            Item::Vitamins => 12,
+        }
+    }
+
+    pub fn blurb(self) -> &'static str {
+        match self {
+            Item::FancyMeal => "+2 hunger, a bit heavy",
+            Item::Toy => "+2 happy, burns weight",
+            Item::Salad => "+1 hunger, lighter",
+            Item::Vitamins => "no sickness for 3 hours",
+        }
+    }
+}
+
 /// Heaviest weight that is still healthy at each stage.
 fn healthy_max_weight(stage: Stage) -> u8 {
     match stage {
@@ -106,6 +149,9 @@ pub struct Pet {
     pub last_commit_meal: Option<i64>,
     #[serde(default)]
     pub quirk: Quirk,
+    /// The pet cannot fall sick until its `age` reaches this (set by vitamins).
+    #[serde(default)]
+    pub immune_until: u64,
     /// Pet's wall-clock time (unix seconds); advances one second per tick.
     #[serde(default)]
     pub clock: i64,
@@ -156,6 +202,7 @@ impl Pet {
             fail_count: 0,
             last_commit_meal: None,
             quirk: Quirk::Easygoing,
+            immune_until: 0,
             clock: seed as i64,
             cfg: Config::default(),
             tz_offset: 0,
@@ -523,7 +570,7 @@ impl Pet {
             self.dirty_t += 1;
             if self.dirty_t >= 1200 {
                 self.dirty_t = 0;
-                if self.rand(3) == 0 && !self.safe_away() {
+                if self.rand(3) == 0 && !self.safe_away() && self.age >= self.immune_until {
                     self.get_sick();
                 }
             }
@@ -537,6 +584,9 @@ impl Pet {
             return;
         }
         if !self.sick {
+            if self.age < self.immune_until {
+                return;
+            }
             let mut odds = self.cfg.sick_odds.max(1);
             if self.quirk == Quirk::Hardy {
                 odds *= 2;
@@ -634,6 +684,37 @@ impl Pet {
             if self.quirk == Quirk::Playful { "You won! It loves games: Happy +2.".into() } else { "You won! Happy +1.".into() }
         } else {
             "You lost... no happiness gained.".into()
+        }
+    }
+
+    /// Use something from the shop. Fails (without using it up) if it would do nothing right now.
+    pub fn use_item(&mut self, item: Item) -> Result<String, String> {
+        if let Some(m) = self.blocked() {
+            return Err(m.into());
+        }
+        match item {
+            Item::FancyMeal | Item::Salad if self.hunger >= MAX_HEARTS => Err("Not hungry.".into()),
+            Item::Toy if self.happy >= MAX_HEARTS => Err("Too happy to play.".into()),
+            Item::Vitamins if self.age < self.immune_until => Err("Already protected.".into()),
+            Item::FancyMeal => {
+                self.hunger = (self.hunger + 2).min(MAX_HEARTS);
+                self.weight = self.weight.saturating_add(1).min(99);
+                Ok("A fancy meal! Hunger +2.".into())
+            }
+            Item::Toy => {
+                self.happy = (self.happy + 2).min(MAX_HEARTS);
+                self.weight = self.weight.saturating_sub(1).max(1);
+                Ok("It loves the toy! Happy +2.".into())
+            }
+            Item::Salad => {
+                self.hunger += 1;
+                self.weight = self.weight.saturating_sub(2).max(1);
+                Ok("A light salad. Hunger +1, a little lighter.".into())
+            }
+            Item::Vitamins => {
+                self.immune_until = self.age + VITAMIN_SECS;
+                Ok("Vitamins! No sickness for 3 hours.".into())
+            }
         }
     }
 
@@ -803,6 +884,52 @@ mod tests {
         assert!(dead.apply_event("fail").is_none());
         let mut p = awake_adult();
         assert!(p.apply_event("nonsense").is_none());
+    }
+
+    #[test]
+    fn shop_items_change_hunger_happiness_and_weight() {
+        let mut p = awake_adult();
+        p.hunger = 1;
+        p.happy = 1;
+        p.weight = 10;
+        p.use_item(Item::FancyMeal).unwrap();
+        assert_eq!((p.hunger, p.weight), (3, 11));
+        p.use_item(Item::Toy).unwrap();
+        assert_eq!((p.happy, p.weight), (3, 10));
+        p.use_item(Item::Salad).unwrap();
+        assert_eq!((p.hunger, p.weight), (4, 8));
+    }
+
+    #[test]
+    fn an_item_that_would_do_nothing_is_refused_so_it_is_not_wasted() {
+        let mut p = awake_adult();
+        assert!(p.use_item(Item::FancyMeal).is_err(), "already full");
+        assert!(p.use_item(Item::Salad).is_err());
+        assert!(p.use_item(Item::Toy).is_err(), "already happy");
+        p.use_item(Item::Vitamins).unwrap();
+        assert!(p.use_item(Item::Vitamins).is_err(), "still protected");
+        let mut asleep = awake_adult();
+        asleep.hunger = 1;
+        asleep.asleep = true;
+        assert!(asleep.use_item(Item::FancyMeal).is_err(), "it is sleeping");
+        assert_eq!(asleep.hunger, 1);
+    }
+
+    #[test]
+    fn vitamins_stop_sickness_until_they_wear_off() {
+        let mut p = awake_adult();
+        p.cfg.sick_odds = 1;
+        p.cfg.away_safe = false;
+        p.use_item(Item::Vitamins).unwrap();
+        for _ in 0..600 {
+            p.tick();
+            p.hunger = 4;
+            p.happy = 4;
+        }
+        assert!(!p.sick, "protected, so it must not get sick");
+        p.immune_until = 0;
+        p.tick();
+        assert!(p.sick, "with odds of 1 in 1 it falls sick the moment the protection ends");
     }
 
     #[test]

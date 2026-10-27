@@ -78,6 +78,9 @@ fn path() -> Option<PathBuf> {
     if let Some(d) = crate::save::dir_override() {
         return Some(d.join("config.json"));
     }
+    #[cfg(test)]
+    panic!("a test touched the real config folder; wrap it in save::with_temp_dir");
+    #[cfg(not(test))]
     dirs::config_dir().map(|d| d.join("tamagotchi").join("config.json"))
 }
 

@@ -2,6 +2,7 @@ mod cli;
 mod config;
 mod games;
 mod pet;
+mod profile;
 mod save;
 mod sprites;
 mod sysinfo;
@@ -9,6 +10,7 @@ mod sysinfo;
 use std::time::{Duration, Instant};
 
 use config::Config;
+use profile::Profile;
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use pet::{Pet, Stage, MAX_HEARTS};
 use ratatui::{
@@ -33,6 +35,8 @@ enum Mode {
     Chooser,
     Game(games::Game),
     Graveyard(Vec<String>),
+    Shop,
+    Awards,
 }
 
 struct App {
@@ -41,6 +45,7 @@ struct App {
     message: String,
     log: Vec<String>,
     cfg: Config,
+    profile: Profile,
     tz: i64,
     speed: f64,
     tick_acc: f64,
@@ -105,6 +110,7 @@ impl App {
             app.message = format!("Welcome back! You were away {}.", fmt_age(away));
         }
         app.pet.load = sysinfo::read();
+        app.profile = save::load_profile();
         app.apply_queued_events();
         app.drain_events();
         app.last_stage = app.pet.stage;
@@ -119,6 +125,7 @@ impl App {
             message,
             log: Vec::new(),
             cfg,
+            profile: Profile::default(),
             tz,
             speed,
             tick_acc: 0.0,
@@ -152,6 +159,23 @@ impl App {
             }
         }
         self.react(before);
+    }
+
+    /// Buy something from the shop and use it on the pet. Nothing is charged if it would do nothing.
+    fn buy(&mut self, item: pet::Item) {
+        if self.profile.coins < item.price() {
+            self.message = format!("Not enough coins: {} costs {}.", item.name(), item.price());
+            return;
+        }
+        let before = self.snapshot();
+        match self.pet.use_item(item) {
+            Ok(msg) => {
+                self.profile.coins -= item.price();
+                self.message = format!("{msg} (-{} coins)", item.price());
+                self.react(before);
+            }
+            Err(msg) => self.message = msg,
+        }
     }
 
     fn fresh_pet(&self) -> Pet {
@@ -233,6 +257,12 @@ impl App {
             self.mode = Mode::Normal;
         }
         self.tick_game();
+        for a in self.profile.check(&self.pet) {
+            let note = format!("Achievement unlocked: {} - {}", a.name, a.how);
+            self.message = note.clone();
+            self.log.push(note);
+            let _ = save::save_profile(&self.profile);
+        }
         let calling = self.pet.needs_attention();
         if calling && !self.was_calling {
             print!("\x07");
@@ -244,6 +274,7 @@ impl App {
         }
         if self.last_save.elapsed() > Duration::from_secs(10) {
             let _ = save::save(&self.pet);
+            let _ = save::save_profile(&self.profile);
             save::heartbeat();
             self.last_save = Instant::now();
         }
@@ -265,6 +296,12 @@ impl App {
             games::Outcome::Done { wins, rounds } => {
                 let before = self.snapshot();
                 self.message = self.pet.finish_game(wins, rounds);
+                let coins = profile::game_reward(wins, rounds);
+                if coins > 0 {
+                    self.profile.add_coins(coins);
+                    self.profile.games_won += 1;
+                    self.message.push_str(&format!(" +{coins} coins."));
+                }
                 self.mode = Mode::Normal;
                 self.react(before);
             }
@@ -289,7 +326,15 @@ impl App {
                 }
                 return;
             }
-            Mode::Graveyard(_) => {
+            Mode::Shop => {
+                match code {
+                    KeyCode::Char(c @ '1'..='4') => self.buy(pet::Item::ALL[(c as u8 - b'1') as usize]),
+                    KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('b') => self.mode = Mode::Normal,
+                    _ => {}
+                }
+                return;
+            }
+            Mode::Awards | Mode::Graveyard(_) => {
                 self.mode = Mode::Normal;
                 return;
             }
@@ -334,6 +379,14 @@ impl App {
             }
             KeyCode::Char('g') => {
                 self.mode = Mode::Graveyard(save::graveyard());
+                return;
+            }
+            KeyCode::Char('b') => {
+                self.mode = Mode::Shop;
+                return;
+            }
+            KeyCode::Char('a') => {
+                self.mode = Mode::Awards;
                 return;
             }
             KeyCode::Char('m') => self.pet.medicine(),
@@ -400,6 +453,10 @@ impl App {
             'k' => {
                 p.dev_kill();
                 "killed".into()
+            }
+            'o' => {
+                self.profile.add_coins(10);
+                format!("coins = {}", self.profile.coins)
             }
             'u' | 'r' | 'b' => {
                 match c {
@@ -507,6 +564,73 @@ fn key_chip_sized(key: &str, label: &str, size: u8) -> Vec<Span<'static>> {
     vec![key_span, label_span]
 }
 
+fn shop_lines(profile: &Profile, pet: &Pet) -> Vec<Line<'static>> {
+    let mut v = vec![
+        Line::from(Span::styled("SHOP", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),
+        Line::from(Span::styled(format!("you have ◎ {}", profile.coins), Style::new().fg(WARN))),
+        Line::from(""),
+    ];
+    for (i, item) in pet::Item::ALL.iter().enumerate() {
+        let affordable = profile.coins >= item.price();
+        let colour = if affordable { TEXT } else { EMPTY };
+        // Every row is the same width, so the centred block lines up.
+        let spans = vec![
+            Span::styled(format!(" {} ", i + 1), Style::new().fg(Color::Rgb(20, 20, 30)).bg(ACCENT).add_modifier(Modifier::BOLD)),
+            Span::styled(format!(" {:<11}", item.name()), Style::new().fg(colour).add_modifier(Modifier::BOLD)),
+            Span::styled(format!("◎{:<4}", item.price()), Style::new().fg(if affordable { WARN } else { EMPTY })),
+            Span::styled(format!("{:<24}", item.blurb()), Style::new().fg(DIM)),
+        ];
+        v.push(Line::from(spans));
+    }
+    v.push(Line::from(""));
+    v.push(Line::from(Span::styled(
+        if pet.alive() { "win mini-games to earn coins" } else { "your pet has passed away" },
+        Style::new().fg(DIM),
+    )));
+    v
+}
+
+fn awards_lines(profile: &Profile) -> Vec<Line<'static>> {
+    let unlocked = profile.achievements.len();
+    let mut v = vec![Line::from(vec![
+        Span::styled("AWARDS ", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD)),
+        Span::styled(format!("{unlocked}/{}   ◎ {}", profile::ACHIEVEMENTS.len(), profile.coins), Style::new().fg(DIM)),
+    ])];
+    for pair in profile::ACHIEVEMENTS.chunks(2) {
+        let mut spans = Vec::new();
+        for a in pair {
+            let done = profile.has(a.id);
+            spans.push(Span::styled(
+                format!("{} {:<16}", if done { "✓" } else { "·" }, a.name),
+                Style::new().fg(if done { GOOD } else { DIM }),
+            ));
+        }
+        v.push(Line::from(spans));
+    }
+    v.push(Line::from(""));
+    v.push(Line::from(Span::styled(
+        format!("Adults raised {}/{}", profile.adults.len(), profile::ADULT_SPECIES.len()),
+        Style::new().fg(ACCENT).add_modifier(Modifier::BOLD),
+    )));
+    for names in profile::ADULT_SPECIES.chunks(3) {
+        let mut spans: Vec<Span<'static>> = names
+            .iter()
+            .map(|s| {
+                let done = profile.raised(s);
+                Span::styled(format!("{} {:<12}", if done { "✓" } else { "·" }, s), Style::new().fg(if done { GOOD } else { DIM }))
+            })
+            .collect();
+        // Pad a short last row so the block stays aligned.
+        spans.resize(3, Span::raw(" ".repeat(14)));
+        v.push(Line::from(spans));
+    }
+    if let Some(next) = profile::ACHIEVEMENTS.iter().find(|a| !profile.has(a.id)) {
+        v.push(Line::from(""));
+        v.push(Line::from(Span::styled(format!("next: {} - {}", next.name, next.how), Style::new().fg(DIM))));
+    }
+    v
+}
+
 /// The smallest window the layout is designed for.
 const MIN_W: u16 = 64;
 const MIN_H: u16 = 22;
@@ -579,6 +703,8 @@ fn draw(f: &mut Frame, app: &App) {
             }
             centered(v)
         }
+        Mode::Shop => centered(shop_lines(&app.profile, p)),
+        Mode::Awards => centered(awards_lines(&app.profile)),
         Mode::Graveyard(entries) => {
             let mut v = vec![Line::from(Span::styled("GRAVEYARD", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))), Line::from("")];
             if entries.is_empty() {
@@ -616,6 +742,7 @@ fn draw(f: &mut Frame, app: &App) {
                 Style::new().fg(if p.mistakes == 0 { GOOD } else if p.mistakes < 4 { WARN } else { BAD }),
             )],
         ),
+        stat_row("Coins", vec![Span::styled(format!("◎ {}", app.profile.coins), Style::new().fg(WARN))]),
         stat_row("Trait", vec![Span::styled(p.quirk.label(), Style::new().fg(ACCENT))]),
         Line::from(Span::styled(format!("  {}", p.quirk.description()), Style::new().fg(DIM))),
         Line::from(""),
@@ -662,7 +789,7 @@ fn draw(f: &mut Frame, app: &App) {
             "m/M mistakes -/+".into(),
             "p poop   s sick".into(),
             "n naughty  g grow".into(),
-            "k kill".into(),
+            "k kill   o +10 coins".into(),
             "u cpu  r ram  b battery".into(),
             "t/T skip 1h / 8h".into(),
             "z 22:00  Z 12:00".into(),
@@ -716,9 +843,10 @@ fn draw(f: &mut Frame, app: &App) {
     let items: &[(&str, &str)] = match &app.mode {
         Mode::Game(g) => g.keys(),
         Mode::Chooser => &[("1-4", "choose"), ("esc", "back")],
-        Mode::Graveyard(_) => &[("any key", "back")],
-        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("g", "graveyard"), ("q", "quit")],
-        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("g", "graveyard"), ("q", "quit")],
+        Mode::Graveyard(_) | Mode::Awards => &[("any key", "back")],
+        Mode::Shop => &[("1-4", "buy"), ("esc", "back")],
+        Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("a", "awards"), ("g", "graveyard"), ("q", "quit")],
+        Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("b", "shop"), ("a", "awards"), ("g", "graveyard"), ("q", "quit")],
     };
     let useful = |k: &str| match k {
         "f" => p.hunger < MAX_HEARTS,
@@ -732,10 +860,14 @@ fn draw(f: &mut Frame, app: &App) {
     let urgent = if matches!(app.mode, Mode::Normal) { need.map(|n| n.0.to_string()) } else { None };
     let ink = Color::Rgb(20, 20, 30);
     let room = rows[4].width.saturating_sub(2) as usize;
-    for size in 0..=2u8 {
+    // Largest style that fits: full labels, short labels, short labels only on the chips you can
+    // use right now (the rest keys only), or keys only.
+    for size in 0..=3u8 {
         spans.clear();
         for (k, l) in items {
-            let mut chip = key_chip_sized(k, l, size);
+            let chip_size = if size == 2 && !(urgent.as_deref() == Some(*k) || useful(k)) { 3 } else { size.min(3) };
+            let chip_size = if size == 2 && chip_size != 3 { 1 } else { chip_size };
+            let mut chip = key_chip_sized(k, l, chip_size);
             if urgent.as_deref() == Some(*k) {
                 chip[0].style = Style::new().fg(ink).bg(WARN).add_modifier(Modifier::BOLD);
                 chip[1].style = Style::new().fg(WARN).add_modifier(Modifier::BOLD);
@@ -900,6 +1032,7 @@ fn main() -> std::io::Result<()> {
     let res = run(&mut terminal, &mut app);
     ratatui::restore();
     let _ = save::save(&app.pet);
+    let _ = save::save_profile(&app.profile);
     save::release();
     res
 }
@@ -960,7 +1093,7 @@ mod tests {
         let app = app_with(Stage::Adult, |_| {});
         let screen = render(&app, 80, 24);
         let menu = &screen[22];
-        for key in ["f", "s", "p", "l", "m", "c", "d", "g", "q"] {
+        for key in ["f", "s", "p", "l", "m", "c", "d", "b", "a", "g", "q"] {
             assert!(menu.contains(&format!(" {key} ")), "missing the {key} key in: {menu}");
         }
         assert!(menu.contains("feed") && menu.contains("quit"), "labels should still show at 80 columns: {menu}");
@@ -980,6 +1113,79 @@ mod tests {
         assert!(screen.contains("sweating") && screen.contains("dizzy") && screen.contains("sleepy"), "{screen}");
         let calm = render(&app_with(Stage::Adult, |_| {}), 140, 40).join("\n");
         assert!(!calm.contains("sweating") && !calm.contains("dizzy"));
+    }
+
+    #[test]
+    fn buying_charges_the_coins_and_uses_the_item() {
+        let mut app = app_with(Stage::Adult, |p| p.hunger = 1);
+        app.profile.coins = 10;
+        app.buy(pet::Item::FancyMeal);
+        assert_eq!((app.profile.coins, app.pet.hunger), (2, 3));
+        app.buy(pet::Item::Vitamins);
+        assert_eq!(app.profile.coins, 2, "12 coins is more than it has");
+        assert!(app.message.contains("Not enough coins"), "{}", app.message);
+    }
+
+    #[test]
+    fn nothing_is_charged_for_an_item_that_would_do_nothing() {
+        let mut app = app_with(Stage::Adult, |p| p.hunger = 4);
+        app.profile.coins = 20;
+        app.buy(pet::Item::FancyMeal);
+        assert_eq!((app.profile.coins, app.pet.hunger), (20, 4));
+        assert!(app.message.contains("Not hungry"), "{}", app.message);
+    }
+
+    #[test]
+    fn winning_a_mini_game_pays_coins_and_losing_pays_nothing() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.handle_outcome(games::Outcome::Done { wins: 5, rounds: 5 });
+        assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
+        assert!(app.message.contains("coins"), "{}", app.message);
+        app.handle_outcome(games::Outcome::Done { wins: 1, rounds: 5 });
+        assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
+    }
+
+    #[test]
+    fn the_shop_and_awards_screens_show_their_contents() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.profile.coins = 7;
+        app.mode = Mode::Shop;
+        let shop = render(&app, 100, 30).join("\n");
+        for want in ["SHOP", "Fancy meal", "Vitamins", "◎ 7"] {
+            assert!(shop.contains(want), "shop is missing {want}:\n{shop}");
+        }
+        app.mode = Mode::Awards;
+        let awards = render(&app, 100, 30).join("\n");
+        for want in ["AWARDS", "First steps", "Adults raised 0/5", "Mametchi"] {
+            assert!(awards.contains(want), "awards is missing {want}:\n{awards}");
+        }
+    }
+
+    #[test]
+    fn the_awards_screen_fits_a_standard_80x24_terminal() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.mode = Mode::Awards;
+        let screen = render(&app, 80, 24).join("\n");
+        assert!(screen.contains("Collector") && screen.contains("Nyorotchi"), "{screen}");
+    }
+
+    #[test]
+    fn the_keys_open_and_close_the_shop_and_awards_and_buy() {
+        save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Adult, |p| p.hunger = 1);
+            app.on_key(KeyCode::Char('b'));
+            assert!(matches!(app.mode, Mode::Shop));
+            app.profile.coins = 20;
+            app.on_key(KeyCode::Char('1'));
+            assert_eq!((app.profile.coins, app.pet.hunger), (12, 3));
+            assert!(matches!(app.mode, Mode::Shop), "stays open for another purchase");
+            app.on_key(KeyCode::Esc);
+            assert!(matches!(app.mode, Mode::Normal));
+            app.on_key(KeyCode::Char('a'));
+            assert!(matches!(app.mode, Mode::Awards));
+            app.on_key(KeyCode::Char('x'));
+            assert!(matches!(app.mode, Mode::Normal));
+        });
     }
 
     #[test]
