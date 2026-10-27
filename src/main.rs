@@ -396,9 +396,10 @@ fn draw(f: &mut Frame, app: &App) {
     let hint = match need {
         Some((k, text)) => Line::from(vec![
             Span::styled("→ ", Style::new().fg(WARN)),
-            Span::styled(format!("press {k}: "), Style::new().fg(WARN).add_modifier(Modifier::BOLD)),
-            Span::styled(text, Style::new().fg(TEXT)),
+            Span::styled(format!("PRESS {}: ", k.to_ascii_uppercase()), Style::new().fg(WARN).add_modifier(Modifier::BOLD)),
+            Span::styled(text.to_uppercase(), Style::new().fg(TEXT)),
         ]),
+        None if p.stage == Stage::Egg => Line::from(Span::styled("IT'S AN EGG - GIVE IT A MOMENT TO HATCH.", Style::new().fg(DIM))),
         None => Line::from(""),
     };
     f.render_widget(Paragraph::new(hint).alignment(Alignment::Center), rows[2]);
