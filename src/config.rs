@@ -24,6 +24,11 @@ pub struct Config {
     pub overweight_sick_factor: u64,
     /// Show (and wiggle) the ears, wings, tuft, leaves and tail. When off those parts are not drawn at all.
     pub animate_parts: bool,
+    /// While the game is closed the pet's needs fall this many times slower (1 = no change).
+    pub away_slowdown: u64,
+    /// While the game is closed the pet is looked after loosely: hunger and happiness never drop
+    /// below one heart, and it cannot fall sick, act up or die. Growing up still carries on.
+    pub away_safe: bool,
     /// Seconds a need can go unanswered before it counts as a care mistake.
     pub mistake_after_secs: u64,
     /// How long each stage lasts, in seconds.
@@ -50,6 +55,8 @@ impl Default for Config {
             naughty_odds: 1800,
             overweight_sick_factor: 3,
             animate_parts: false,
+            away_slowdown: 3,
+            away_safe: true,
             mistake_after_secs: 900,
             baby_secs: 600,
             child_secs: 3600,

@@ -106,14 +106,16 @@ impl App {
             app.pet.clock = (save::now() - away) as i64;
         }
         let ticks = ((away as f64 * speed) as u64).min(MAX_CATCHUP_TICKS);
+        app.pet.away = true;
         for _ in 0..ticks {
             app.pet.tick();
         }
+        app.pet.away = false;
         if speed == 1.0 {
             app.pet.clock = save::now() as i64;
         }
         if ticks > 0 {
-            app.message = format!("Away for {} - catching up...", fmt_age(away));
+            app.message = format!("Welcome back! You were away {}.", fmt_age(away));
         }
         app.drain_events();
         app.last_stage = app.pet.stage;

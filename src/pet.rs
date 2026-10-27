@@ -107,6 +107,9 @@ pub struct Pet {
     pub cfg: Config,
     #[serde(skip)]
     pub tz_offset: i64,
+    /// True while catching up on time the game was closed (see `Config::away_safe`).
+    #[serde(skip)]
+    pub away: bool,
     hunger_t: u64,
     happy_t: u64,
     poop_t: u64,
@@ -145,6 +148,7 @@ impl Pet {
             clock: seed as i64,
             cfg: Config::default(),
             tz_offset: 0,
+            away: false,
             hunger_t: 0,
             happy_t: 0,
             poop_t: 0,
@@ -283,7 +287,7 @@ impl Pet {
         }
         self.update_sleep();
         if self.asleep {
-            if self.light_on {
+            if self.light_on && !self.safe_away() {
                 self.light_t += 1;
                 if self.light_t == 600 {
                     self.mistake("left the light on while sleeping");
@@ -304,11 +308,21 @@ impl Pet {
         let asleep = self.in_sleep_hours();
         if asleep != self.asleep {
             self.asleep = asleep;
-            self.light_on = true;
+            self.light_on = !self.safe_away();
             self.light_t = 0;
             let msg = if asleep { "went to sleep." } else { "woke up!" };
             self.events.push(format!("{} {msg}", self.species));
         }
+    }
+
+    /// Being away with the protection switched on.
+    fn safe_away(&self) -> bool {
+        self.away && self.cfg.away_safe
+    }
+
+    /// While away, the slow timers (decay, poop) only advance on every `away_slowdown`-th tick.
+    fn skip_slow_tick(&self) -> bool {
+        self.away && self.age % self.cfg.away_slowdown.max(1) != 0
     }
 
     pub fn local_hour(&self) -> i64 {
@@ -406,6 +420,13 @@ impl Pet {
     }
 
     fn decay(&mut self) {
+        if self.safe_away() {
+            self.hunger = self.hunger.max(1);
+            self.happy = self.happy.max(1);
+        }
+        if self.skip_slow_tick() {
+            return;
+        }
         let hi = self.hunger_interval();
         self.hunger_t += 1;
         if self.hunger_t >= hi {
@@ -441,6 +462,9 @@ impl Pet {
     }
 
     fn poop(&mut self) {
+        if self.skip_slow_tick() {
+            return;
+        }
         self.poop_t += 1;
         if self.poop_t >= self.poop_next {
             self.poop_t = 0;
@@ -454,7 +478,7 @@ impl Pet {
             self.dirty_t += 1;
             if self.dirty_t >= 1200 {
                 self.dirty_t = 0;
-                if self.rand(3) == 0 {
+                if self.rand(3) == 0 && !self.safe_away() {
                     self.get_sick();
                 }
             }
@@ -464,6 +488,9 @@ impl Pet {
     }
 
     fn sickness(&mut self) {
+        if self.safe_away() {
+            return;
+        }
         if !self.sick {
             let mut odds = self.cfg.sick_odds.max(1);
             if self.quirk == Quirk::Hardy {
@@ -487,6 +514,9 @@ impl Pet {
     }
 
     fn discipline_call(&mut self) {
+        if self.safe_away() {
+            return;
+        }
         match self.disc_call {
             None => {
                 let odds = if self.quirk == Quirk::Mischievous { self.cfg.naughty_odds / 2 } else { self.cfg.naughty_odds };
@@ -624,6 +654,72 @@ mod tests {
             p.tick();
         }
         assert_eq!(p.stage, Stage::Baby);
+    }
+
+    fn awake_adult() -> Pet {
+        let mut p = Pet::new(11);
+        p.dev_set_hour(7);
+        p.stage = Stage::Adult;
+        p.species = "Mametchi".into();
+        p.hunger = 4;
+        p.happy = 4;
+        p
+    }
+
+    #[test]
+    fn a_pet_left_alone_for_a_day_while_away_gets_by_unharmed() {
+        let mut p = awake_adult();
+        p.away = true;
+        for _ in 0..86_400 {
+            p.tick();
+        }
+        assert!(p.alive());
+        assert_eq!(p.mistakes, 0);
+        assert!(!p.sick);
+        assert!(p.hunger >= 1 && p.happy >= 1);
+    }
+
+    #[test]
+    fn the_same_day_unattended_with_the_game_open_is_not_harmless() {
+        let mut p = awake_adult();
+        for _ in 0..86_400 {
+            p.tick();
+        }
+        assert!(p.mistakes > 0 || !p.alive());
+    }
+
+    #[test]
+    fn being_away_slows_hunger_down() {
+        let mut home = awake_adult();
+        let mut away = awake_adult();
+        away.away = true;
+        for _ in 0..1800 {
+            home.tick();
+            away.tick();
+        }
+        assert!(away.hunger > home.hunger, "away {} vs home {}", away.hunger, home.hunger);
+    }
+
+    #[test]
+    fn with_the_protection_off_being_away_still_has_consequences() {
+        let mut p = awake_adult();
+        p.cfg.away_safe = false;
+        p.away = true;
+        for _ in 0..(8 * 3600) {
+            p.tick();
+        }
+        assert!(p.mistakes > 0);
+    }
+
+    #[test]
+    fn a_pet_still_grows_up_while_away() {
+        let mut p = Pet::new(13);
+        p.dev_set_hour(7);
+        p.away = true;
+        for _ in 0..(4 * 3600) {
+            p.tick();
+        }
+        assert_eq!(p.stage, Stage::Adult);
     }
 
     #[test]

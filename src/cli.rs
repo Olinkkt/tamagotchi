@@ -19,9 +19,12 @@ pub fn load_caught_up() -> Option<Pet> {
     if pet.clock == 0 {
         pet.clock = (save::now() - away) as i64;
     }
+    // The time since the last save is "away" unless a game window is open and saving.
+    pet.away = !save::game_running();
     for _ in 0..away.min(crate::MAX_CATCHUP_TICKS) {
         pet.tick();
     }
+    pet.away = false;
     pet.clock = save::now() as i64;
     pet.events.clear();
     Some(pet)
