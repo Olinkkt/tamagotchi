@@ -167,37 +167,16 @@ fn calm(p: &Pet) -> bool {
     p.alive() && p.stage != Stage::Egg && !p.asleep && !p.sick
 }
 
-/// How far the pet has strolled from the middle: stand, walk right, stand, walk left, back.
-fn stroll(ms: u64) -> i32 {
-    let t = (ms % 12_000) as f32 / 12_000.0;
-    let reach = 22.0;
-    let x = match t {
-        t if t < 0.2 => 0.0,
-        t if t < 0.35 => (t - 0.2) / 0.15 * reach,
-        t if t < 0.5 => reach,
-        t if t < 0.8 => reach - (t - 0.5) / 0.3 * reach * 2.0,
-        t if t < 0.9 => -reach,
-        t => -reach + (t - 0.9) / 0.1 * reach,
-    };
-    x.round() as i32
-}
-
-/// The pet's offset from where it normally stands.
+/// The pet's offset from where it normally stands: it only bobs up and down, never sideways.
 fn motion(m: &Moment) -> (i32, i32) {
     let p = m.pet;
     let beat = m.beat() as i32;
-    let (mut dx, dy) = match p.stage {
-        Stage::Dead => (0, 0),
-        Stage::Egg if p.stage_age as f32 / 30.0 > 0.35 => ([0, 1, 0, -1][(beat % 4) as usize], 0),
-        Stage::Egg => (0, 0),
-        _ if p.asleep => (0, -(beat / 3 % 2)),
-        _ if p.sick || p.hunger == 0 => (0, -(beat % 2)),
-        _ => (stroll(m.ms), -(beat % 2)),
+    let dy = match p.stage {
+        Stage::Dead | Stage::Egg => 0,
+        _ if p.asleep => -(beat / 3 % 2),
+        _ => -(beat % 2),
     };
-    if let Some(f) = m.fx_is(Fx::Scold) {
-        dx += if (f * 20.0) as i32 % 2 == 0 { 1 } else { -1 };
-    }
-    (dx, dy)
+    (0, dy)
 }
 
 /// The pet with its face (or egg cracks) laid on.
@@ -472,6 +451,20 @@ mod tests {
         let (small, big) = (room(&m, 160, 116), room(&m, 400, 200));
         let pink = |f: &Frame, x0: i32, y0: i32| (0..32).flat_map(|y| (0..32).map(move |x| (x, y))).filter(|&(x, y)| f.get(x0 + x, y0 + y) == Some(Pal::Pink)).count();
         assert_eq!(pink(&small, 64, 70), pink(&big, 184, 154));
+    }
+
+    #[test]
+    fn the_pet_never_moves_sideways() {
+        for stage in [Stage::Egg, Stage::Baby, Stage::Adult] {
+            let mut p = pet(stage);
+            p.stage_age = 20;
+            for state in 0..3 {
+                p.sick = state == 1;
+                p.asleep = state == 2;
+                let xs: Vec<i32> = (0..40u64).map(|i| motion(&Moment { pet: &p, fx: Some((Fx::Scold, 0.1)), ms: i * 350 }).0).collect();
+                assert!(xs.iter().all(|&x| x == 0), "{stage:?} state {state}: {xs:?}");
+            }
+        }
     }
 
     #[test]
