@@ -222,7 +222,7 @@ invisible=0
 
 ```sh
 cargo test        # unit tests; file tests run in a temporary folder
-tama --dev        # separate test save; press ` for the dev panel
+tama --dev        # separate test save; press Tab for the dev panel
 ```
 
 The dev panel changes hunger/happy/discipline/weight/mistakes, adds poop, sickness or a naughty

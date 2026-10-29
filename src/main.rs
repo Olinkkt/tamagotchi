@@ -349,7 +349,7 @@ impl App {
             }
             return;
         }
-        if self.dev && code == KeyCode::Char('`') {
+        if self.dev && code == KeyCode::Tab {
             self.dev_open = !self.dev_open;
             return;
         }

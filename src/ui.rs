@@ -302,7 +302,7 @@ pub fn draw(f: &mut Frame, app: &App) {
             "u cpu  r ram  b battery".into(),
             "t/T skip 1h / 8h".into(),
             "z 22:00  Z 12:00".into(),
-            "f speed  ` close".into(),
+            "f speed  tab close".into(),
         ];
         for h in help {
             stats.push(Line::from(Span::styled(h, Style::new().fg(WARN))));
