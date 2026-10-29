@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.3.1
+
+- The egg wobble and the final hatch shake are random now: every lurch leans a different way and
+  distance, so no two eggs (or two runs) move the same.
+
 ## 1.3.0
 
 - Hatching is now an animation: the finished egg shakes hard, flashes white and bursts. The baby

@@ -1,6 +1,9 @@
 //! The room and everything in it: the pet, its moods and reactions, poop, sleep, speech bubbles
 //! and the one-shot effects after an action. Drawn in room pixels (160x116).
 
+use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::app::{App, Mode};
 use crate::art::{self, Light, Sprite};
 use crate::cast::{self, Character};
@@ -171,10 +174,10 @@ fn calm(p: &Pet) -> bool {
 
 /// How far through its 30 seconds the egg is when each crack stage begins.
 const EGG_STAGES: [f32; 5] = [0.2, 0.4, 0.6, 0.8, 0.92];
-/// How wide (pixels) and how slow (milliseconds per swing) the egg wobbles at each stage, 0 to 5.
+/// How far (pixels) the egg lurches at most, and how long (milliseconds) each lurch takes, at each stage, 0 to 5.
 const WOBBLE_AMP: [f32; 6] = [0.0, 0.0, 1.0, 1.0, 2.0, 3.0];
-const WOBBLE_MS: [f32; 6] = [1.0, 1.0, 1600.0, 1100.0, 760.0, 420.0];
-/// In the last stage the egg also hops, this often (milliseconds) and this high (pixels).
+const WOBBLE_MS: [u64; 6] = [1, 1, 800, 550, 380, 210];
+/// In the last stage the egg also hops now and then: one chance per this many milliseconds, this high (pixels).
 const HOP_MS: u64 = 210;
 const HOP_PX: i32 = 2;
 /// How long the shell lies on the floor after hatching.
@@ -196,8 +199,38 @@ fn egg_stage(p: &Pet) -> usize {
     EGG_STAGES.iter().filter(|&&at| progress > at).count()
 }
 
+/// A random number for `slot` that differs on every run, so the egg never repeats itself.
+fn jitter(slot: u64, salt: u64) -> u64 {
+    static SEED: OnceLock<u64> = OnceLock::new();
+    let seed = *SEED.get_or_init(|| {
+        SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos() as u64).unwrap_or(1)
+    });
+    let mut x = seed ^ slot.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ salt.wrapping_mul(0xC2B2_AE3D_27D4_EB4F);
+    x ^= x >> 33;
+    x = x.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
+    x ^ (x >> 33)
+}
+
+/// Where the egg is leaning at the end of lurch `slot`: anywhere within the stage's reach.
+fn lean(slot: u64, amp: f32) -> f32 {
+    (jitter(slot, 1) % 2001) as f32 / 1000.0 * amp - amp
+}
+
+/// The egg's sideways offset: it eases from one random lean to the next, so no two wobbles match.
+fn wobble(ms: u64, n: usize) -> i32 {
+    let (slot, into) = (ms / WOBBLE_MS[n], (ms % WOBBLE_MS[n]) as f32 / WOBBLE_MS[n] as f32);
+    let ease = into * into * (3.0 - 2.0 * into);
+    let (from, to) = (lean(slot, WOBBLE_AMP[n]), lean(slot + 1, WOBBLE_AMP[n]));
+    (from + (to - from) * ease).round() as i32
+}
+
+/// In the last stage the egg hops on a random two thirds of its beats.
+fn hop(ms: u64) -> i32 {
+    -((jitter(ms / HOP_MS, 2) % 3 != 0) as i32) * HOP_PX
+}
+
 /// The pet's offset from where it normally stands. It only bobs up and down; the one sideways
-/// movement is an egg wobbling, wider and faster as it gets closer to hatching, and hopping at the end.
+/// movement is an egg wobbling at random, wider and faster as it gets closer to hatching, and hopping at the end.
 fn motion(m: &Moment) -> (i32, i32) {
     let p = m.pet;
     let beat = m.beat() as i32;
@@ -205,9 +238,7 @@ fn motion(m: &Moment) -> (i32, i32) {
         Stage::Dead => (0, 0),
         Stage::Egg => {
             let n = egg_stage(p);
-            let dx = (WOBBLE_AMP[n] * (std::f32::consts::TAU * m.ms as f32 / WOBBLE_MS[n]).sin()).round() as i32;
-            let dy = if n == 5 { -(((m.ms / HOP_MS) % 2) as i32) * HOP_PX } else { 0 };
-            (dx, dy)
+            (if n < 2 { 0 } else { wobble(m.ms, n) }, if n == 5 { hop(m.ms) } else { 0 })
         }
         _ if p.asleep => (0, -(beat / 3 % 2)),
         _ => (0, -(beat % 2)),
@@ -326,7 +357,7 @@ fn draw_shell(f: &mut Frame, t: f32, s: Size) {
 fn draw_hatching_egg(f: &mut Frame, m: &Moment, t: f32, s: Size) -> Place {
     let c = cast::EGG;
     let body = art::body(&c);
-    let shake = if (t * 22.0) as i32 % 2 == 0 { 3 } else { -3 };
+    let shake = (jitter((t * 22.0) as u64, 3) % 7) as i32 - 3;
     let y = s.floor() - body.bottom();
     let at = Place { x: s.centre() - c.size as i32 / 2 + shake, y, size: c.size as i32, head: y + body.top() };
     let sprite = assemble(m.pet, &c, &cracks_at(5), m.beat());
@@ -579,9 +610,18 @@ mod tests {
         let swing = |age| egg_motion(age).iter().map(|m| m.0.abs()).max().unwrap();
         let rate = |age| egg_motion(age).windows(2).filter(|w| w[0].0 != w[1].0).count();
         assert_eq!([3, 8].map(swing), [0, 0], "a young egg sits still");
-        assert_eq!([13, 19, 25, 28].map(swing), [1, 1, 2, 3], "wider every stage");
-        let rates = [13, 19, 25, 28].map(rate);
-        assert!(rates.windows(2).all(|w| w[0] < w[1]), "faster every stage: {rates:?}");
+        for (age, amp) in [(13, 1), (19, 1), (25, 2), (28, 3)] {
+            assert!((1..=amp).contains(&swing(age)), "age {age} swings {}", swing(age));
+        }
+        let rates = [13, 28].map(rate);
+        assert!(rates[0] < rates[1], "faster at the end: {rates:?}");
+    }
+
+    #[test]
+    fn an_egg_wobble_never_repeats() {
+        let xs: Vec<i32> = egg_motion(28).iter().map(|m| m.0).collect();
+        let (a, b) = (&xs[..200], &xs[200..400]);
+        assert_ne!(a, b, "two stretches of the same length should differ");
     }
 
     #[test]
