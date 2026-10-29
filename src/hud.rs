@@ -1,5 +1,6 @@
-//! The whole 240x160 screen around the room: header strip, status panel, hint line and the
-//! clickable icon bar. Pixel parts are drawn into the frame; text is handed back as `Label`s
+//! The whole screen around the room: header strip, status panel, hint line and the clickable
+//! icon bar. The screen is at least 240x160 scene pixels and grows with the window; the room
+//! takes the extra space, and the panel and bar stay glued to the right and bottom edges. Pixel parts are drawn into the frame; text is handed back as `Label`s
 //! for the window to draw sharp, at full resolution.
 
 use crate::app::{App, Key, Mode};
@@ -14,18 +15,59 @@ use crate::panel;
 use crate::scene;
 use crate::screens;
 
-pub const W: i32 = 240;
-pub const H: i32 = 160;
-/// Top-left corner of the room.
-pub const ROOM: (i32, i32) = (0, 12);
-pub const PANEL_X: i32 = 160;
-const HINT_Y: i32 = 128;
-/// The message about the last thing that happened sits on a dimmed strip along the room's foot.
-const MESSAGE_Y: i32 = 117;
-const BAR_Y: i32 = 140;
+/// Top of the room, under the header strip.
+pub const ROOM_Y: i32 = 12;
+pub const PANEL_W: i32 = 80;
+/// Height of the hint line plus the button bar under the room.
+const FOOT: i32 = 32;
 const BUTTON: i32 = 16;
 const GAP: i32 = 3;
 const KEYCAP: i32 = 7;
+
+/// The size of the screen in scene pixels, and where its parts go.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub struct Layout {
+    pub w: i32,
+    pub h: i32,
+}
+
+impl Layout {
+    /// The smallest screen the layout is designed for.
+    pub const MIN: Layout = Layout { w: 240, h: 160 };
+    /// The biggest: the room art stops growing here, and a bigger window gets bars.
+    pub const MAX: Layout = Layout { w: PANEL_W + crate::cast::ROOM_MASTER.0 as i32, h: ROOM_Y + FOOT + crate::cast::ROOM_MASTER.1 as i32 };
+
+    pub fn new(w: i32, h: i32) -> Layout {
+        Layout { w: w.clamp(Layout::MIN.w, Layout::MAX.w), h: h.clamp(Layout::MIN.h, Layout::MAX.h) }
+    }
+
+    pub fn panel_x(self) -> i32 {
+        self.w - PANEL_W
+    }
+
+    /// Where the line telling you what to do sits; the button bar is under it.
+    pub fn hint_y(self) -> i32 {
+        self.h - FOOT
+    }
+
+    pub fn bar_y(self) -> i32 {
+        self.h - 20
+    }
+
+    pub fn room_h(self) -> i32 {
+        self.hint_y() - ROOM_Y
+    }
+
+    /// The message about the last thing that happened sits on a dimmed strip along the room's foot.
+    fn message_y(self) -> i32 {
+        self.hint_y() - 11
+    }
+
+    /// Where a 240x128 game or card goes so it is centred above the hint line.
+    pub fn centred_240x128(self) -> (i32, i32) {
+        ((self.w - 240) / 2, (self.hint_y() - 128) / 2)
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Look {
@@ -84,13 +126,13 @@ fn useful(app: &App, key: char) -> bool {
     }
 }
 
-fn row(items: Vec<(Key, Option<Grid>, &'static str, Look)>) -> Vec<Button> {
+fn row(items: Vec<(Key, Option<Grid>, &'static str, Look)>, lay: Layout) -> Vec<Button> {
     let n = items.len() as i32;
-    let x0 = (W - (n * BUTTON + (n - 1) * GAP)) / 2;
+    let x0 = (lay.w - (n * BUTTON + (n - 1) * GAP)) / 2;
     items
         .into_iter()
         .enumerate()
-        .map(|(i, (key, icon, label, look))| Button { key, icon, label, x: x0 + i as i32 * (BUTTON + GAP), y: BAR_Y + 2, look })
+        .map(|(i, (key, icon, label, look))| Button { key, icon, label, x: x0 + i as i32 * (BUTTON + GAP), y: lay.bar_y() + 2, look })
         .collect()
 }
 
@@ -122,7 +164,7 @@ fn text_button(c: char) -> (Key, Option<Grid>, &'static str, Look) {
 const BACK: (Key, Option<Grid>, &str, Look) = (Key::Esc, None, "esc", Look::Normal);
 
 /// The buttons along the bottom for the current mode.
-pub fn buttons(app: &App) -> Vec<Button> {
+pub fn buttons(app: &App, lay: Layout) -> Vec<Button> {
     let urgent = app.pet.top_need().map(|n| n.0);
     let action = |c: char| {
         let look = if urgent == Some(c) { Look::Urgent } else if useful(app, c) { Look::Normal } else { Look::Idle };
@@ -136,12 +178,12 @@ pub fn buttons(app: &App) -> Vec<Button> {
         Mode::Game(Game::Memory(_)) => vec![text_button('1'), text_button('2'), text_button('3'), text_button('4'), BACK],
         Mode::Game(Game::Pong(_)) => vec![(Key::Up, Some(icons::UP), "w", Look::Normal), (Key::Down, Some(icons::DOWN), "s", Look::Normal), BACK],
         Mode::Finish(_) | Mode::Awards | Mode::Graveyard(_) => vec![BACK],
-    })
+    }, lay)
 }
 
 /// The key a click at scene position (`x`, `y`) presses, if it lands on a button.
-pub fn button_at(app: &App, x: f32, y: f32) -> Option<Key> {
-    buttons(app).into_iter().find(|b| (b.x..b.x + BUTTON).contains(&(x as i32)) && (b.y..b.y + BUTTON).contains(&(y as i32)) && x >= 0.0 && y >= 0.0).map(|b| b.key)
+pub fn button_at(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
+    buttons(app, lay).into_iter().find(|b| (b.x..b.x + BUTTON).contains(&(x as i32)) && (b.y..b.y + BUTTON).contains(&(y as i32)) && x >= 0.0 && y >= 0.0).map(|b| b.key)
 }
 
 fn draw_button(f: &mut Frame, b: &Button, hover: bool, bounce: i32) {
@@ -167,45 +209,54 @@ fn draw_button(f: &mut Frame, b: &Button, hover: bool, bounce: i32) {
     }
 }
 
-/// The full 240x160 picture, with `hover` the key under the mouse.
-pub fn frame(app: &App, hover: Option<Key>) -> Frame {
-    let mut f = Frame::new(W, H, Pal::Ink);
-    // A game takes the whole width above the hint line; the status panel comes back afterwards.
+/// The full picture, with `hover` the key under the mouse.
+pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
+    let mut f = Frame::new(lay.w, lay.h, Pal::Ink);
+    let (panel_x, hint_y) = (lay.panel_x(), lay.hint_y());
+    // A game takes the whole width above the hint line, over the dimmed room; the status panel
+    // comes back afterwards.
     let game = match &app.mode {
         Mode::Game(g) => Some(g.draw()),
         Mode::Finish(fin) => Some(fin.draw()),
         _ => None,
     };
     if let Some(g) = game {
-        f.frame(&g, 0, 0);
-        draw_bar(&mut f, app, hover);
+        f.frame(&scene::area(app, lay.w, hint_y), 0, 0);
+        let (x, y) = lay.centred_240x128();
+        if (x, y) != (0, 0) {
+            f.boxed(x - 1, y - 1, g.w + 2, g.h + 2, Pal::Ink, Pal::Slate);
+        }
+        f.frame(&g, x, y);
+        draw_bar(&mut f, app, lay, hover);
         return f;
     }
     // Header strip over the room, status panel to its right.
-    f.rect(0, 0, PANEL_X, ROOM.1, Pal::Night);
-    f.rect(0, ROOM.1 - 1, PANEL_X, 1, Pal::Dusk);
-    f.frame(&scene::area(app), ROOM.0, ROOM.1);
+    f.rect(0, 0, panel_x, ROOM_Y, Pal::Night);
+    f.rect(0, ROOM_Y - 1, panel_x, 1, Pal::Dusk);
+    f.frame(&scene::area(app, panel_x, lay.room_h()), 0, ROOM_Y);
     if !app.message.is_empty() && matches!(app.mode, Mode::Normal) {
-        f.tint(0, MESSAGE_Y, PANEL_X, HINT_Y - MESSAGE_Y, Pal::dark);
+        f.tint(0, lay.message_y(), panel_x, hint_y - lay.message_y(), Pal::dark);
     }
-    f.boxed(PANEL_X, 0, W - PANEL_X, HINT_Y, Pal::Night, Pal::Dusk);
-    f.rect(PANEL_X + 1, 11, W - PANEL_X - 2, 1, Pal::Dusk);
-    panel::draw(&mut f, app);
-    screens::draw(&mut f, app);
+    f.boxed(panel_x, 0, PANEL_W, hint_y, Pal::Night, Pal::Dusk);
+    f.rect(panel_x + 1, 11, PANEL_W - 2, 1, Pal::Dusk);
+    if matches!(app.mode, Mode::Normal) {
+        panel::draw(&mut f, app, lay);
+    }
+    screens::draw(&mut f, app, lay);
     if app.confirming_reset() {
-        screens::draw_reset(&mut f);
+        screens::draw_reset(&mut f, lay);
     }
-    draw_bar(&mut f, app, hover);
+    draw_bar(&mut f, app, lay, hover);
     f
 }
 
 /// The hint line and the button bar under it.
-fn draw_bar(f: &mut Frame, app: &App, hover: Option<Key>) {
-    f.rect(0, HINT_Y, W, BAR_Y - HINT_Y, Pal::Ink);
-    f.rect(0, BAR_Y, W, H - BAR_Y, Pal::Night);
-    f.rect(0, BAR_Y, W, 1, Pal::Dusk);
+fn draw_bar(f: &mut Frame, app: &App, lay: Layout, hover: Option<Key>) {
+    f.rect(0, lay.hint_y(), lay.w, lay.bar_y() - lay.hint_y(), Pal::Ink);
+    f.rect(0, lay.bar_y(), lay.w, lay.h - lay.bar_y(), Pal::Night);
+    f.rect(0, lay.bar_y(), lay.w, 1, Pal::Dusk);
     let bounce = ((app.started.elapsed().as_millis() / 350) % 2) as i32;
-    for b in buttons(app) {
+    for b in buttons(app, lay) {
         draw_button(f, &b, hover == Some(b.key), bounce);
     }
 }
@@ -228,9 +279,10 @@ fn hint(app: &App) -> Option<(String, Pal)> {
 }
 
 /// Every piece of text on screen. `ratio` is scene pixels per font pixel at the current scale.
-pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
+pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
     let p = &app.pet;
     let mut out = Vec::new();
+    let (panel_x, hint_y) = (lay.panel_x(), lay.hint_y());
     // Games and cards cover the header and the panel.
     let in_game = !matches!(app.mode, Mode::Normal);
     let mut head = format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age));
@@ -239,26 +291,26 @@ pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
     }
     if !in_game {
         out.push(label(head, 4.0, 6.0, Pal::White, Align::Left));
-        out.push(label("STATUS", PANEL_X as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
+        out.push(label("STATUS", panel_x as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
     }
     if let Some((text, colour)) = hint(app) {
-        out.push(label(text, W as f32 / 2.0, HINT_Y as f32 + 6.0, colour, Align::Centre));
+        out.push(label(text, lay.w as f32 / 2.0, hint_y as f32 + 6.0, colour, Align::Centre));
     }
     if !app.message.is_empty() && matches!(app.mode, Mode::Normal) {
         // One line only: long messages lose their tail rather than spill over the panel.
-        let max = ((PANEL_X - 8) as f32 / ratio) as i32;
+        let max = ((panel_x - 8) as f32 / ratio) as i32;
         let mut text = app.message.clone();
         while font::width(&text) > max && text.pop().is_some() {}
-        out.push(label(text, PANEL_X as f32 / 2.0, (MESSAGE_Y + HINT_Y) as f32 / 2.0, Pal::White, Align::Centre));
+        out.push(label(text, panel_x as f32 / 2.0, (lay.message_y() + hint_y) as f32 / 2.0, Pal::White, Align::Centre));
     }
     if !in_game {
-        out.extend(panel::labels(app, ratio));
+        out.extend(panel::labels(app, ratio, lay));
     }
-    out.extend(screens::labels(app));
+    out.extend(screens::labels(app, lay));
     if app.confirming_reset() {
-        out.extend(screens::reset_labels());
+        out.extend(screens::reset_labels(lay));
     }
-    for b in buttons(app) {
+    for b in buttons(app, lay) {
         if b.icon.is_some() && matches!(b.key, Key::Char(_)) {
             let bounce = if b.look == Look::Urgent { ((app.started.elapsed().as_millis() / 350) % 2) as f32 } else { 0.0 };
             let cap = KEYCAP as f32 / 2.0;
@@ -278,13 +330,13 @@ mod tests {
     #[test]
     fn the_bar_has_every_action_and_a_click_presses_it() {
         let app = app_with(Stage::Adult, |_| {});
-        let bar = buttons(&app);
+        let bar = buttons(&app, Layout::MIN);
         let keys: String = bar.iter().filter_map(|b| if let Key::Char(c) = b.key { Some(c) } else { None }).collect();
         assert_eq!(keys, "fsplmcdbagq");
-        assert!(bar.iter().all(|b| b.x >= 0 && b.x + BUTTON <= W && b.y + BUTTON <= H), "buttons stay on screen");
+        assert!(bar.iter().all(|b| b.x >= 0 && b.x + BUTTON <= 240 && b.y + BUTTON <= 160), "buttons stay on screen");
         let feed = bar[0];
-        assert_eq!(button_at(&app, feed.x as f32 + 8.0, feed.y as f32 + 8.0), Some(Key::Char('f')));
-        assert_eq!(button_at(&app, 1.0, 1.0), None);
+        assert_eq!(button_at(&app, Layout::MIN, feed.x as f32 + 8.0, feed.y as f32 + 8.0), Some(Key::Char('f')));
+        assert_eq!(button_at(&app, Layout::MIN, 1.0, 1.0), None);
     }
 
     #[test]
@@ -293,7 +345,7 @@ mod tests {
             p.hunger = 0;
             p.sick = false;
         });
-        let look = |c: char| buttons(&app).into_iter().find(|b| b.key == Key::Char(c)).unwrap().look;
+        let look = |c: char| buttons(&app, Layout::MIN).into_iter().find(|b| b.key == Key::Char(c)).unwrap().look;
         assert_eq!(look('f'), Look::Urgent);
         assert_eq!(look('m'), Look::Idle, "it is not sick");
         assert_eq!(look('b'), Look::Normal);
@@ -302,14 +354,14 @@ mod tests {
     #[test]
     fn a_dead_pet_offers_a_new_egg() {
         let app = app_with(Stage::Dead, |_| {});
-        let keys: Vec<Key> = buttons(&app).iter().map(|b| b.key).collect();
+        let keys: Vec<Key> = buttons(&app, Layout::MIN).iter().map(|b| b.key).collect();
         assert_eq!(keys, [Key::Char('n'), Key::Char('a'), Key::Char('g'), Key::Char('q')]);
     }
 
     #[test]
     fn the_header_and_message_are_on_screen() {
         let app = app_with(Stage::Baby, |_| {});
-        let text: Vec<String> = labels(&app, 0.5).into_iter().map(|l| l.text).collect();
+        let text: Vec<String> = labels(&app, Layout::MIN, 0.5).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t.starts_with("Babytchi · Baby")), "{text:?}");
         assert!(text.contains(&"hello".to_string()));
     }
@@ -317,20 +369,20 @@ mod tests {
     #[test]
     fn the_hint_line_says_what_to_press() {
         let app = app_with(Stage::Baby, |p| p.hunger = 0);
-        let text: Vec<String> = labels(&app, 0.5).into_iter().map(|l| l.text).collect();
+        let text: Vec<String> = labels(&app, Layout::MIN, 0.5).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t.starts_with("→ PRESS F: STARVING")), "{text:?}");
         let egg = app_with(Stage::Egg, |_| {});
-        assert!(labels(&egg, 0.5).iter().any(|l| l.text.starts_with("IT'S AN EGG")));
+        assert!(labels(&egg, Layout::MIN, 0.5).iter().any(|l| l.text.starts_with("IT'S AN EGG")));
     }
 
     #[test]
     fn a_game_fills_the_screen_and_says_what_to_do() {
         let mut app = app_with(Stage::Baby, |_| {});
         app.mode = Mode::Game(Game::new(2, &mut app.pet));
-        let text: Vec<String> = labels(&app, 0.5).into_iter().map(|l| l.text).collect();
+        let text: Vec<String> = labels(&app, Layout::MIN, 0.5).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t.starts_with("HOLD UP/DOWN")), "{text:?}");
         assert!(!text.iter().any(|t| t == "STATUS"), "the panel makes way for the game");
-        let keys: Vec<Key> = buttons(&app).iter().map(|b| b.key).collect();
+        let keys: Vec<Key> = buttons(&app, Layout::MIN).iter().map(|b| b.key).collect();
         assert_eq!(keys, [Key::Up, Key::Down, Key::Esc]);
     }
 
@@ -347,8 +399,23 @@ mod tests {
         for tweak in states {
             let app = app_with(Stage::Adult, tweak);
             let (text, _) = hint(&app).unwrap();
-            assert!(font::width(&text) as f32 * 2.0 / 3.0 <= W as f32 - 4.0, "too wide: {text}");
+            assert!(font::width(&text) as f32 * 2.0 / 3.0 <= 240.0 - 4.0, "too wide: {text}");
         }
+    }
+
+    #[test]
+    fn a_bigger_screen_moves_the_panel_and_bar_to_its_edges() {
+        let app = app_with(Stage::Adult, |_| {});
+        let lay = Layout::new(400, 240);
+        assert_eq!((lay.panel_x(), lay.hint_y(), lay.bar_y()), (320, 208, 220));
+        let f = frame(&app, lay, None);
+        assert_eq!((f.w, f.h), (400, 240));
+        let bar = buttons(&app, lay);
+        assert!(bar.iter().all(|b| b.y >= lay.bar_y() && b.y + BUTTON <= 240 && b.x >= 0 && b.x + BUTTON <= 400));
+        let status = labels(&app, lay, 0.5).into_iter().find(|l| l.text == "STATUS").unwrap();
+        assert_eq!(status.x, 360.0);
+        let click = &bar[0];
+        assert_eq!(button_at(&app, lay, click.x as f32 + 8.0, click.y as f32 + 8.0), Some(Key::Char('f')));
     }
 
     #[test]
@@ -356,8 +423,8 @@ mod tests {
         let mut app = app_with(Stage::Adult, |_| {});
         for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(vec!["x".into()])] {
             app.mode = mode;
-            assert_eq!(frame(&app, None).w, W);
-            assert!(!labels(&app, 0.5).is_empty());
+            assert_eq!(frame(&app, Layout::MIN, None).w, 240);
+            assert!(!labels(&app, Layout::MIN, 0.5).is_empty());
         }
     }
 }

@@ -36,6 +36,13 @@ impl Sketch {
         self
     }
 
+    /// Move the origin: afterwards (0, 0) is `dx`, `dy` (in authoring units) from the corner.
+    pub fn shifted(mut self, dx: f32, dy: f32) -> Sketch {
+        self.base = self.base.pre_translate(dx, dy);
+        self.xf = self.base;
+        self
+    }
+
     /// Shapes drawn from here on are turned `deg` degrees (clockwise) about (`px`, `py`),
     /// until the next call. Animated parts use this to make their frames.
     pub fn turn(&mut self, deg: f32, px: f32, py: f32) {

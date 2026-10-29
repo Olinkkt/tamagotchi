@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0
+
+- F11 toggles fullscreen.
+- The picture now fills the whole window at any shape (a whole-number pixel scale, so pixels stay
+  the same size): the room gets bigger, the status panel taller and the buttons stay on the
+  bottom edge. Cards and games are centred. Only a window bigger than the room art can fill gets bars.
+
 ## 1.0.0
 
 The terminal game becomes a window game. Saves, profile and config are unchanged.

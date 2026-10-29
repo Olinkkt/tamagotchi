@@ -80,6 +80,12 @@ pub fn for_species(species: &str) -> Option<Character> {
     ALL.into_iter().find(|c| c.name == name || (c.name == "baby" && name == "babytchi"))
 }
 
+/// The room art is one wide, tall master image. The standard 160x116 room sits at its bottom
+/// centre, and the wall, floor and wallpaper carry on around it, so the game can show as much of
+/// the surroundings as the window has room for.
+pub const ROOM_MASTER: (usize, usize) = (544, 244);
+pub const ROOM_STAGE: (usize, usize) = (160, 116);
+
 /// The spot on the egg where the cracks go.
 pub const EGG_CRACK_AT: (i32, i32) = (9, 15);
 /// Where the ghost's face goes.

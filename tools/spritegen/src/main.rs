@@ -148,9 +148,11 @@ fn main() {
     for (light, name) in [(room::Light::Day, "day"), (room::Light::Lamp, "lamp"), (room::Light::Dark, "dark")] {
         let r = room::room(light);
         img::save(&r, &sprites.join(format!("room_{name}.png")));
-        img::save_preview(&r, &preview.join(format!("room_{name}.png")), PREVIEW_SCALE);
-        // The baby standing on the rug, to judge proportions in place.
-        let mut scene = r.clone();
+        img::save_preview(&r, &preview.join(format!("room_{name}.png")), 2);
+        // The standard 160x116 room with the baby standing on the rug, to judge proportions.
+        let (sx, sy) = ((cast::ROOM_MASTER.0 - cast::ROOM_STAGE.0) as i32 / 2, (cast::ROOM_MASTER.1 - cast::ROOM_STAGE.1) as i32);
+        let mut scene = Img::new(cast::ROOM_STAGE.0, cast::ROOM_STAGE.1);
+        scene.blit(&r, -sx, -sy);
         scene.blit(&baby, 80 - 16, 101 - 30);
         img::save_preview(&scene, &preview.join(format!("scene_{name}.png")), 4);
     }

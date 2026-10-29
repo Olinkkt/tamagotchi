@@ -3,9 +3,11 @@
 A pixel-art tamagotchi in a little window. Feed it, clean up after it, play games with it, and
 keep an eye on it from your status bar. It keeps living while the game is closed.
 
-The whole scene is drawn at 240x160 pixels and shown at the largest whole-number scale that
-fits the window (960x640, 4x, to start with; resize it freely), so every pixel stays crisp and
-the same size. Text is drawn at full window resolution in a matching pixel font.
+The scene is drawn in pixels and shown at a whole-number scale, so every pixel stays crisp and
+the same size. The window opens at 960x640 (4x) and can be resized freely or made fullscreen with
+F11: the picture grows with it, with a bigger room, a taller status panel and the button bar on
+the edges, instead of leaving bars. Text is drawn at full window resolution in a matching pixel
+font.
 
 ## Install
 
@@ -24,7 +26,7 @@ This puts `tama` in `~/.cargo/bin`, which must be on your `PATH`. After you chan
 
 Run `tama` to open the window. One pet at a time; when it dies you can hatch a new egg with `n`.
 Every action is also a button along the bottom of the window: click it, or press its key (shown
-in the button's corner).
+in the button's corner). F11 toggles fullscreen.
 
 | Key | Action |
 |---|---|

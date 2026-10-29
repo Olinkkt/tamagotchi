@@ -47,6 +47,26 @@ impl Frame {
         self.sprite_with(s, x, y, |p| p);
     }
 
+    /// Copy the (`sx`, `sy`, `w`, `h`) rectangle of another frame to (`x`, `y`).
+    pub fn copy_rect(&mut self, src: &Frame, (sx, sy, w, h): (i32, i32, i32, i32), x: i32, y: i32) {
+        for dy in 0..h {
+            for dx in 0..w {
+                self.set(x + dx, y + dy, src.px[((sy + dy) * src.w + sx + dx) as usize]);
+            }
+        }
+    }
+
+    /// Draw the `w` x `h` part of `s` that starts at (`sx`, `sy`) with its corner at (`x`, `y`).
+    pub fn region(&mut self, s: &Sprite, (sx, sy, w, h): (i32, i32, i32, i32), x: i32, y: i32) {
+        for dy in 0..h {
+            for dx in 0..w {
+                if let Some(p) = s.get(sx + dx, sy + dy) {
+                    self.set(x + dx, y + dy, p);
+                }
+            }
+        }
+    }
+
     /// Draw a sprite with every colour passed through `f` (for flashes and dark rooms).
     pub fn sprite_with(&mut self, s: &Sprite, x: i32, y: i32, f: impl Fn(Pal) -> Pal) {
         for sy in 0..s.h {

@@ -4,14 +4,17 @@
 use crate::app::App;
 use crate::font;
 use crate::frame::Frame;
-use crate::hud::{Align, Label, PANEL_X};
+use crate::hud::{Align, Label, Layout};
 use crate::icons;
 use crate::palette::Pal;
 use crate::pet::{Pet, Stage, MAX_HEARTS};
 
-const LEFT: f32 = PANEL_X as f32 + 4.0;
+/// The panel is laid out for the standard screen, where it starts at this column; on a wider
+/// screen everything moves right with it.
+const BASE_X: i32 = 160;
+const LEFT: f32 = BASE_X as f32 + 4.0;
 /// Where the values in the fixed rows start.
-const VALUE_X: i32 = PANEL_X + 38;
+const VALUE_X: i32 = BASE_X + 38;
 const WIDTH: f32 = 72.0;
 /// Fixed rows, by the middle of their line.
 const HUNGER_Y: i32 = 18;
@@ -21,28 +24,29 @@ const WEIGHT_Y: f32 = 44.0;
 const MISTAKES_Y: f32 = 51.0;
 const COINS_Y: i32 = 58;
 const TRAIT_Y: f32 = 65.0;
-/// Free-flowing lines start here and stop before the panel's bottom edge.
+/// Free-flowing lines start here and stop this far above the hint line.
 const FLOW_TOP: f32 = 73.0;
-const FLOW_BOTTOM: f32 = 125.0;
+const FLOW_MARGIN: i32 = 3;
 const PITCH: f32 = 7.0;
 
 /// The pixel parts: hearts, the discipline bar and the coin.
-pub fn draw(f: &mut Frame, app: &App) {
+pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
     let p = &app.pet;
     if !has_stats(p) {
         return;
     }
+    let dx = lay.panel_x() - BASE_X;
     for (y, n) in [(HUNGER_Y, p.hunger), (HAPPY_Y, p.happy)] {
         for i in 0..MAX_HEARTS {
             let icon = if i < n { icons::HEART_FULL } else { icons::HEART_EMPTY };
-            f.grid(icon, VALUE_X + i as i32 * 9, y - 3);
+            f.grid(icon, VALUE_X + dx + i as i32 * 9, y - 3);
         }
     }
     // The word "discipline" is long, so its bar starts further right than the other values.
-    let (x, w, fill) = (PANEL_X + 46, 30, if p.discipline >= 60 { Pal::Green } else { Pal::Yellow });
+    let (x, w, fill) = (BASE_X + dx + 46, 30, if p.discipline >= 60 { Pal::Green } else { Pal::Yellow });
     f.boxed(x, DISCIPLINE_Y - 3, w, 6, Pal::Ink, Pal::Slate);
     f.rect(x + 1, DISCIPLINE_Y - 2, ((w - 2) * p.discipline as i32 + 99) / 100, 4, fill);
-    f.grid(icons::COIN, VALUE_X, COINS_Y - 3);
+    f.grid(icons::COIN, VALUE_X + dx, COINS_Y - 3);
 }
 
 fn has_stats(p: &Pet) -> bool {
@@ -68,30 +72,33 @@ fn chips(p: &Pet) -> Vec<(&'static str, Pal)> {
 
 /// The text of the panel. `ratio` is how many scene pixels one font pixel covers, so lines
 /// can be wrapped to what actually fits at the window's current scale.
-pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
+pub fn labels(app: &App, ratio: f32, lay: Layout) -> Vec<Label> {
     let p = &app.pet;
+    let dx = (lay.panel_x() - BASE_X) as f32;
+    let (col, value_x) = (LEFT + dx, VALUE_X as f32 + dx);
+    let flow_bottom = (lay.hint_y() - FLOW_MARGIN) as f32;
     let max = (WIDTH / ratio) as i32;
     let text = |t: &str, x: f32, y: f32, c: Pal| Label { text: t.into(), x, y, colour: c, align: Align::Left };
     let mut out = Vec::new();
     if has_stats(p) {
-        out.push(text("hunger", LEFT, HUNGER_Y as f32, Pal::Mist));
-        out.push(text("happy", LEFT, HAPPY_Y as f32, Pal::Mist));
-        out.push(text("discipline", LEFT, DISCIPLINE_Y as f32, Pal::Mist));
-        out.push(text("weight", LEFT, WEIGHT_Y, Pal::Mist));
+        out.push(text("hunger", col, HUNGER_Y as f32, Pal::Mist));
+        out.push(text("happy", col, HAPPY_Y as f32, Pal::Mist));
+        out.push(text("discipline", col, DISCIPLINE_Y as f32, Pal::Mist));
+        out.push(text("weight", col, WEIGHT_Y, Pal::Mist));
         let weight = if p.overweight() { format!("{} heavy", p.weight) } else { p.weight.to_string() };
-        out.push(text(&weight, VALUE_X as f32, WEIGHT_Y, if p.overweight() { Pal::Yellow } else { Pal::White }));
-        out.push(text("mistakes", LEFT, MISTAKES_Y, Pal::Mist));
+        out.push(text(&weight, value_x, WEIGHT_Y, if p.overweight() { Pal::Yellow } else { Pal::White }));
+        out.push(text("mistakes", col, MISTAKES_Y, Pal::Mist));
         let colour = match p.mistakes {
             0 => Pal::Green,
             1..=3 => Pal::Yellow,
             _ => Pal::Red,
         };
-        out.push(text(&p.mistakes.to_string(), VALUE_X as f32, MISTAKES_Y, colour));
-        out.push(text("trait", LEFT, TRAIT_Y, Pal::Mist));
-        out.push(text(p.quirk.label(), VALUE_X as f32, TRAIT_Y, Pal::Pink));
+        out.push(text(&p.mistakes.to_string(), value_x, MISTAKES_Y, colour));
+        out.push(text("trait", col, TRAIT_Y, Pal::Mist));
+        out.push(text(p.quirk.label(), value_x, TRAIT_Y, Pal::Pink));
     }
-    out.push(text("coins", LEFT, COINS_Y as f32, Pal::Mist));
-    out.push(text(&app.profile.coins.to_string(), VALUE_X as f32 + 8.0, COINS_Y as f32, Pal::Yellow));
+    out.push(text("coins", col, COINS_Y as f32, Pal::Mist));
+    out.push(text(&app.profile.coins.to_string(), value_x + 8.0, COINS_Y as f32, Pal::Yellow));
 
     // The rest flows down the panel, most important first, until it is full.
     let mut flow: Vec<(String, Pal)> = Vec::new();
@@ -113,7 +120,7 @@ pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
     if has_stats(p) {
         add(p.quirk.description(), Pal::Slate, false);
     }
-    let room = ((FLOW_BOTTOM - FLOW_TOP) / PITCH) as usize + 1;
+    let room = ((flow_bottom - FLOW_TOP) / PITCH) as usize + 1;
     let left = room.saturating_sub(flow.len());
     if left >= 2 && !app.log.is_empty() {
         flow.push(("recent".into(), Pal::Pink));
@@ -121,7 +128,7 @@ pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
         flow.extend(recent.into_iter().take(left - 1).map(|l| (l, Pal::Slate)));
     }
     for (i, (t, c)) in flow.into_iter().take(room).enumerate() {
-        out.push(text(&t, LEFT, FLOW_TOP + i as f32 * PITCH, c));
+        out.push(text(&t, col, FLOW_TOP + i as f32 * PITCH, c));
     }
     out
 }
@@ -133,7 +140,7 @@ mod tests {
     use crate::sysinfo::Strain;
 
     fn panel_text(app: &App, ratio: f32) -> String {
-        labels(app, ratio).into_iter().map(|l| l.text).collect::<Vec<_>>().join("\n")
+        labels(app, ratio, Layout::MIN).into_iter().map(|l| l.text).collect::<Vec<_>>().join("\n")
     }
 
     #[test]
@@ -167,9 +174,9 @@ mod tests {
             p.load = Strain { busy_cpu: true, low_ram: true, low_battery: true };
         });
         app.log = (0..20).map(|i| format!("Something long happened to the pet, number {i}")).collect();
-        for l in labels(&app, ratio) {
+        for l in labels(&app, ratio, Layout::MIN) {
             assert!(l.x + font::width(&l.text) as f32 * ratio <= 240.0 - 1.0, "too wide: {}", l.text);
-            assert!(l.y <= FLOW_BOTTOM, "below the panel: {}", l.text);
+            assert!(l.y <= 125.0, "below the panel: {}", l.text);
         }
     }
 
@@ -178,7 +185,7 @@ mod tests {
         let app = app_with(Stage::Egg, |_| {});
         assert!(!panel_text(&app, 0.5).contains("hunger"));
         let mut f = Frame::new(240, 160, Pal::Ink);
-        draw(&mut f, &app);
+        draw(&mut f, &app, Layout::MIN);
         assert_eq!(f, Frame::new(240, 160, Pal::Ink));
     }
 }

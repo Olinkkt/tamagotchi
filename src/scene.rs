@@ -34,15 +34,37 @@ impl Fx {
     }
 }
 
+/// The standard room size, which the art was drawn for. Bigger windows get a bigger room that
+/// carries the wall and floor on around it, with everything kept to the bottom centre.
 pub const W: i32 = 160;
 pub const H: i32 = 116;
-/// The pet's feet rest on this row, the middle of the rug.
-const FLOOR_Y: i32 = 102;
-const CENTRE_X: i32 = 80;
-/// Where up to three poops sit, left to right.
-const POOP_X: [i32; 3] = [16, 34, 128];
+/// Where up to three poops sit, left to right, relative to the middle of the room.
+const POOP_X: [i32; 3] = [-64, -46, 48];
 /// Stars in the night window that twinkle (the room sprite has them all lit).
 const TWINKLE: [(i32, i32); 3] = [(21, 19), (36, 18), (50, 41)];
+
+/// The size of the room being drawn, and what hangs off it.
+#[derive(Clone, Copy)]
+struct Size {
+    w: i32,
+    h: i32,
+}
+
+impl Size {
+    fn centre(self) -> i32 {
+        self.w / 2
+    }
+
+    /// The pet's feet rest on this row, the middle of the rug.
+    fn floor(self) -> i32 {
+        self.h - (H - 102)
+    }
+
+    /// How far things drawn for the standard room move to follow the bottom centre.
+    fn shift(self) -> (i32, i32) {
+        (self.w / 2 - W / 2, self.h - H)
+    }
+}
 
 /// Everything that decides how the room looks at one moment.
 pub struct Moment<'a> {
@@ -222,17 +244,17 @@ struct Place {
     head: i32,
 }
 
-fn place(m: &Moment, c: &Character) -> Place {
+fn place(m: &Moment, c: &Character, s: Size) -> Place {
     let (dx, dy) = motion(m);
     let body = art::body(c);
-    let y = FLOOR_Y - body.bottom() + dy;
-    Place { x: CENTRE_X - c.size as i32 / 2 + dx, y, size: c.size as i32, head: y + body.top() }
+    let y = s.floor() - body.bottom() + dy;
+    Place { x: s.centre() - c.size as i32 / 2 + dx, y, size: c.size as i32, head: y + body.top() }
 }
 
-fn draw_poop(f: &mut Frame, m: &Moment) {
+fn draw_poop(f: &mut Frame, m: &Moment, s: Size) {
     let poop = art::body(&cast::POOP);
-    for (i, &x) in POOP_X.iter().take(m.pet.poops.min(3) as usize).enumerate() {
-        let y = FLOOR_Y + 2 - poop.bottom();
+    for (i, &off) in POOP_X.iter().take(m.pet.poops.min(3) as usize).enumerate() {
+        let (x, y) = (s.centre() + off, s.floor() + 2 - poop.bottom());
         f.sprite(poop, x, y);
         // Two specks of stink, hopping about above it.
         let hop = ((m.beat() + i as u64) % 2) as i32;
@@ -241,11 +263,11 @@ fn draw_poop(f: &mut Frame, m: &Moment) {
     }
 }
 
-fn draw_dead(f: &mut Frame, m: &Moment) {
+fn draw_dead(f: &mut Frame, m: &Moment, s: Size) {
     let grave = art::body(&cast::GRAVE);
-    f.sprite(grave, CENTRE_X - 16, FLOOR_Y + 1 - grave.bottom());
+    f.sprite(grave, s.centre() - 16, s.floor() + 1 - grave.bottom());
     let float = [0, -1, -2, -1][(m.beat() / 2 % 4) as usize];
-    let (x, y) = (CENTRE_X - 12, FLOOR_Y + 1 - grave.bottom() + grave.top() - 20 + float);
+    let (x, y) = (s.centre() - 12, s.floor() + 1 - grave.bottom() + grave.top() - 20 + float);
     f.sprite(art::body(&cast::GHOST), x, y);
     f.grid(&faces::GHOST_FACE, x + cast::GHOST_FACE_AT.0, y + cast::GHOST_FACE_AT.1);
 }
@@ -266,7 +288,7 @@ fn draw_bubble(f: &mut Frame, x: i32, y: i32, key: char) {
     }
 }
 
-fn draw_effects(f: &mut Frame, m: &Moment, at: Place) {
+fn draw_effects(f: &mut Frame, m: &Moment, at: Place, s: Size) {
     let Some((fx, t)) = m.fx else { return };
     let (px, py, size, cx) = (at.x, at.head, at.size, at.x + at.size / 2);
     match fx {
@@ -276,7 +298,7 @@ fn draw_effects(f: &mut Frame, m: &Moment, at: Place) {
             }
         }
         Fx::Eat if t < 0.5 => {
-            let x = W - 10 - ((t / 0.5) * (W - 10 - cx - 8) as f32) as i32;
+            let x = s.w - 10 - ((t / 0.5) * (s.w - 10 - cx - 8) as f32) as i32;
             f.grid(icons::APPLE, x, at.y + size / 2);
         }
         Fx::Heal => {
@@ -287,10 +309,10 @@ fn draw_effects(f: &mut Frame, m: &Moment, at: Place) {
             }
         }
         Fx::Clean => {
-            let x = (t * (W + 24) as f32) as i32 - 16;
-            f.grid(icons::CLEAN, x, FLOOR_Y - 10);
+            let x = (t * (s.w + 24) as f32) as i32 - 16;
+            f.grid(icons::CLEAN, x, s.floor() - 10);
             for i in 0..3 {
-                f.grid(icons::SPARKLE, x - 8 - i * 9, FLOOR_Y - 14 + (i % 2) * 6);
+                f.grid(icons::SPARKLE, x - 8 - i * 9, s.floor() - 14 + (i % 2) * 6);
             }
         }
         Fx::Scold if (t * 10.0) as i32 % 2 == 0 => f.grid(icons::ANGER, px + 2, py - 2),
@@ -305,7 +327,7 @@ fn draw_effects(f: &mut Frame, m: &Moment, at: Place) {
     }
 }
 
-fn draw_machine(f: &mut Frame, m: &Moment, c: &Character, at: Place) {
+fn draw_machine(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
     let p = m.pet;
     if !calm(p) {
         return;
@@ -319,7 +341,8 @@ fn draw_machine(f: &mut Frame, m: &Moment, c: &Character, at: Place) {
         }
     }
     if p.load.low_battery {
-        f.grid(icons::BATTERY, 70, 24);
+        let (dx, dy) = s.shift();
+        f.grid(icons::BATTERY, 70 + dx, 24 + dy);
     }
 }
 
@@ -330,48 +353,56 @@ fn draw_sleep(f: &mut Frame, m: &Moment, at: Place) {
     }
 }
 
-/// The room at this moment, 160x116.
-pub fn room(m: &Moment) -> Frame {
+/// The room at this moment, `w` x `h` (at least the standard 160x116 where the art allows).
+pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
     let p = m.pet;
     let light = light(p);
-    let mut f = Frame::new(W, H, Pal::Ink);
-    f.sprite(art::room(light), 0, 0);
+    let s = Size { w, h };
+    let mut f = Frame::new(w, h, Pal::Ink);
+    // The standard room sits at the bottom centre of the master art; take what fits around it.
+    let master = art::room(light);
+    let (cw, ch) = (w.min(master.w), h.min(master.h));
+    let (sx, sy) = ((master.w - W) / 2 + W / 2 - cw / 2, master.h - ch);
+    f.region(master, (sx, sy, cw, ch), (w - cw) / 2, h - ch);
+    // The shadow along the ceiling, wherever the top of the room is cropped to.
+    f.rect(0, 0, w, 3, if light == Light::Dark { Pal::Ink } else { Pal::Night });
+    let (dx, dy) = s.shift();
     if light != Light::Day {
         for (i, &(x, y)) in TWINKLE.iter().enumerate() {
             if (m.beat() as usize + i * 3) % 7 == 0 {
-                f.set(x, y, Pal::Night);
+                f.set(x + dx, y + dy, Pal::Night);
             }
         }
     }
-    draw_poop(&mut f, m);
+    draw_poop(&mut f, m, s);
     if !p.alive() {
-        draw_dead(&mut f, m);
+        draw_dead(&mut f, m, s);
         return f;
     }
     let c = character(p);
-    let at = place(m, &c);
+    let at = place(m, &c, s);
     let sprite = pet_sprite(m, &c);
     let flash = m.fx_is(Fx::Evolve).is_some_and(|t| t < 0.6 && (t * 14.0) as i32 % 2 == 0);
     f.sprite_with(&sprite, at.x, at.y, |c| if flash { Pal::White } else { c });
     if p.asleep {
         draw_sleep(&mut f, m, at);
     }
-    draw_machine(&mut f, m, &c, at);
+    draw_machine(&mut f, m, &c, at, s);
     if let Some((key, _)) = p.top_need() {
         if !p.asleep {
-            let x = (at.x + at.size - 6).min(W - 19);
+            let x = (at.x + at.size - 6).min(w - 19);
             draw_bubble(&mut f, x, (at.head - 16 + (m.beat() % 2) as i32).max(1), key);
         }
     }
-    draw_effects(&mut f, m, at);
+    draw_effects(&mut f, m, at, s);
     f
 }
 
 /// The room area for the modes that show the room. Menus and lists dim it behind their text.
-pub fn area(app: &App) -> Frame {
-    let mut f = room(&Moment::of(app));
+pub fn area(app: &App, w: i32, h: i32) -> Frame {
+    let mut f = room(&Moment::of(app), w, h);
     if !matches!(app.mode, Mode::Normal) {
-        f.tint(0, 0, W, H, Pal::dark);
+        f.tint(0, 0, w, h, Pal::dark);
     }
     f
 }
@@ -391,7 +422,7 @@ mod tests {
     }
 
     fn look(p: &Pet, ms: u64) -> Frame {
-        room(&Moment { pet: p, fx: None, ms })
+        room(&Moment { pet: p, fx: None, ms }, W, H)
     }
 
     #[test]
@@ -404,7 +435,7 @@ mod tests {
             for fx in fxs {
                 for t in [0.0, 0.4, 0.95] {
                     for ms in [0, 2_900, 7_000] {
-                        room(&Moment { pet: &p, fx: fx.map(|f| (f, t)), ms });
+                        room(&Moment { pet: &p, fx: fx.map(|f| (f, t)), ms }, W, H);
                     }
                 }
             }
@@ -427,6 +458,20 @@ mod tests {
         p.cfg.animate_parts = true;
         assert_ne!(bare, look(&p, 0), "the ears show when animate_parts is on");
         assert_ne!(look(&p, 0), look(&p, 700), "and they move");
+    }
+
+    #[test]
+    fn a_bigger_room_keeps_the_pet_at_the_bottom_centre_and_draws_at_any_size() {
+        let p = pet(Stage::Baby);
+        let m = Moment { pet: &p, fx: None, ms: 0 };
+        for (w, h) in [(160, 116), (240, 116), (400, 200), (544, 244), (700, 300), (100, 60)] {
+            let f = room(&m, w, h);
+            assert_eq!((f.w, f.h), (w, h));
+        }
+        // The pet is in the same place relative to the bottom centre of any room.
+        let (small, big) = (room(&m, 160, 116), room(&m, 400, 200));
+        let pink = |f: &Frame, x0: i32, y0: i32| (0..32).flat_map(|y| (0..32).map(move |x| (x, y))).filter(|&(x, y)| f.get(x0 + x, y0 + y) == Some(Pal::Pink)).count();
+        assert_eq!(pink(&small, 64, 70), pink(&big, 184, 154));
     }
 
     #[test]

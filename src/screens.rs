@@ -7,7 +7,7 @@ use crate::art::Sprite;
 use crate::cast;
 use crate::faces::Expr;
 use crate::frame::Frame;
-use crate::hud::{Align, Label};
+use crate::hud::{Align, Label, Layout, ROOM_Y};
 use crate::icons::{self, Grid};
 use crate::palette::Pal;
 use crate::pet::{self, Pet, Stage};
@@ -223,29 +223,40 @@ fn chooser_labels() -> Vec<Label> {
     v
 }
 
-pub fn draw(f: &mut Frame, app: &App) {
+/// Draw the card for the current mode, centred over the dimmed screen.
+pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
     if !showing(app) {
         return;
     }
-    f.tint(0, 0, crate::hud::W, CARD.1 + CARD.3 + 4, Pal::dark);
-    card(f);
+    f.tint(0, 0, lay.w, lay.hint_y(), Pal::dark);
+    // The card is laid out as if the screen were the smallest one, then moved to the middle.
+    let mut local = Frame::new(240, 128, Pal::Ink);
+    card(&mut local);
     match &app.mode {
-        Mode::Chooser => draw_chooser(f),
-        Mode::Shop => draw_shop(f, app),
-        Mode::Awards => draw_awards(f, app),
-        Mode::Graveyard(entries) => draw_graveyard(f, entries),
+        Mode::Chooser => draw_chooser(&mut local),
+        Mode::Shop => draw_shop(&mut local, app),
+        Mode::Awards => draw_awards(&mut local, app),
+        Mode::Graveyard(entries) => draw_graveyard(&mut local, entries),
         _ => {}
     }
+    let (ox, oy) = lay.centred_240x128();
+    f.copy_rect(&local, CARD, ox + CARD.0, oy + CARD.1);
 }
 
-pub fn labels(app: &App) -> Vec<Label> {
-    match &app.mode {
+pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
+    let mut v = match &app.mode {
         Mode::Chooser => chooser_labels(),
         Mode::Shop => shop_labels(app),
         Mode::Awards => awards_labels(app),
         Mode::Graveyard(entries) => graveyard_labels(entries),
         _ => Vec::new(),
+    };
+    let (ox, oy) = lay.centred_240x128();
+    for l in &mut v {
+        l.x += ox as f32;
+        l.y += oy as f32;
     }
+    v
 }
 
 /// The line under a card.
@@ -263,8 +274,9 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
 }
 
 /// The key a click on a card presses: a shop row or a game.
-pub fn click(app: &App, x: f32, y: f32) -> Option<Key> {
-    let (x, y) = (x as i32, y as i32);
+pub fn click(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
+    let (ox, oy) = lay.centred_240x128();
+    let (x, y) = (x as i32 - ox, y as i32 - oy);
     match app.mode {
         Mode::Shop => (0..4).find(|&i| (shop_row_y(i)..shop_row_y(i) + SHOP_ROW - 3).contains(&y) && (CARD.0..CARD.0 + CARD.2).contains(&x)).map(|i| Key::Char((b'1' + i as u8) as char)),
         Mode::Chooser => (0..2).find(|&i| (game_card_x(i)..game_card_x(i) + GAME_CARD.2).contains(&x) && (GAME_CARD.1..GAME_CARD.1 + 70).contains(&y)).map(|i| Key::Char((b'1' + i as u8) as char)),
@@ -272,18 +284,29 @@ pub fn click(app: &App, x: f32, y: f32) -> Option<Key> {
     }
 }
 
-/// The box over the room after Shift+R.
-pub fn draw_reset(f: &mut Frame) {
-    f.boxed(20, 44, 120, 44, Pal::Night, Pal::Red);
-    f.rect(21, 45, 118, 1, Pal::Maroon);
+const RESET_W: i32 = 120;
+const RESET_H: i32 = 44;
+
+/// Top-left of the reset box: the middle of the room.
+fn reset_at(lay: Layout) -> (i32, i32) {
+    ((lay.panel_x() - RESET_W) / 2, ROOM_Y + (lay.room_h() - RESET_H) / 2)
 }
 
-pub fn reset_labels() -> Vec<Label> {
+/// The box over the room after Shift+R.
+pub fn draw_reset(f: &mut Frame, lay: Layout) {
+    let (x, y) = reset_at(lay);
+    f.boxed(x, y, RESET_W, RESET_H, Pal::Night, Pal::Red);
+    f.rect(x + 1, y + 1, RESET_W - 2, 1, Pal::Maroon);
+}
+
+pub fn reset_labels(lay: Layout) -> Vec<Label> {
+    let (x, y) = reset_at(lay);
+    let (cx, y) = (x as f32 + RESET_W as f32 / 2.0, y as f32);
     vec![
-        centred("START OVER?", 80.0, 53.0, Pal::Red),
-        centred("This pet is thrown away", 80.0, 63.0, Pal::White),
-        centred("and a new egg appears.", 80.0, 70.0, Pal::White),
-        centred("y = yes, any other key = no", 80.0, 80.0, Pal::Mist),
+        centred("START OVER?", cx, y + 9.0, Pal::Red),
+        centred("This pet is thrown away", cx, y + 19.0, Pal::White),
+        centred("and a new egg appears.", cx, y + 26.0, Pal::White),
+        centred("y = yes, any other key = no", cx, y + 36.0, Pal::Mist),
     ]
 }
 
@@ -310,19 +333,19 @@ mod tests {
         let mut app = app_with(Stage::Adult, |p| p.hunger = 1);
         app.profile.coins = 7;
         app.mode = Mode::Shop;
-        let text: Vec<String> = labels(&app).into_iter().map(|l| l.text).collect();
+        let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
         for want in ["SHOP", "7", "Fancy meal", "Vitamins", "12"] {
             assert!(text.iter().any(|t| t == want), "shop is missing {want}: {text:?}");
         }
-        assert_eq!(click(&app, 100.0, shop_row_y(2) as f32 + 5.0), Some(Key::Char('3')));
-        assert_eq!(click(&app, 100.0, 2.0), None);
+        assert_eq!(click(&app, Layout::MIN, 100.0, shop_row_y(2) as f32 + 5.0), Some(Key::Char('3')));
+        assert_eq!(click(&app, Layout::MIN, 100.0, 2.0), None);
     }
 
     #[test]
     fn the_awards_list_every_achievement_and_the_collection() {
         let mut app = app_with(Stage::Adult, |_| {});
         app.mode = Mode::Awards;
-        let text: Vec<String> = labels(&app).into_iter().map(|l| l.text).collect();
+        let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t == "First steps") && text.iter().any(|t| t == "Collector"), "{text:?}");
         assert!(text.iter().any(|t| t.contains("adults raised 0/5")));
         assert!(hint(&app).unwrap().0.starts_with("NEXT:"));
@@ -342,11 +365,11 @@ mod tests {
         let graves = vec!["2026-10-29 22:00 | Hashitamatchi | lived 1d 23h 59m | 12 care mistakes | cause: starvation".to_string(); 9];
         for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(graves), Mode::Graveyard(Vec::new())] {
             app.mode = mode;
-            for l in labels(&app) {
+            for l in labels(&app, Layout::MIN) {
                 assert!(fits(&l, COARSEST), "does not fit: {:?}", l.text);
             }
             let mut f = Frame::new(240, 160, Pal::Ink);
-            draw(&mut f, &app);
+            draw(&mut f, &app, Layout::MIN);
         }
     }
 
@@ -369,9 +392,21 @@ mod tests {
     }
 
     #[test]
+    fn a_card_is_centred_on_a_bigger_screen_and_clicks_follow_it() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.mode = Mode::Shop;
+        let lay = Layout::new(400, 220);
+        let (ox, oy) = lay.centred_240x128();
+        assert_eq!((ox, oy), (80, 30));
+        let title = labels(&app, lay).into_iter().find(|l| l.text == "SHOP").unwrap();
+        assert_eq!((title.x, title.y), (CARD.0 as f32 + 6.0 + 80.0, TITLE_Y + 30.0));
+        assert_eq!(click(&app, lay, 180.0, shop_row_y(1) as f32 + 5.0 + 30.0), Some(Key::Char('2')));
+    }
+
+    #[test]
     fn a_click_on_a_game_card_picks_it() {
         let mut app = app_with(Stage::Adult, |_| {});
         app.mode = Mode::Chooser;
-        assert_eq!(click(&app, game_card_x(1) as f32 + 10.0, GAME_CARD.1 as f32 + 10.0), Some(Key::Char('2')));
+        assert_eq!(click(&app, Layout::MIN, game_card_x(1) as f32 + 10.0, GAME_CARD.1 as f32 + 10.0), Some(Key::Char('2')));
     }
 }

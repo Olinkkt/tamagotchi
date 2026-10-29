@@ -145,7 +145,7 @@ mod tests {
         }
         for light in [Light::Day, Light::Lamp, Light::Dark] {
             let r = room(light);
-            assert_eq!((r.w, r.h), (160, 116));
+            assert_eq!((r.w, r.h), (cast::ROOM_MASTER.0 as i32, cast::ROOM_MASTER.1 as i32));
             assert!((0..r.h).all(|y| (0..r.w).all(|x| r.get(x, y).is_some())), "the room has no holes");
         }
     }

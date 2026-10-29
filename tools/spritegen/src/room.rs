@@ -1,15 +1,28 @@
-//! The pet's room, 160x116, drawn in room pixels on a 4x canvas and shrunk like a sprite.
+//! The pet's room, drawn in room pixels on a 4x canvas and shrunk like a sprite.
 //! Three versions: daytime, asleep with the lamp on, and asleep in the dark.
+//!
+//! Everything is authored in "stage" coordinates, the standard 160x116 room. The image made is
+//! the larger master of `cast::ROOM_MASTER`: the stage sits at its bottom centre, the wall and
+//! floor patterns carry on around it, and the lamp cord reaches up to the top edge.
 
 use crate::img::Img;
 use crate::palette::Pal::{self, *};
 use crate::process::{layer, Finish};
 use crate::sketch::Sketch;
 
-pub const W: usize = 160;
-pub const H: usize = 116;
+use crate::cast::{ROOM_MASTER, ROOM_STAGE};
+
+pub const W: usize = ROOM_STAGE.0;
+pub const H: usize = ROOM_STAGE.1;
+const MW: usize = ROOM_MASTER.0;
+const MH: usize = ROOM_MASTER.1;
+/// Where the stage's top-left corner is in the master.
+const SX: i32 = ((MW - W) / 2) as i32;
+const SY: i32 = (MH - H) as i32;
 const FLOOR: f32 = 84.0;
 const K: f32 = 4.0;
+/// Stage coordinates covered by the master.
+const XS: std::ops::Range<i32> = -SX..(W as i32 + SX);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Light {
@@ -19,37 +32,43 @@ pub enum Light {
 }
 
 fn canvas() -> Sketch {
-    Sketch::new((W as f32 * K) as u32, (H as f32 * K) as u32).scaled(K)
+    Sketch::new((MW as f32 * K) as u32, (MH as f32 * K) as u32).scaled(K).shifted(SX as f32, SY as f32)
+}
+
+/// Set a pixel at a stage position.
+fn put(img: &mut Img, x: i32, y: i32, p: Pal) {
+    img.set(x + SX, y + SY, Some(p));
 }
 
 fn flat(s: &Sketch) -> Img {
-    layer(&s.to_img(), W, H, &Finish { shade: false, outline: None })
+    layer(&s.to_img(), MW, MH, &Finish { shade: false, outline: None })
 }
 
 /// Furniture gets a soft dark outline rather than the characters' ink, so the pet stands out.
 fn lined(s: &Sketch) -> Img {
-    layer(&s.to_img(), W, H, &Finish { shade: false, outline: Some(Night) })
+    layer(&s.to_img(), MW, MH, &Finish { shade: false, outline: Some(Night) })
 }
 
 fn wall() -> Img {
     let mut s = canvas();
-    s.rect(0.0, 0.0, W as f32, FLOOR, Dusk);
-    s.rect(0.0, 0.0, W as f32, 3.0, Night);
+    let (x0, w, top) = (-SX as f32, MW as f32, -SY as f32);
+    s.rect(x0, top, w, FLOOR - top, Dusk);
     // Lower panelling below a wooden rail.
-    s.rect(0.0, 60.0, W as f32, FLOOR - 60.0, Night);
-    for x in (8..W).step_by(16) {
+    s.rect(x0, 60.0, w, FLOOR - 60.0, Night);
+    for x in XS.filter(|x| (x - 8).rem_euclid(16) == 0) {
         s.rect(x as f32, 64.0, 1.0, 14.0, Dusk);
     }
-    s.rect(0.0, 58.0, W as f32, 2.0, Tan);
-    s.rect(0.0, 60.0, W as f32, 1.0, Brown);
-    s.rect(0.0, 79.0, W as f32, 5.0, Brown);
-    s.rect(0.0, 79.0, W as f32, 1.0, Tan);
+    s.rect(x0, 58.0, w, 2.0, Tan);
+    s.rect(x0, 60.0, w, 1.0, Brown);
+    s.rect(x0, 79.0, w, 5.0, Brown);
+    s.rect(x0, 79.0, w, 1.0, Tan);
     let mut img = flat(&s);
-    // Wallpaper: a lattice of small darker diamonds.
-    for (row, y) in (7..56).step_by(8).enumerate() {
-        for x in (4 + (row % 2) * 6..W).step_by(12) {
+    // Wallpaper: a lattice of small darker diamonds, on rows 8 apart and columns 12 apart.
+    for y in (-SY..56).filter(|y| (y - 7).rem_euclid(8) == 0) {
+        let shift = (y - 7).div_euclid(8).rem_euclid(2) * 6;
+        for x in XS.filter(|x| (x - 4 - shift).rem_euclid(12) == 0) {
             for (dx, dy) in [(0, -1), (-1, 0), (1, 0), (0, 1)] {
-                img.set(x as i32 + dx, y as i32 + dy, Some(Night));
+                put(&mut img, x + dx, y + dy, Night);
             }
         }
     }
@@ -76,13 +95,13 @@ fn view(light: Light) -> Img {
         for y in 43..48 {
             for x in 17..54 {
                 if (x + y) % 2 == 0 || y >= 46 {
-                    img.set(x, y, Some(Ice));
+                    put(&mut img, x, y, Ice);
                 }
             }
         }
     } else {
         for (x, y, p) in [(21, 19, White), (29, 27, Ice), (24, 37, White), (36, 18, Ice), (50, 41, White), (33, 43, Ice), (39, 31, White)] {
-            img.set(x, y, Some(p));
+            put(&mut img, x, y, p);
         }
     }
     img
@@ -152,24 +171,25 @@ fn clock() -> Img {
 
 fn floor() -> Img {
     let mut s = canvas();
-    s.rect(0.0, FLOOR, W as f32, H as f32 - FLOOR, Brown);
+    s.rect(-SX as f32, FLOOR, MW as f32, H as f32 - FLOOR, Brown);
     let mut img = flat(&s);
     // Boards get taller towards the viewer; joints are staggered from board to board.
     let seams = [84, 88, 93, 99, 106, 114];
     for (i, w) in seams.windows(2).enumerate() {
         let seam = if w[0] == seams[0] { Night } else { Maroon };
-        for x in 0..W as i32 {
-            img.set(x, w[0], Some(seam));
+        for x in XS {
+            put(&mut img, x, w[0], seam);
         }
-        let step = 36 + i as i32 * 6;
-        for x in ((i as i32 * 23) % step..W as i32).step_by(step as usize) {
+        let (i, step) = (i as i32, 36 + i as i32 * 6);
+        let first = (i * 23) % step;
+        for x in XS.filter(|x| (x - first).rem_euclid(step) == 0) {
             for y in w[0] + 1..w[1] {
-                img.set(x, y, Some(Maroon));
+                put(&mut img, x, y, Maroon);
             }
             // A streak of grain just after each joint.
             let gy = (w[0] + w[1]) / 2;
-            for gx in x + 4..x + 4 + 5 + i as i32 {
-                img.set(gx, gy, Some(Tan));
+            for gx in x + 4..x + 4 + 5 + i {
+                put(&mut img, gx, gy, Tan);
             }
         }
     }
@@ -188,7 +208,8 @@ fn rug() -> Img {
 
 fn lamp(on: bool) -> Img {
     let mut s = canvas();
-    s.rect(79.5, 0.0, 1.0, 8.0, Ink);
+    // The cord reaches up to the top of the master, however tall the room is cropped.
+    s.rect(79.5, -SY as f32, 1.0, 8.0 + SY as f32, Ink);
     s.poly(&[(75.0, 8.0), (85.0, 8.0), (90.0, 16.0), (70.0, 16.0)], Yellow);
     s.poly(&[(72.5, 12.0), (87.5, 12.0), (90.0, 16.0), (70.0, 16.0)], Orange);
     s.ellipse(80.0, 17.5, 2.5, 2.0, if on { Cream } else { Mist });
@@ -218,11 +239,11 @@ fn lit(p: Pal) -> Pal {
     }
 }
 
-/// Recolour every pixel inside `area` (or inside the ellipse) with `f`.
+/// Recolour every pixel where `hit` (given stage coordinates) is true.
 fn light_patch(img: &mut Img, hit: impl Fn(f32, f32) -> bool, f: impl Fn(Pal) -> Pal) {
-    for y in 0..H as i32 {
-        for x in 0..W as i32 {
-            if hit(x as f32 + 0.5, y as f32 + 0.5) {
+    for y in 0..MH as i32 {
+        for x in 0..MW as i32 {
+            if hit((x - SX) as f32 + 0.5, (y - SY) as f32 + 0.5) {
                 if let Some(p) = img.get(x, y) {
                     img.set(x, y, Some(f(p)));
                 }
@@ -259,13 +280,14 @@ pub fn room(light: Light) -> Img {
             light_patch(&mut img, near_bulb, |p| if p == Cream { p } else { lit(p) });
         }
         Light::Dark => {
-            let moonlit: Vec<bool> = (0..W * H).map(|i| inside(&WINDOW_PATCH, (i % W) as f32 + 0.5, (i / W) as f32 + 0.5)).collect();
+            let moonlit: Vec<bool> =
+                (0..MW * MH).map(|i| inside(&WINDOW_PATCH, (i % MW) as f32 - SX as f32 + 0.5, (i / MW) as f32 - SY as f32 + 0.5)).collect();
             for (p, moon) in img.px.iter_mut().zip(moonlit) {
                 *p = p.map(|c| if moon { lit(c.dark()) } else { c.dark() });
             }
             // The night sky through the glass keeps its own light.
-            for y in 0..H as i32 {
-                for x in 0..W as i32 {
+            for y in 0..MH as i32 {
+                for x in 0..MW as i32 {
                     if view.get(x, y).is_some() && front.iter().all(|l| l.get(x, y).is_none()) {
                         img.set(x, y, view.get(x, y));
                     }
