@@ -10,7 +10,7 @@ use ratatui::{
 };
 
 use crate::pet::Pet;
-use crate::{ACCENT, BAD, DIM, EMPTY, GOOD, TEXT, WARN};
+use crate::ui::{ACCENT, BAD, DIM, EMPTY, GOOD, TEXT, WARN};
 
 pub enum Outcome {
     Continue,
