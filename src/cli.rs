@@ -384,7 +384,8 @@ const REPO: Option<&str> = None;
 /// `--update`: reinstall the newest version with cargo.
 fn update() -> i32 {
     let mut cmd = std::process::Command::new("cargo");
-    cmd.args(["install", "--force"]);
+    // --locked builds with the versions in Cargo.lock, which are known to work.
+    cmd.args(["install", "--force", "--locked"]);
     match REPO {
         Some(repo) => {
             cmd.args(["--git", &format!("https://github.com/{repo}")]);

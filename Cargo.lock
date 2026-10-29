@@ -1608,6 +1608,7 @@ dependencies = [
  "chrono",
  "crossterm",
  "dirs",
+ "fontdue",
  "macroquad",
  "ratatui",
  "serde",
