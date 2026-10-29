@@ -3,7 +3,7 @@
 
 use std::time::{Duration, Instant};
 
-use crossterm::event::KeyCode;
+use crate::app::Key;
 use ratatui::text::Line;
 
 use crate::pet::Pet;
@@ -30,8 +30,8 @@ impl Game {
         }
     }
 
-    pub fn key(&mut self, code: KeyCode) -> Outcome {
-        if matches!(code, KeyCode::Esc | KeyCode::Char('q')) {
+    pub fn key(&mut self, code: Key) -> Outcome {
+        if matches!(code, Key::Esc | Key::Char('q')) {
             return Outcome::Quit;
         }
         match self {
@@ -170,8 +170,8 @@ impl Memory {
         self.phase = MPhase::Show { idx: 0, lit: false, until: after_ms(600) };
     }
 
-    fn key(&mut self, code: KeyCode) -> Outcome {
-        let (MPhase::Input(pos), KeyCode::Char(c @ '1'..='4')) = (&self.phase, code) else {
+    fn key(&mut self, code: Key) -> Outcome {
+        let (MPhase::Input(pos), Key::Char(c @ '1'..='4')) = (&self.phase, code) else {
             return Outcome::Continue;
         };
         let pos = *pos;
@@ -286,18 +286,18 @@ const PADDLE_MOVE_MS: u64 = 40;
 
 /// Press a direction once and it keeps going until you press the other way or space, so the
 /// game does not depend on the terminal's key repeat.
-fn steer(code: KeyCode, neg: &[KeyCode], pos: &[KeyCode], dir: &mut i32) {
+fn steer(code: Key, neg: &[Key], pos: &[Key], dir: &mut i32) {
     if neg.contains(&code) {
         *dir = -1;
     } else if pos.contains(&code) {
         *dir = 1;
-    } else if code == KeyCode::Char(' ') {
+    } else if code == Key::Char(' ') {
         *dir = 0;
     }
 }
 
-const UP: [KeyCode; 3] = [KeyCode::Up, KeyCode::Char('w'), KeyCode::Char('k')];
-const DOWN: [KeyCode; 3] = [KeyCode::Down, KeyCode::Char('s'), KeyCode::Char('j')];
+const UP: [Key; 3] = [Key::Up, Key::Char('w'), Key::Char('k')];
+const DOWN: [Key; 3] = [Key::Down, Key::Char('s'), Key::Char('j')];
 
 pub struct Pong {
     py: i32,
@@ -342,7 +342,7 @@ impl Pong {
         }
     }
 
-    fn key(&mut self, code: KeyCode) -> Outcome {
+    fn key(&mut self, code: Key) -> Outcome {
         steer(code, &UP, &DOWN, &mut self.dir);
         Outcome::Continue
     }
@@ -525,7 +525,7 @@ mod tests {
         for kind in 1..=2 {
             let mut p = pet();
             let mut g = Game::new(kind, &mut p);
-            assert!(matches!(g.key(KeyCode::Esc), Outcome::Quit), "game {kind}");
+            assert!(matches!(g.key(Key::Esc), Outcome::Quit), "game {kind}");
         }
     }
 
@@ -535,7 +535,7 @@ mod tests {
         let mut m = Memory::new(&mut p);
         m.phase = MPhase::Input(0);
         for n in m.seq.clone() {
-            m.key(KeyCode::Char((b'0' + n) as char));
+            m.key(Key::Char((b'0' + n) as char));
         }
         assert_eq!(m.wins, 1);
         assert_eq!(m.results, [true]);
@@ -544,7 +544,7 @@ mod tests {
         let mut m = Memory::new(&mut p);
         m.phase = MPhase::Input(0);
         let wrong = (m.seq[0] % 4) + 1;
-        m.key(KeyCode::Char((b'0' + wrong) as char));
+        m.key(Key::Char((b'0' + wrong) as char));
         assert_eq!(m.results, [false]);
         assert_eq!(m.wins, 0);
     }
@@ -553,7 +553,7 @@ mod tests {
     fn memory_ignores_keys_while_the_pattern_is_showing() {
         let mut p = pet();
         let mut m = Memory::new(&mut p);
-        m.key(KeyCode::Char('1'));
+        m.key(Key::Char('1'));
         assert_eq!(m.wins, 0);
         assert!(matches!(m.phase, MPhase::Show { .. }));
     }
@@ -602,19 +602,19 @@ mod tests {
     fn pong_paddle_keeps_moving_until_stopped_and_stays_in_the_court() {
         let mut p = pet();
         let mut pong = Pong::new(&mut p);
-        pong.key(KeyCode::Up);
+        pong.key(Key::Up);
         for _ in 0..30 {
             pong.nudge();
         }
         assert_eq!(pong.py, PY_MIN);
-        pong.key(KeyCode::Down);
+        pong.key(Key::Down);
         for _ in 0..30 {
             pong.nudge();
         }
         assert_eq!(pong.py, PY_MAX);
-        pong.key(KeyCode::Up);
+        pong.key(Key::Up);
         pong.nudge();
-        pong.key(KeyCode::Char(' '));
+        pong.key(Key::Char(' '));
         let at = pong.py;
         pong.nudge();
         assert_eq!(pong.py, at, "space stops the paddle");

@@ -8,7 +8,8 @@ use ratatui::{
 
 use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
-use crate::{fmt_age, games, sprites, App, Mode};
+use crate::app::{App, Mode};
+use crate::{fmt_age, games, sprites};
 
 pub const BORDER: Color = Color::Rgb(86, 90, 125);
 pub const DIM: Color = Color::Rgb(120, 124, 150);

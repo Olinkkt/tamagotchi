@@ -130,6 +130,14 @@ impl Canvas {
         self.pixels(&edge, c);
     }
 
+    /// The pixels as RGBA bytes, row by row, with `outside` where nothing was drawn.
+    pub fn rgba(&self, outside: C) -> Vec<u8> {
+        self.px.iter().flat_map(|p| {
+            let (r, g, b) = p.unwrap_or(outside);
+            [r, g, b, 255]
+        }).collect()
+    }
+
     pub fn blit(&mut self, src: &Canvas, dx: i32, dy: i32, flat: Option<C>) {
         for y in 0..src.h as i32 {
             for x in 0..src.w as i32 {
