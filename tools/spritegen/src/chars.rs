@@ -240,6 +240,44 @@ pub fn ghost(c: &Character) -> Vec<Img> {
     vec![finish(c, &s)]
 }
 
+/// The two halves an egg leaves behind: the bowl with a ragged rim, and the cap tipped on its side.
+pub fn shell(c: &Character) -> Vec<Img> {
+    let teeth = |p: &mut tiny_skia::PathBuilder, y: f32, from: f32, to: f32| {
+        let n = 8;
+        for i in 1..n {
+            let x = from + (to - from) * i as f32 / n as f32;
+            p.line_to(x, if i % 2 == 1 { y - 12.0 } else { y + 2.0 });
+        }
+    };
+    let mut bowl = Sketch::new(SRC, SRC);
+    bowl.shape(
+        |p| {
+            p.move_to(18.0, 68.0);
+            teeth(p, 68.0, 18.0, 110.0);
+            p.line_to(110.0, 68.0);
+            p.cubic_to(114.0, 100.0, 92.0, 120.0, 64.0, 120.0);
+            p.cubic_to(36.0, 120.0, 14.0, 100.0, 18.0, 68.0);
+        },
+        White,
+    );
+    bowl.ellipse(44.0, 100.0, 8.0, 7.0, Teal);
+    bowl.ellipse(82.0, 108.0, 6.0, 5.0, Teal);
+    let mut cap = Sketch::new(SRC, SRC);
+    cap.turn(-32.0, 64.0, 80.0);
+    cap.shape(
+        |p| {
+            p.move_to(22.0, 86.0);
+            teeth(p, 86.0, 22.0, 106.0);
+            p.line_to(106.0, 86.0);
+            p.cubic_to(106.0, 40.0, 86.0, 22.0, 64.0, 22.0);
+            p.cubic_to(42.0, 22.0, 22.0, 40.0, 22.0, 86.0);
+        },
+        White,
+    );
+    cap.ellipse(70.0, 46.0, 8.0, 7.0, Teal);
+    vec![finish(c, &bowl), finish(c, &cap)]
+}
+
 pub fn cells(c: &Character) -> Vec<Img> {
     match c.name {
         "egg" => egg(c),
@@ -255,6 +293,7 @@ pub fn cells(c: &Character) -> Vec<Img> {
         "poop" => poop(c),
         "grave" => grave(c),
         "ghost" => ghost(c),
+        "shell" => shell(c),
         other => panic!("no drawing for {other}"),
     }
 }

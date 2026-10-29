@@ -30,7 +30,7 @@ fn pet(stage: Stage, species: &str, cfg: &Config) -> Pet {
 /// The sprites for one row of the sheet.
 fn row(stage: Stage, species: &str, cfg: &Config) -> Vec<art::Sprite> {
     match stage {
-        Stage::Egg => [0, 16, 26]
+        Stage::Egg => [3, 7, 13, 19, 25, 28]
             .map(|age| {
                 let mut p = pet(stage, species, cfg);
                 p.stage_age = age;
@@ -90,7 +90,7 @@ mod tests {
     fn the_sheet_has_a_row_per_form_and_a_column_per_expression() {
         let f = sheet(&Config::default());
         assert_eq!((f.w, f.h), (NAMES + CELL * 7, TOP + CELL * 11));
-        assert_eq!(row(Stage::Egg, "Egg", &Config::default()).len(), 3, "the egg shows its cracks");
+        assert_eq!(row(Stage::Egg, "Egg", &Config::default()).len(), 6, "the egg shows every crack stage");
     }
 
     #[test]

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- The egg cracks in five detailed stages (the last two glow, with a chip breaking open), instead of
+  a single line.
+- The nearer the egg is to hatching, the harder it wobbles: wider swings, faster, then hops in the
+  last couple of seconds.
+- Hatching leaves the two halves of the shell on the floor for a few seconds.
+- `--gallery` shows all six egg stages.
+
 ## 1.1.4
 
 - Dev panel: `1` sets the speed straight back to 1x.

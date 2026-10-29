@@ -72,11 +72,13 @@ pub struct Moment<'a> {
     pub fx: Option<(Fx, f32)>,
     /// Milliseconds on the animation clock.
     pub ms: u64,
+    /// Seconds since the egg hatched, while its shell still lies on the floor.
+    pub shell: Option<f32>,
 }
 
 impl<'a> Moment<'a> {
     pub fn of(app: &'a App) -> Moment<'a> {
-        Moment { pet: &app.pet, fx: app.current_fx(), ms: app.started.elapsed().as_millis() as u64 }
+        Moment { pet: &app.pet, fx: app.current_fx(), ms: app.started.elapsed().as_millis() as u64, shell: app.shell_age() }
     }
 
     /// The 350 ms beat most of the little animations step on.
@@ -167,15 +169,36 @@ fn calm(p: &Pet) -> bool {
     p.alive() && p.stage != Stage::Egg && !p.asleep && !p.sick
 }
 
+/// How far through its 30 seconds the egg is when each crack stage begins.
+const EGG_STAGES: [f32; 5] = [0.2, 0.4, 0.6, 0.8, 0.92];
+/// How wide (pixels) and how slow (milliseconds per swing) the egg wobbles at each stage, 0 to 5.
+const WOBBLE_AMP: [f32; 6] = [0.0, 0.0, 1.0, 1.0, 2.0, 3.0];
+const WOBBLE_MS: [f32; 6] = [1.0, 1.0, 1600.0, 1100.0, 760.0, 420.0];
+/// In the last stage the egg also hops, this often (milliseconds) and this high (pixels).
+const HOP_MS: u64 = 210;
+const HOP_PX: i32 = 2;
+/// How long the shell lies on the floor after hatching.
+pub const SHELL_SECS: f32 = 7.0;
+
+/// How many crack stages the egg has reached: 0 (whole) to 5 (about to burst).
+fn egg_stage(p: &Pet) -> usize {
+    let progress = p.stage_age as f32 / 30.0;
+    EGG_STAGES.iter().filter(|&&at| progress > at).count()
+}
+
 /// The pet's offset from where it normally stands. It only bobs up and down; the one sideways
-/// movement is an egg wobbling as it gets close to hatching.
+/// movement is an egg wobbling, wider and faster as it gets closer to hatching, and hopping at the end.
 fn motion(m: &Moment) -> (i32, i32) {
     let p = m.pet;
     let beat = m.beat() as i32;
     match p.stage {
         Stage::Dead => (0, 0),
-        Stage::Egg if p.stage_age as f32 / 30.0 > 0.35 => ([0, 1, 0, -1][(beat % 4) as usize], 0),
-        Stage::Egg => (0, 0),
+        Stage::Egg => {
+            let n = egg_stage(p);
+            let dx = (WOBBLE_AMP[n] * (std::f32::consts::TAU * m.ms as f32 / WOBBLE_MS[n]).sin()).round() as i32;
+            let dy = if n == 5 { -(((m.ms / HOP_MS) % 2) as i32) * HOP_PX } else { 0 };
+            (dx, dy)
+        }
         _ if p.asleep => (0, -(beat / 3 % 2)),
         _ => (0, -(beat % 2)),
     }
@@ -186,7 +209,7 @@ fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
     let p = m.pet;
     let mut overlay: Vec<(i32, i32, Pal)> = Vec::new();
     if p.stage == Stage::Egg {
-        overlay = cracks(p);
+        overlay = cracks(p, m.beat());
     } else if let Some(spot) = c.face {
         let dizzy = p.load.low_ram && calm(p) && expression(m) != Expr::Sleeping;
         let face: Vec<(i32, i32, Pal)> =
@@ -196,19 +219,23 @@ fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
     assemble(p, c, &overlay, m.beat())
 }
 
-/// Cracks in the shell as an egg gets close to hatching.
-fn cracks(p: &Pet) -> Vec<(i32, i32, Pal)> {
-    let progress = p.stage_age as f32 / 30.0;
-    let Some(i) = [(0.5, 0), (0.8, 1)].iter().rev().find(|(at, _)| progress > *at).map(|(_, i)| *i) else { return Vec::new() };
+/// Cracks in the shell as an egg gets close to hatching. In the last stage the glow pulses
+/// between yellow and orange on every other beat.
+fn cracks(p: &Pet, beat: u64) -> Vec<(i32, i32, Pal)> {
+    let n = egg_stage(p);
+    if n == 0 {
+        return Vec::new();
+    }
     let (x, y) = cast::EGG_CRACK_AT;
-    faces::pixels(&faces::EGG_CRACKS[i]).map(|(dx, dy, p)| (x + dx, y + dy, p)).collect()
+    let pulse = n == 5 && beat % 2 == 1;
+    faces::pixels(&faces::EGG_CRACKS[n - 1]).map(|(dx, dy, c)| (x + dx, y + dy, if pulse && c == Pal::Yellow { Pal::Orange } else { c })).collect()
 }
 
 /// The pet with a given face (an egg shows its cracks instead), for the games and the gallery.
 pub fn posed(p: &Pet, e: Expr) -> Sprite {
     let c = character(p);
     let face: Vec<(i32, i32, Pal)> = match c.face {
-        None if p.stage == Stage::Egg => cracks(p),
+        None if p.stage == Stage::Egg => cracks(p, 0),
         Some(spot) => faces::pixels(faces::grid(spot.style, e)).map(|(x, y, col)| (spot.x + x, spot.y + y, col)).collect(),
         None => Vec::new(),
     };
@@ -242,6 +269,17 @@ fn draw_poop(f: &mut Frame, m: &Moment, s: Size) {
         f.set(x + 4 + hop, y - 3, Pal::Lime);
         f.set(x + 10 - hop, y - 5, Pal::Lime);
     }
+}
+
+/// The two halves of the egg, left on the floor either side of the pet; they blink out at the end.
+fn draw_shell(f: &mut Frame, t: f32, s: Size) {
+    if t > SHELL_SECS - 1.5 && (t * 8.0) as i32 % 2 == 1 {
+        return;
+    }
+    let cells = art::cells(&cast::SHELL);
+    let floor = s.floor() + 2;
+    f.sprite(&cells[0], s.centre() - 46, floor - cells[0].bottom());
+    f.sprite(&cells[1], s.centre() + 22, floor - cells[1].bottom());
 }
 
 fn draw_dead(f: &mut Frame, m: &Moment, s: Size) {
@@ -356,6 +394,9 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
         }
     }
     draw_poop(&mut f, m, s);
+    if let Some(t) = m.shell {
+        draw_shell(&mut f, t, s);
+    }
     if !p.alive() {
         draw_dead(&mut f, m, s);
         return f;
@@ -403,7 +444,7 @@ mod tests {
     }
 
     fn look(p: &Pet, ms: u64) -> Frame {
-        room(&Moment { pet: p, fx: None, ms }, W, H)
+        room(&Moment { pet: p, fx: None, ms, shell: None }, W, H)
     }
 
     #[test]
@@ -416,7 +457,7 @@ mod tests {
             for fx in fxs {
                 for t in [0.0, 0.4, 0.95] {
                     for ms in [0, 2_900, 7_000] {
-                        room(&Moment { pet: &p, fx: fx.map(|f| (f, t)), ms }, W, H);
+                        room(&Moment { pet: &p, fx: fx.map(|f| (f, t)), ms, shell: None }, W, H);
                     }
                 }
             }
@@ -444,7 +485,7 @@ mod tests {
     #[test]
     fn a_bigger_room_keeps_the_pet_at_the_bottom_centre_and_draws_at_any_size() {
         let p = pet(Stage::Baby);
-        let m = Moment { pet: &p, fx: None, ms: 0 };
+        let m = Moment { pet: &p, fx: None, ms: 0, shell: None };
         for (w, h) in [(160, 116), (240, 116), (400, 200), (544, 244), (700, 300), (100, 60)] {
             let f = room(&m, w, h);
             assert_eq!((f.w, f.h), (w, h));
@@ -455,24 +496,70 @@ mod tests {
         assert_eq!(pink(&small, 64, 70), pink(&big, 184, 154));
     }
 
-    #[test]
-    fn only_a_hatching_egg_moves_sideways() {
-        let at = |p: &Pet, i: u64| motion(&Moment { pet: p, fx: None, ms: i * 350 }).0;
+    fn egg_at(age: u64) -> Pet {
         let mut egg = pet(Stage::Egg);
-        egg.stage_age = 5;
-        assert!((0..40).all(|i| at(&egg, i) == 0), "a young egg sits still");
-        egg.stage_age = 20;
-        let xs: Vec<i32> = (0..4).map(|i| at(&egg, i)).collect();
-        assert_eq!(xs, [0, 1, 0, -1], "an egg about to hatch wobbles");
+        egg.stage_age = age;
+        egg
+    }
+
+    /// The sideways and up/down offsets of an egg over six seconds, sampled every 10 ms.
+    fn egg_motion(age: u64) -> Vec<(i32, i32)> {
+        let egg = egg_at(age);
+        (0..600u64).map(|i| motion(&Moment { pet: &egg, fx: None, ms: i * 10, shell: None })).collect()
+    }
+
+    #[test]
+    fn an_egg_wobbles_wider_and_faster_as_it_gets_closer_to_hatching() {
+        // Ages 3, 8, 13, 19, 25, 28 seconds are crack stages 0 to 5.
+        let stages: Vec<usize> = [3, 8, 13, 19, 25, 28].iter().map(|&a| egg_stage(&egg_at(a))).collect();
+        assert_eq!(stages, [0, 1, 2, 3, 4, 5]);
+        let swing = |age| egg_motion(age).iter().map(|m| m.0.abs()).max().unwrap();
+        let rate = |age| egg_motion(age).windows(2).filter(|w| w[0].0 != w[1].0).count();
+        assert_eq!([3, 8].map(swing), [0, 0], "a young egg sits still");
+        assert_eq!([13, 19, 25, 28].map(swing), [1, 1, 2, 3], "wider every stage");
+        let rates = [13, 19, 25, 28].map(rate);
+        assert!(rates.windows(2).all(|w| w[0] < w[1]), "faster every stage: {rates:?}");
+    }
+
+    #[test]
+    fn an_egg_only_hops_in_its_last_stage() {
+        assert!(egg_motion(25).iter().all(|m| m.1 == 0));
+        let hops: Vec<i32> = egg_motion(28).iter().map(|m| m.1).collect();
+        assert!(hops.contains(&0) && hops.contains(&-HOP_PX));
+    }
+
+    #[test]
+    fn nothing_but_an_egg_moves_sideways() {
         for stage in [Stage::Baby, Stage::Adult] {
             let mut p = pet(stage);
             for state in 0..3 {
                 p.sick = state == 1;
                 p.asleep = state == 2;
-                let xs: Vec<i32> = (0..40u64).map(|i| motion(&Moment { pet: &p, fx: Some((Fx::Scold, 0.1)), ms: i * 350 }).0).collect();
+                let xs: Vec<i32> = (0..40u64).map(|i| motion(&Moment { pet: &p, fx: Some((Fx::Scold, 0.1)), ms: i * 350, shell: None }).0).collect();
                 assert!(xs.iter().all(|&x| x == 0), "{stage:?} state {state}: {xs:?}");
             }
         }
+    }
+
+    #[test]
+    fn the_shell_lies_on_the_floor_after_hatching_and_blinks_out() {
+        let p = pet(Stage::Baby);
+        let room_at = |shell: Option<f32>| room(&Moment { pet: &p, fx: None, ms: 0, shell }, W, H);
+        let none = room_at(None);
+        assert!(none != room_at(Some(1.0)), "the halves are on the floor");
+        assert!(room_at(Some(1.0)) == room_at(Some(3.0)), "and stay put");
+        assert!(none == room_at(Some(5.7)), "at 5.7s it is in a blink");
+        assert!(none != room_at(Some(5.8)), "and back for a moment");
+    }
+
+    #[test]
+    fn the_cracks_get_bigger_each_stage_and_pulse_at_the_end() {
+        let count = |age| cracks(&egg_at(age), 0).len();
+        let counts: Vec<usize> = [3, 8, 13, 19, 25, 28].iter().map(|&a| count(a)).collect();
+        assert_eq!(counts[0], 0);
+        assert!(counts.windows(2).all(|w| w[0] < w[1]), "{counts:?}");
+        assert_ne!(cracks(&egg_at(28), 0), cracks(&egg_at(28), 1), "the light pulses");
+        assert_eq!(cracks(&egg_at(25), 0), cracks(&egg_at(25), 1), "but only at the end");
     }
 
     #[test]
@@ -504,12 +591,12 @@ mod tests {
         assert_eq!(light(&p), Light::Lamp);
         p.light_on = false;
         assert_eq!(light(&p), Light::Dark);
-        assert_eq!(expression(&Moment { pet: &p, fx: None, ms: 0 }), Expr::Sleeping);
+        assert_eq!(expression(&Moment { pet: &p, fx: None, ms: 0, shell: None }), Expr::Sleeping);
     }
 
     #[test]
     fn moods_follow_the_needs() {
-        let face = |p: &Pet, fx: Option<(Fx, f32)>| expression(&Moment { pet: p, fx, ms: 0 });
+        let face = |p: &Pet, fx: Option<(Fx, f32)>| expression(&Moment { pet: p, fx, ms: 0, shell: None });
         let mut p = pet(Stage::Baby);
         assert_eq!(face(&p, None), Expr::Idle);
         p.happy = 4;
@@ -521,7 +608,7 @@ mod tests {
         p.sick = false;
         p.hunger = 3;
         assert_eq!(face(&p, Some((Fx::Eat, 0.5))), Expr::Eating);
-        assert_eq!(expression(&Moment { pet: &p, fx: None, ms: 350 * 8 }), Expr::Blink);
+        assert_eq!(expression(&Moment { pet: &p, fx: None, ms: 350 * 8, shell: None }), Expr::Blink);
     }
 
     #[test]

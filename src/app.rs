@@ -49,6 +49,8 @@ pub struct App {
     was_calling: bool,
     pub started: Instant,
     fx: Option<(scene::Fx, Instant)>,
+    /// When the egg hatched, so its shell can lie on the floor for a while.
+    shell_at: Option<Instant>,
     last_stage: Stage,
     confirm_reset: bool,
     pub dev: bool,
@@ -170,6 +172,7 @@ impl App {
             was_calling: false,
             started: Instant::now(),
             fx: None,
+            shell_at: None,
             last_stage: Stage::Egg,
             confirm_reset: false,
             dev,
@@ -259,6 +262,12 @@ impl App {
         self.confirm_reset
     }
 
+    /// Seconds since the egg hatched, while its shell is still on the floor.
+    pub fn shell_age(&self) -> Option<f32> {
+        let age = self.shell_at?.elapsed().as_secs_f32();
+        (age < scene::SHELL_SECS).then_some(age)
+    }
+
     pub fn current_fx(&self) -> Option<(scene::Fx, f32)> {
         let (fx, at) = self.fx?;
         let p = at.elapsed().as_secs_f32() / fx.duration_secs();
@@ -295,6 +304,9 @@ impl App {
         if self.pet.stage != self.last_stage {
             if self.pet.alive() {
                 self.trigger(scene::Fx::Evolve);
+            }
+            if self.last_stage == Stage::Egg && self.pet.stage == Stage::Baby {
+                self.shell_at = Some(Instant::now());
             }
             self.last_stage = self.pet.stage;
         }
@@ -417,6 +429,7 @@ impl App {
                 self.pet = self.fresh_pet();
                 self.log.clear();
                 self.fx = None;
+                self.shell_at = None;
                 self.last_stage = Stage::Egg;
                 self.message = "Reset! A fresh egg appears.".into();
                 let _ = save::save(&self.pet);
@@ -466,6 +479,7 @@ impl App {
             Key::Char('l') => self.pet.toggle_light(),
             Key::Char('n') if !self.pet.alive() => {
                 self.pet = self.fresh_pet();
+                self.shell_at = None;
                 self.last_stage = Stage::Egg;
                 "A new egg appears!".into()
             }
@@ -562,8 +576,12 @@ impl App {
             '[' | ']' => {
                 let now = FORMS.iter().position(|&(s, n)| s == p.stage && (s == Stage::Dead || n == p.species)).unwrap_or(0);
                 let next = if c == ']' { (now + 1) % FORMS.len() } else { (now + FORMS.len() - 1) % FORMS.len() };
+                let was_egg = p.stage == Stage::Egg;
                 set_form(p, next);
                 self.last_stage = p.stage;
+                if was_egg && p.stage == Stage::Baby {
+                    self.shell_at = Some(Instant::now());
+                }
                 format!("form = {} ({})", p.species, p.stage.label())
             }
             'e' => {
@@ -693,6 +711,24 @@ pub(crate) mod tests {
             assert_eq!(app.speed, 1.0, "1 goes straight back to normal speed");
             app.on_key(Key::Char('f'));
             assert_eq!(app.speed, 2.0);
+        });
+    }
+
+    #[test]
+    fn hatching_leaves_a_shell_that_goes_away_again() {
+        save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Egg, |p| p.species = "Egg".into());
+            assert_eq!(app.shell_age(), None);
+            app.pet.dev_grow();
+            app.pet.tick();
+            app.update();
+            assert_eq!(app.pet.stage, Stage::Baby);
+            assert!(app.shell_age().is_some_and(|t| t < 1.0), "the shell is on the floor");
+            app.shell_at = Some(Instant::now() - Duration::from_secs_f32(scene::SHELL_SECS + 0.1));
+            assert_eq!(app.shell_age(), None, "and is gone after a few seconds");
+            app.on_key(Key::Char('R'));
+            app.on_key(Key::Char('y'));
+            assert_eq!(app.shell_at, None, "a new egg starts without one");
         });
     }
 

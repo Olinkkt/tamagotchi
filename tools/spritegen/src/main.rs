@@ -117,6 +117,12 @@ fn build(c: &Character, sprites: &Path, preview: &Path) -> Img {
             ghost.set(cast::GHOST_FACE_AT.0 + x, cast::GHOST_FACE_AT.1 + y, Some(p));
         }
         vec![("face".to_string(), ghost)]
+    } else if c.name == "shell" {
+        // The bowl and the cap side by side, as they lie on the floor.
+        let mut both = Img::new(c.size * 2 + 2, c.size);
+        both.blit(&cells[0], 0, 0);
+        both.blit(&cells[1], c.size as i32 + 2, 0);
+        vec![("both".to_string(), both)]
     } else if c.name != "egg" {
         vec![("plain".to_string(), cells[0].clone())]
     } else {

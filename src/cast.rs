@@ -71,8 +71,11 @@ pub const POOP: Character = Character { name: "poop", size: 16, face: None, part
 pub const GRAVE: Character = Character { name: "grave", size: 32, face: None, parts: &[] };
 pub const GHOST: Character = Character { name: "ghost", size: 24, face: None, parts: &[] };
 
-pub const ALL: [Character; 13] =
-    [EGG, BABY, CHILD, TONMARUTCHI, HASHITAMATCHI, MAMETCHI, KUCHIPATCHI, TARAKOTCHI, ICHIGOTCHI, NYOROTCHI, POOP, GRAVE, GHOST];
+/// What an egg leaves behind: the bowl is the body, the cap is its one part frame.
+pub const SHELL: Character = Character { name: "shell", size: 24, face: None, parts: &[Part { name: "cap", frames: 1, front: false }] };
+
+pub const ALL: [Character; 14] =
+    [EGG, BABY, CHILD, TONMARUTCHI, HASHITAMATCHI, MAMETCHI, KUCHIPATCHI, TARAKOTCHI, ICHIGOTCHI, NYOROTCHI, POOP, GRAVE, GHOST, SHELL];
 
 /// The sprite set for a species, if it has one.
 pub fn for_species(species: &str) -> Option<Character> {
@@ -87,6 +90,6 @@ pub const ROOM_MASTER: (usize, usize) = (544, 244);
 pub const ROOM_STAGE: (usize, usize) = (160, 116);
 
 /// The spot on the egg where the cracks go.
-pub const EGG_CRACK_AT: (i32, i32) = (9, 15);
+pub const EGG_CRACK_AT: (i32, i32) = (7, 4);
 /// Where the ghost's face goes.
 pub const GHOST_FACE_AT: (i32, i32) = (9, 8);

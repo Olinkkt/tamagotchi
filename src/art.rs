@@ -96,6 +96,7 @@ fn sheet_bytes(name: &str) -> &'static [u8] {
         "poop" => include_bytes!("../assets/sprites/poop.png"),
         "grave" => include_bytes!("../assets/sprites/grave.png"),
         "ghost" => include_bytes!("../assets/sprites/ghost.png"),
+        "shell" => include_bytes!("../assets/sprites/shell.png"),
         other => panic!("no sprite sheet for {other}"),
     }
 }
@@ -147,6 +148,17 @@ mod tests {
             let r = room(light);
             assert_eq!((r.w, r.h), (cast::ROOM_MASTER.0 as i32, cast::ROOM_MASTER.1 as i32));
             assert!((0..r.h).all(|y| (0..r.w).all(|x| r.get(x, y).is_some())), "the room has no holes");
+        }
+    }
+
+    #[test]
+    fn every_egg_crack_pixel_lies_on_the_shell() {
+        let egg = body(&cast::EGG);
+        let (ox, oy) = cast::EGG_CRACK_AT;
+        for (stage, grid) in crate::faces::EGG_CRACKS.iter().enumerate() {
+            for (x, y, _) in crate::faces::pixels(grid) {
+                assert!(egg.get(ox + x, oy + y).is_some(), "stage {stage} has a crack pixel off the egg at {x},{y}");
+            }
         }
     }
 
