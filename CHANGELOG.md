@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.1
+
+- Changelog now covers 0.1 to 0.23 too, rebuilt from the git history.
+
 ## 1.4.0
 
 - Every egg now follows a 30-second schedule of its own: shaking in five phases, from rare 1px
@@ -10,6 +14,7 @@
 - Six crack stages (the first is three pixels at 20 seconds), a shell that lifts apart from 24
   seconds and flying shell bits from 26 seconds. The old wobble and the post-hatch shake are gone;
   the burst now happens the moment the egg breaks.
+
 ## 1.3.1
 
 - The egg wobble and the final hatch shake are random now: every lurch leans a different way and
@@ -69,3 +74,103 @@ The terminal game becomes a window game. Saves, profile and config are unchanged
 - Pong's paddle moves while a key is held, instead of keeping going after one press.
 - `--gallery` writes `tama-gallery.png` instead of printing to the terminal.
 - The terminal UI is gone. Saves, profile, config and all shell commands are unchanged.
+
+Before 1.0.0, rebuilt from the git history (patch releases folded into their minor).
+
+## 0.23.x
+
+- Terminal UI removed; the window is the only frontend.
+- Window screens: status panel, growth, hint, shop, awards, graveyard, reset.
+- Pixel-art pipeline with a fixed palette; every child, teen and adult form is drawn.
+- Dev: arrow keys step through forms (0.23.1).
+
+## 0.22.x
+
+- Mini-games get a result screen and drop text headings.
+
+## 0.21.x
+
+- Snake, reaction, catch and dodge removed. Memory and pong stay, drawn in pixel art with fair hitboxes.
+
+## 0.20.x
+
+- Snake and dodge added (later removed in 0.21). Dev panel opens with Tab.
+
+## 0.19.x
+
+- Two more mini-games, and clipped game screens fixed.
+- Saves carry a format version (0.19.6).
+- Internal: code split into modules, clippy clean, evolution tests.
+
+## 0.18.x
+
+- Coins, a shop, achievements and a collection of adults.
+
+## 0.17.x
+
+- The pet reacts to CPU load, RAM use and a low battery.
+
+## 0.16.x
+
+- Shell hook: commits feed the pet, failed commands upset it.
+
+## 0.15.x
+
+- Gentler behaviour while the game is closed; small terminal windows handled; README added.
+
+## 0.14.x
+
+- `tama status --waybar` gives short text with a hover tooltip.
+- Tests for saves, lock, config, shell commands and mini-games; a second game window is refused.
+
+## 0.13.x
+
+- `tama watch` sends desktop notifications while the game is closed.
+
+## 0.12.x
+
+- `tama status` and shell care commands.
+
+## 0.11.x
+
+- `tama --animate on|off`; the gallery follows the config.
+
+## 0.10.x
+
+- `animate_parts` setting, off by default.
+
+## 0.9.x
+
+- Personality traits, weight that matters, evolution preview, animated sprite parts.
+
+## 0.8.x
+
+- `tama --update`, `--version` and `--help`.
+
+## 0.7.x
+
+- Config file, real-clock sleep, three more mini-games, graveyard, dev mode, `tama` command.
+
+## 0.6.x
+
+- Reset key with confirmation; smarter hints and menu chips.
+
+## 0.5.x
+
+- Hint line, speech bubble, context-aware menu.
+
+## 0.4.x
+
+- Room scene, scaling sprites, restyled UI.
+
+## 0.3.x
+
+- Pixel-art sprites, effects, side status panel.
+
+## 0.2.x
+
+- `cargo fast`: 60x test mode with a separate save.
+
+## 0.1.x
+
+- Terminal tamagotchi: pet simulation, ASCII sprites, saves.
