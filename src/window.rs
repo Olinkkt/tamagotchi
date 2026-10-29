@@ -118,7 +118,8 @@ fn draw_dev_panel(v: &Viewport, app: &App) {
         "z/Z  clock 22:00 / 12:00".into(),
         format!("u cpu {}  r ram {}", on(p.load.busy_cpu), on(p.load.low_ram)),
         format!("b battery {}", on(p.load.low_battery)),
-        "f speed   tab close".into(),
+        "f    speed 1/2/5/10/60/600".into(),
+        "tab  close the panel".into(),
     ];
     // Shrink the text until the longest line and all the rows fit the panel.
     let mut size = (h / lines.len() as f32).floor();

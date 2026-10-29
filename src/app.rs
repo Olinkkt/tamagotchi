@@ -73,6 +73,14 @@ pub const FORMS: [(Stage, &str); 11] = [
     (Stage::Dead, "Departed"),
 ];
 
+/// The game speeds the dev panel's `f` key steps through, then back to the start.
+const SPEEDS: [f64; 6] = [1.0, 2.0, 5.0, 10.0, 60.0, 600.0];
+
+fn next_speed(now: f64) -> f64 {
+    let i = SPEEDS.iter().position(|&s| s == now);
+    SPEEDS[i.map_or(0, |i| (i + 1) % SPEEDS.len())]
+}
+
 /// Turn the pet into `FORMS[i]` straight away (dev panel only).
 fn set_form(p: &mut Pet, i: usize) {
     let (stage, species) = FORMS[i];
@@ -570,12 +578,7 @@ impl App {
                 format!("clock set to {hour:02}:00")
             }
             'f' => {
-                self.speed = match self.speed as u32 {
-                    1 => 10.0,
-                    10 => 60.0,
-                    60 => 600.0,
-                    _ => 1.0,
-                };
+                self.speed = next_speed(self.speed);
                 format!("speed = x{}", self.speed)
             }
             _ => return false,
@@ -665,7 +668,17 @@ pub(crate) mod tests {
         app.press(Key::Char('f'));
         assert_eq!(app.pet.hunger, 2, "f on the panel is the speed key, but the click feeds");
         app.on_key(Key::Char('f'));
-        assert_eq!((app.pet.hunger, app.speed), (2, 10.0));
+        assert_eq!((app.pet.hunger, app.speed), (2, 2.0));
+    }
+
+    #[test]
+    fn the_dev_speed_key_steps_through_1_2_5_10_60_600_and_round() {
+        let mut speeds = vec![1.0];
+        for _ in 0..6 {
+            speeds.push(next_speed(*speeds.last().unwrap()));
+        }
+        assert_eq!(speeds, [1.0, 2.0, 5.0, 10.0, 60.0, 600.0, 1.0]);
+        assert_eq!(next_speed(7.0), 1.0, "an odd speed (from TAMA_SPEED) restarts the cycle");
     }
 
     #[test]

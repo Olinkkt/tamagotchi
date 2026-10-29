@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.3
+
+- Dev panel: the speed key (`f`) now steps 1x, 2x, 5x, 10x, 60x, 600x.
+
 ## 1.1.2
 
 - The egg wobble is back; the pet still only bobs up and down.
