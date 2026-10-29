@@ -63,7 +63,7 @@ impl Viewport {
 /// The keys pressed since the last frame, in the game's own terms.
 fn keys_pressed() -> Vec<Key> {
     let mut keys = Vec::new();
-    for (code, key) in [(KeyCode::Escape, Key::Esc), (KeyCode::Tab, Key::Tab), (KeyCode::Up, Key::Up), (KeyCode::Down, Key::Down)] {
+    for (code, key) in [(KeyCode::Escape, Key::Esc), (KeyCode::Tab, Key::Tab), (KeyCode::Up, Key::Up), (KeyCode::Down, Key::Down), (KeyCode::Left, Key::Left), (KeyCode::Right, Key::Right)] {
         if is_key_pressed(code) {
             keys.push(key);
         }
@@ -97,7 +97,7 @@ fn draw_dev_panel(v: &Viewport, app: &App) {
     let on = |b: bool| if b { "ON" } else { "off" };
     let lines = [
         format!("DEV  speed x{}  {:02}:00", app.speed, p.local_hour()),
-        format!("[ ]  form: {}", p.species),
+        format!("<- ->  form: {}", p.species),
         format!("h/H  hunger {}/4", p.hunger),
         format!("a/A  happy {}/4", p.happy),
         format!("d/D  discipline {}", p.discipline),

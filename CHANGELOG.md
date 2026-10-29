@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.1
+
+- Dev panel: ← and → step through the forms (`[` and `]` still work).
+
 ## 0.23.0
 
 - tama now opens a pixel-art window (macroquad) instead of drawing in the terminal. The scene is

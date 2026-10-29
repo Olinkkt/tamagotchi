@@ -14,6 +14,8 @@ pub enum Key {
     Char(char),
     Up,
     Down,
+    Left,
+    Right,
     Esc,
     Tab,
 }
@@ -473,7 +475,13 @@ impl App {
     fn on_dev_key(&mut self, code: Key) -> bool {
         let p = &mut self.pet;
         let step = |v: u8, up: bool, max: u8| if up { v.saturating_add(1).min(max) } else { v.saturating_sub(1) };
-        let Key::Char(c) = code else { return false };
+        // ← and → step through the forms, like [ and ].
+        let c = match code {
+            Key::Char(c) => c,
+            Key::Left => '[',
+            Key::Right => ']',
+            _ => return false,
+        };
         let note = match c {
             'h' | 'H' => {
                 p.hunger = step(p.hunger, c == 'H', MAX_HEARTS);
@@ -636,14 +644,16 @@ pub(crate) mod tests {
             app.on_key(Key::Tab);
             let mut seen = Vec::new();
             for _ in 0..FORMS.len() {
-                app.on_key(Key::Char(']'));
+                app.on_key(Key::Right);
                 seen.push((app.pet.stage, app.pet.species.clone()));
             }
             assert_eq!(seen.last().map(|s| s.0), Some(Stage::Egg), "wraps round to the egg");
             assert!(seen.iter().any(|s| s.0 == Stage::Dead));
             assert!(app.pet.alive(), "stepping past death brings a living pet back");
-            app.on_key(Key::Char('['));
+            app.on_key(Key::Left);
             assert_eq!(app.pet.stage, Stage::Dead);
+            app.on_key(Key::Char(']'));
+            assert_eq!(app.pet.stage, Stage::Egg, "[ and ] still work too");
         });
     }
 
