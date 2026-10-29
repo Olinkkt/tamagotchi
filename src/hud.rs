@@ -9,10 +9,10 @@ use crate::frame::Frame;
 use crate::games::Game;
 use crate::icons::{self, Grid};
 use crate::palette::Pal;
-use crate::pet::{self, Stage, MAX_HEARTS};
+use crate::pet::{Stage, MAX_HEARTS};
 use crate::panel;
-use crate::profile;
 use crate::scene;
+use crate::screens;
 
 pub const W: i32 = 240;
 pub const H: i32 = 160;
@@ -185,12 +185,16 @@ pub fn frame(app: &App, hover: Option<Key>) -> Frame {
     f.rect(0, 0, PANEL_X, ROOM.1, Pal::Night);
     f.rect(0, ROOM.1 - 1, PANEL_X, 1, Pal::Dusk);
     f.frame(&scene::area(app), ROOM.0, ROOM.1);
-    if !app.message.is_empty() && !matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) {
+    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) {
         f.tint(0, MESSAGE_Y, PANEL_X, HINT_Y - MESSAGE_Y, Pal::dark);
     }
     f.boxed(PANEL_X, 0, W - PANEL_X, HINT_Y, Pal::Night, Pal::Dusk);
     f.rect(PANEL_X + 1, 11, W - PANEL_X - 2, 1, Pal::Dusk);
     panel::draw(&mut f, app);
+    screens::draw(&mut f, app);
+    if app.confirming_reset() {
+        screens::draw_reset(&mut f);
+    }
     draw_bar(&mut f, app, hover);
     f
 }
@@ -206,46 +210,15 @@ fn draw_bar(f: &mut Frame, app: &App, hover: Option<Key>) {
     }
 }
 
-fn mode_lines(app: &App) -> Vec<(String, Pal)> {
-    let dim = Pal::Mist;
-    match &app.mode {
-        Mode::Chooser => vec![("PICK A GAME".into(), Pal::Pink), ("1  memory".into(), Pal::White), ("2  pong".into(), Pal::White)],
-        Mode::Shop => {
-            let mut v = vec![("SHOP".into(), Pal::Pink), (format!("you have ◎ {}", app.profile.coins), Pal::Yellow)];
-            for (i, item) in pet::Item::ALL.iter().enumerate() {
-                let colour = if app.profile.coins >= item.price() { Pal::White } else { Pal::Slate };
-                v.push((format!("{}  {}  ◎{}  {}", i + 1, item.name(), item.price(), item.blurb()), colour));
-            }
-            v
-        }
-        Mode::Awards => {
-            let mut v = vec![(format!("AWARDS {}/{}", app.profile.achievements.len(), profile::ACHIEVEMENTS.len()), Pal::Pink)];
-            for a in profile::ACHIEVEMENTS.iter() {
-                let done = app.profile.has(a.id);
-                v.push((format!("{} {}", if done { "✓" } else { "·" }, a.name), if done { Pal::Green } else { dim }));
-            }
-            v
-        }
-        Mode::Graveyard(entries) => {
-            let mut v = vec![("GRAVEYARD".into(), Pal::Pink)];
-            if entries.is_empty() {
-                v.push(("No pets have passed away yet.".into(), dim));
-            }
-            v.extend(entries.iter().take(10).map(|e| (e.clone(), Pal::White)));
-            v
-        }
-        _ => Vec::new(),
-    }
-}
-
 /// The most urgent thing to do, for the line under the room.
 fn hint(app: &App) -> Option<(String, Pal)> {
     let p = &app.pet;
     match &app.mode {
         Mode::Game(g) => return Some((g.hint().into(), Pal::Yellow)),
         Mode::Finish(_) => return Some(("ANY KEY TO GO ON".into(), Pal::Mist)),
+        Mode::Normal if app.confirming_reset() => return Some(("PRESS Y TO START OVER".into(), Pal::Red)),
         Mode::Normal => {}
-        _ => return None,
+        _ => return screens::hint(app),
     }
     match p.top_need() {
         Some((k, text)) => Some((format!("→ PRESS {}: {}", k.to_ascii_uppercase(), text.to_uppercase()), Pal::Yellow)),
@@ -258,7 +231,8 @@ fn hint(app: &App) -> Option<(String, Pal)> {
 pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
     let p = &app.pet;
     let mut out = Vec::new();
-    let in_game = matches!(app.mode, Mode::Game(_) | Mode::Finish(_));
+    // Games and cards cover the header and the panel.
+    let in_game = !matches!(app.mode, Mode::Normal);
     let mut head = format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age));
     if app.dev {
         head.push_str(" · DEV");
@@ -270,7 +244,7 @@ pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
     if let Some((text, colour)) = hint(app) {
         out.push(label(text, W as f32 / 2.0, HINT_Y as f32 + 6.0, colour, Align::Centre));
     }
-    if !app.message.is_empty() && !matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) {
+    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) {
         // One line only: long messages lose their tail rather than spill over the panel.
         let max = ((PANEL_X - 8) as f32 / ratio) as i32;
         let mut text = app.message.clone();
@@ -280,6 +254,10 @@ pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
     if !in_game {
         out.extend(panel::labels(app, ratio));
     }
+    out.extend(screens::labels(app));
+    if app.confirming_reset() {
+        out.extend(screens::reset_labels());
+    }
     for b in buttons(app) {
         if b.icon.is_some() && matches!(b.key, Key::Char(_)) {
             let bounce = if b.look == Look::Urgent { ((app.started.elapsed().as_millis() / 350) % 2) as f32 } else { 0.0 };
@@ -288,9 +266,6 @@ pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
         } else if b.icon.is_none() {
             out.push(label(b.label, b.x as f32 + BUTTON as f32 / 2.0, b.y as f32 + BUTTON as f32 / 2.0, Pal::White, Align::Centre));
         }
-    }
-    for (i, (text, colour)) in mode_lines(app).into_iter().enumerate() {
-        out.push(label(text, 6.0, ROOM.1 as f32 + 8.0 + i as f32 * 8.0, colour, Align::Left));
     }
     out
 }
@@ -360,12 +335,29 @@ mod tests {
     }
 
     #[test]
+    fn the_need_hints_fit_the_screen_at_the_coarsest_text_scale() {
+        let states: [fn(&mut crate::pet::Pet); 6] = [
+            |p| p.asleep = true,
+            |p| p.sick = true,
+            |p| p.hunger = 0,
+            |p| p.disc_call = Some(0),
+            |p| p.poops = 1,
+            |p| p.weight = 99,
+        ];
+        for tweak in states {
+            let app = app_with(Stage::Adult, tweak);
+            let (text, _) = hint(&app).unwrap();
+            assert!(font::width(&text) as f32 * 2.0 / 3.0 <= W as f32 - 4.0, "too wide: {text}");
+        }
+    }
+
+    #[test]
     fn every_mode_draws() {
         let mut app = app_with(Stage::Adult, |_| {});
         for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(vec!["x".into()])] {
             app.mode = mode;
             assert_eq!(frame(&app, None).w, W);
-            assert!(!mode_lines(&app).is_empty());
+            assert!(!labels(&app, 0.5).is_empty());
         }
     }
 }

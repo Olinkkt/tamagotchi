@@ -3,7 +3,7 @@
 //! the same size. Text is drawn on top at full window resolution with the pixel font.
 
 use macroquad::prelude::{
-    clear_background, draw_rectangle, draw_text, draw_texture_ex, get_char_pressed, is_key_down, is_key_pressed,
+    clear_background, draw_rectangle, draw_text, measure_text, draw_texture_ex, get_char_pressed, is_key_down, is_key_pressed,
     is_mouse_button_down, is_mouse_button_pressed, is_quit_requested, mouse_position, next_frame, prevent_quit, screen_height, screen_width,
     vec2, Color, Conf, DrawTextureParams, FilterMode, Image, KeyCode, MouseButton, Texture2D, WHITE,
 };
@@ -12,6 +12,7 @@ use crate::app::{App, Key};
 use crate::font;
 use crate::hud::{self, Align, Label};
 use crate::palette::Pal;
+use crate::screens;
 
 const START_SCALE: i32 = 4;
 const LETTERBOX: Pal = Pal::Ink;
@@ -87,29 +88,41 @@ fn draw_label(v: &Viewport, l: &Label) {
     }
 }
 
-/// The developer panel: plain text over the status panel, listing the dev keys.
+/// The developer panel: plain text over the status panel, every dev key with what it changes.
 fn draw_dev_panel(v: &Viewport, app: &App) {
-    let (x, y) = (v.x + (hud::PANEL_X as f32 + 2.0) * v.scale, v.y + 14.0 * v.scale);
-    draw_rectangle(x - 4.0, y - 4.0, 76.0 * v.scale, 112.0 * v.scale, Color::from_rgba(0, 0, 0, 220));
+    let (x, y) = (v.x + (hud::PANEL_X as f32 + 2.0) * v.scale, v.y + 13.0 * v.scale);
+    let (w, h) = (76.0 * v.scale, 113.0 * v.scale);
+    draw_rectangle(x - 2.0, y - 2.0, w, h, Color::from_rgba(0, 0, 0, 225));
     let p = &app.pet;
+    let on = |b: bool| if b { "ON" } else { "off" };
     let lines = [
-        format!("DEV  x{}  {:02}:00", app.speed, p.local_hour()),
-        format!("[ ] form: {}", p.species),
-        format!("m/M mistakes: {}", p.mistakes),
-        "p poop   s sick".into(),
-        "n naughty   g grow".into(),
-        "e crack the egg".into(),
-        ", . clock -/+1h".into(),
-        "z 22:00   Z 12:00".into(),
-        "f speed   l light".into(),
-        "u cpu  r ram  b batt".into(),
-        "h/H a/A d/D w/W".into(),
-        "k kill  o coins  t/T".into(),
-        "tab close".into(),
+        format!("DEV  speed x{}  {:02}:00", app.speed, p.local_hour()),
+        format!("[ ]  form: {}", p.species),
+        format!("h/H  hunger {}/4", p.hunger),
+        format!("a/A  happy {}/4", p.happy),
+        format!("d/D  discipline {}", p.discipline),
+        format!("w/W  weight {}", p.weight),
+        format!("m/M  mistakes {}", p.mistakes),
+        format!("o    +10 coins ({})", app.profile.coins),
+        format!("p    poop ({}/3)", p.poops),
+        "s sick  n naughty  g grow".into(),
+        "k    kill the pet".into(),
+        "e    crack the egg".into(),
+        "t/T  skip 1h / 8h".into(),
+        ", .  clock -/+ 1h".into(),
+        "z/Z  clock 22:00 / 12:00".into(),
+        format!("u cpu {}  r ram {}", on(p.load.busy_cpu), on(p.load.low_ram)),
+        format!("b battery {}", on(p.load.low_battery)),
+        "f speed   tab close".into(),
     ];
-    let size = (5.0 * v.scale).max(12.0);
+    // Shrink the text until the longest line and all the rows fit the panel.
+    let mut size = (h / lines.len() as f32).floor();
+    while size > 8.0 && lines.iter().any(|l| measure_text(l, None, size as u16, 1.0).width > w - 6.0) {
+        size -= 1.0;
+    }
+    let colour = Color::from_rgba(250, 210, 90, 255);
     for (i, l) in lines.iter().enumerate() {
-        draw_text(l, x, y + size + i as f32 * size * 1.05, size, Color::from_rgba(250, 210, 90, 255));
+        draw_text(l, x + 2.0, y + size * (i as f32 + 0.85), size, colour);
     }
 }
 
@@ -129,7 +142,7 @@ async fn main_loop(mut app: App) {
         for k in keys_pressed() {
             app.on_key(k);
         }
-        let under_mouse = hud::button_at(&app, sx, sy);
+        let under_mouse = hud::button_at(&app, sx, sy).or_else(|| screens::click(&app, sx, sy));
         if is_mouse_button_pressed(MouseButton::Left) {
             if let Some(k) = under_mouse {
                 app.press(k);

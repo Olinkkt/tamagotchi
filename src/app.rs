@@ -245,6 +245,11 @@ impl App {
         }
     }
 
+    /// Waiting for `y` after Shift+R.
+    pub fn confirming_reset(&self) -> bool {
+        self.confirm_reset
+    }
+
     pub fn current_fx(&self) -> Option<(sprites::Fx, f32)> {
         let (fx, at) = self.fx?;
         let p = at.elapsed().as_secs_f32() / fx.duration_secs();
@@ -652,6 +657,21 @@ pub(crate) mod tests {
         assert_eq!(app.pet.hunger, 2, "f on the panel is the speed key, but the click feeds");
         app.on_key(Key::Char('f'));
         assert_eq!((app.pet.hunger, app.speed), (2, 10.0));
+    }
+
+    #[test]
+    fn shift_r_starts_over_only_after_y() {
+        save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Adult, |_| {});
+            app.on_key(Key::Char('R'));
+            assert!(app.confirming_reset());
+            app.on_key(Key::Char('x'));
+            assert!(!app.confirming_reset());
+            assert_eq!(app.pet.stage, Stage::Adult, "any other key cancels");
+            app.on_key(Key::Char('R'));
+            app.on_key(Key::Char('y'));
+            assert_eq!(app.pet.stage, Stage::Egg, "y throws the pet away for a new egg");
+        });
     }
 
     #[test]

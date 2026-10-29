@@ -20,6 +20,7 @@ mod pet;
 mod profile;
 mod save;
 mod scene;
+mod screens;
 mod sprites;
 mod sysinfo;
 mod tui;

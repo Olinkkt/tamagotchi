@@ -183,6 +183,53 @@ pub const NEW_EGG: Grid = &[
     "............",
 ];
 
+pub const CAKE: Grid = &[
+    "............",
+    ".....krk....",
+    "....krrrk...",
+    "..kkkkkkkk..",
+    ".kbbbbbbbbk.",
+    ".kwwwwwwwwk.",
+    ".kppppppppk.",
+    ".kwwwwwwwwk.",
+    ".kppppppppk.",
+    ".kvvvvvvvvk.",
+    ".kkkkkkkkkk.",
+    "............",
+];
+
+pub const SALAD: Grid = &[
+    "............",
+    "............",
+    "...kk.kk.k..",
+    "..kglkgfklk.",
+    ".kgllgggrlgk",
+    "kkkkkkkkkkkk",
+    "kiiwiiiiiiik",
+    ".kiiiiiiiik.",
+    "..kiiiiiik..",
+    "...kkkkkk...",
+    "............",
+    "............",
+];
+
+pub const VITAMINS: Grid = &[
+    "....kkkk....",
+    "....krrk....",
+    "...kkkkkk...",
+    "..kooooook..",
+    "..kwwwwwwk..",
+    "..kwrwwrwk..",
+    "..kwwrrwwk..",
+    "..kwwwwwwk..",
+    "..kooooook..",
+    "..kuuuuuuk..",
+    "...kkkkkk...",
+    "............",
+];
+
+pub const CHECK: Grid = &["......k", ".....kg", "k...kgk", "gk.kgk.", ".gkgk..", "..gk..."];
+
 /// The icon for an action key, as used on the buttons and in the speech bubble.
 pub fn for_key(key: char) -> Option<Grid> {
     Some(match key {
@@ -269,7 +316,7 @@ mod tests {
     #[test]
     fn icons_are_rectangular_and_use_palette_letters() {
         let keys = "fsplmcdbagqn".chars().map(|k| for_key(k).unwrap());
-        for g in keys.chain([UP, DOWN, STAR, HEART_FULL, HEART_EMPTY, COIN, Z, SWEAT, BATTERY, HEART, SPARKLE, ANGER, APPLE]) {
+        for g in keys.chain([CAKE, SALAD, VITAMINS, CHECK, UP, DOWN, STAR, HEART_FULL, HEART_EMPTY, COIN, Z, SWEAT, BATTERY, HEART, SPARKLE, ANGER, APPLE]) {
             for row in g {
                 assert_eq!(row.len(), g[0].len(), "{g:?}");
                 assert!(row.chars().all(|c| c == '.' || colour(c).is_some()), "{row}");
