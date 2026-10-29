@@ -119,6 +119,7 @@ fn draw_dev_panel(v: &Viewport, app: &App) {
         format!("u cpu {}  r ram {}", on(p.load.busy_cpu), on(p.load.low_ram)),
         format!("b battery {}", on(p.load.low_battery)),
         "f    speed 1/2/5/10/60/600".into(),
+        "1    back to speed x1".into(),
         "tab  close the panel".into(),
     ];
     // Shrink the text until the longest line and all the rows fit the panel.

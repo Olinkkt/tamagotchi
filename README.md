@@ -237,7 +237,7 @@ cargo art         # redraw every sprite into assets/ (tools/spritegen)
 The dev panel shows the value behind every dev key. It changes hunger/happy/discipline/weight/
 mistakes, adds poop, sickness or a naughty call, adds coins, steps through every form (← →,
 or `[` `]`, including death), cracks the egg, grows or kills the pet, skips time and sets the clock, changes
-the speed (x1, 2, 5, 10, 60, 600 with `f`), and switches the machine reactions (CPU, RAM, battery) on and off. Clicking a button
+the speed (x1, 2, 5, 10, 60, 600 with `f`, and `1` for straight back to x1), and switches the machine reactions (CPU, RAM, battery) on and off. Clicking a button
 always does the action, even while the panel is open.
 
 Shift+R (then `y`) throws the current pet away and starts a new egg.

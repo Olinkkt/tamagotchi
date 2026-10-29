@@ -577,6 +577,10 @@ impl App {
                 p.dev_set_hour(hour);
                 format!("clock set to {hour:02}:00")
             }
+            '1' => {
+                self.speed = 1.0;
+                "speed = x1".to_string()
+            }
             'f' => {
                 self.speed = next_speed(self.speed);
                 format!("speed = x{}", self.speed)
@@ -679,6 +683,17 @@ pub(crate) mod tests {
         }
         assert_eq!(speeds, [1.0, 2.0, 5.0, 10.0, 60.0, 600.0, 1.0]);
         assert_eq!(next_speed(7.0), 1.0, "an odd speed (from TAMA_SPEED) restarts the cycle");
+
+        save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Adult, |_| {});
+            app.dev = true;
+            app.on_key(Key::Tab);
+            app.speed = 600.0;
+            app.on_key(Key::Char('1'));
+            assert_eq!(app.speed, 1.0, "1 goes straight back to normal speed");
+            app.on_key(Key::Char('f'));
+            assert_eq!(app.speed, 2.0);
+        });
     }
 
     #[test]

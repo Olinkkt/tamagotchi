@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.4
+
+- Dev panel: `1` sets the speed straight back to 1x.
+
 ## 1.1.3
 
 - Dev panel: the speed key (`f`) now steps 1x, 2x, 5x, 10x, 60x, 600x.
