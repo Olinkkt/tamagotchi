@@ -132,6 +132,9 @@ pub struct Reaction {
     wins: u8,
     phase: RPhase,
     note: String,
+    /// Colour of the lamp after a press: green for a win, amber for slow, red for too early.
+    tone: Color,
+    born: Instant,
 }
 
 fn random_delay(pet: &mut Pet) -> Instant {
@@ -140,7 +143,7 @@ fn random_delay(pet: &mut Pet) -> Instant {
 
 impl Reaction {
     fn new(pet: &mut Pet) -> Self {
-        Reaction { round: 1, wins: 0, phase: RPhase::Wait(random_delay(pet)), note: String::new() }
+        Reaction { round: 1, wins: 0, phase: RPhase::Wait(random_delay(pet)), note: String::new(), tone: EMPTY, born: Instant::now() }
     }
 
     fn key(&mut self, code: KeyCode) -> Outcome {
@@ -151,6 +154,7 @@ impl Reaction {
         match self.phase {
             RPhase::Wait(_) => {
                 self.note = "Too early!".into();
+                self.tone = BAD;
                 self.phase = RPhase::Pause(pause);
             }
             RPhase::Go(since) => {
@@ -158,8 +162,10 @@ impl Reaction {
                 if ms <= REACTION_WIN_MS {
                     self.wins += 1;
                     self.note = format!("{ms} ms - fast!");
+                    self.tone = GOOD;
                 } else {
                     self.note = format!("{ms} ms - too slow.");
+                    self.tone = WARN;
                 }
                 self.phase = RPhase::Pause(pause);
             }
@@ -186,20 +192,47 @@ impl Reaction {
     }
 
     fn lines(&self) -> Vec<Line<'static>> {
-        let prompt = match self.phase {
-            RPhase::Wait(_) => Line::from(Span::styled("  wait for it...  ", Style::new().fg(TEXT).bg(EMPTY))),
-            RPhase::Go(_) => Line::from(Span::styled("   GO!  press space   ", Style::new().fg(INK).bg(GOOD).add_modifier(Modifier::BOLD))),
-            RPhase::Pause(_) => Line::from(""),
+        const W: usize = 24;
+        let lamp = |bg: Color, label: &str| -> Vec<Line<'static>> {
+            let style = Style::new().fg(INK).bg(bg).add_modifier(Modifier::BOLD);
+            vec![
+                Line::from(Span::styled(" ".repeat(W), style)),
+                Line::from(Span::styled(format!("{label:^W$}"), style)),
+                Line::from(Span::styled(" ".repeat(W), style)),
+            ]
         };
-        vec![
-            title("REACTION"),
-            dim(format!("round {}/{}   wins {}", self.round, REACTION_ROUNDS, self.wins)),
-            dim(format!("press space within {REACTION_WIN_MS} ms of GO")),
-            Line::from(""),
-            prompt,
-            Line::from(""),
-            text(self.note.clone()),
-        ]
+        let (face, mut body, bar) = match self.phase {
+            RPhase::Wait(_) => {
+                // The red lamp breathes so it is clear the game is alive and you should wait.
+                let on = (self.born.elapsed().as_millis() / 350) % 2 == 0;
+                let red = if on { Color::Rgb(215, 80, 90) } else { Color::Rgb(130, 50, 62) };
+                ("o_o", lamp(red, "wait for it..."), Line::from(""))
+            }
+            RPhase::Go(since) => {
+                let left = REACTION_WIN_MS.saturating_sub(since.elapsed().as_millis());
+                let filled = (left as usize * W / REACTION_WIN_MS as usize).min(W);
+                let colour = if left * 2 > REACTION_WIN_MS { GOOD } else if left * 5 > REACTION_WIN_MS { WARN } else { BAD };
+                let bar = Line::from(vec![
+                    Span::styled("█".repeat(filled), Style::new().fg(colour)),
+                    Span::styled("░".repeat(W - filled), Style::new().fg(EMPTY)),
+                ]);
+                ("O_O", lamp(GOOD, "G O !   press space"), bar)
+            }
+            RPhase::Pause(_) => {
+                let face = if self.tone == GOOD { "^_^" } else { "T_T" };
+                let label = self.note.to_uppercase();
+                (face, lamp(self.tone, &label), Line::from(""))
+            }
+        };
+        let pips: String = (1..=REACTION_ROUNDS).map(|r| if r <= self.wins { "●" } else if r < self.round { "○" } else { "·" }).collect::<Vec<_>>().join(" ");
+        let mut out = vec![
+            heading("REACTION", format!("round {}/{}   {pips}", self.round, REACTION_ROUNDS)),
+            Line::from(Span::styled(face, Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),
+        ];
+        out.append(&mut body);
+        out.push(bar);
+        out.push(dim(format!("press space within {REACTION_WIN_MS} ms of green")));
+        out
     }
 }
 
@@ -451,7 +484,7 @@ impl Pong {
 
 /// Five pieces of food fall one after another; catch them in the basket.
 const CATCH_ITEMS: u8 = 5;
-const BASKET: i32 = 5;
+const BASKET: i32 = 7;
 const CATCH_FOOD: [(&str, Color); 3] = [("●", BAD), ("◆", WARN), ("♥", GOOD)];
 
 pub struct Catch {
@@ -469,7 +502,7 @@ pub struct Catch {
 
 impl Catch {
     fn new(pet: &mut Pet) -> Self {
-        Catch { face: face(pet), dir: 0, moved: Instant::now(), bx: PW / 2 - 2, ix: pet.rand(PW as u64) as i32, iy: 0, item: 1, caught: 0, last: Instant::now(), step_ms: 130 }
+        Catch { face: face(pet), dir: 0, moved: Instant::now(), bx: PW / 2 - 3, ix: pet.rand(PW as u64) as i32, iy: 0, item: 1, caught: 0, last: Instant::now(), step_ms: 190 }
     }
 
     fn key(&mut self, code: KeyCode) -> Outcome {
@@ -503,7 +536,7 @@ impl Catch {
         self.item += 1;
         self.ix = pet.rand(PW as u64) as i32;
         self.iy = 0;
-        self.step_ms = (self.step_ms * 92 / 100).max(60);
+        self.step_ms = (self.step_ms * 95 / 100).max(100);
         Outcome::Continue
     }
 
@@ -520,7 +553,10 @@ impl Catch {
                         } else if i == BASKET as usize - 1 {
                             Span::styled("╯", Style::new().fg(ACCENT))
                         } else {
-                            Span::styled(self.face.chars().nth(i - 1).unwrap_or('─').to_string(), Style::new().fg(TEXT))
+                            // The pet's three-character face sits in the middle of the basket.
+                            let off = (BASKET as usize - 3) / 2;
+                            let ch = i.checked_sub(off).and_then(|k| self.face.chars().nth(k)).unwrap_or('─');
+                            Span::styled(ch.to_string(), Style::new().fg(TEXT))
                         }
                     } else if x == self.ix && y == self.iy {
                         let (glyph, colour) = CATCH_FOOD[self.item as usize % CATCH_FOOD.len()];
@@ -550,12 +586,13 @@ pub struct Snake {
     eaten: u8,
     last: Instant,
     step_ms: u64,
+    born: Instant,
 }
 
 impl Snake {
     fn new(pet: &mut Pet) -> Self {
         let body: VecDeque<(i32, i32)> = [(5, PH / 2), (4, PH / 2), (3, PH / 2)].into();
-        let mut s = Snake { body, dir: (1, 0), want: (1, 0), food: (0, 0), eaten: 0, last: Instant::now(), step_ms: 150 };
+        let mut s = Snake { body, dir: (1, 0), want: (1, 0), food: (0, 0), eaten: 0, last: Instant::now(), step_ms: 150, born: Instant::now() };
         s.place_food(pet);
         s
     }
@@ -619,18 +656,29 @@ impl Snake {
     }
 
     fn lines(&self) -> Vec<Line<'static>> {
-        let mut out = vec![heading("SNAKE", format!("food {}/{}  (a crash ends it)", self.eaten, SNAKE_GOAL))];
+        let hearts: String = (0..SNAKE_GOAL).map(|i| if i < self.eaten { "♥" } else { "♡" }).collect::<Vec<_>>().join("");
+        let mut out = vec![heading("SNAKE", format!("{hearts}  (a crash ends it)"))];
+        // The food pulses between two colours.
+        let pulse = if (self.born.elapsed().as_millis() / 250) % 2 == 0 { BAD } else { ACCENT };
+        let last = self.body.len().saturating_sub(1).max(1);
         for y in 0..PH {
             let row: Vec<Span<'static>> = (0..PW)
                 .map(|x| {
-                    if self.body[0] == (x, y) {
-                        Span::styled("◆", Style::new().fg(ACCENT))
-                    } else if self.body.contains(&(x, y)) {
-                        Span::styled("●", Style::new().fg(GOOD))
+                    // A faint checkerboard lawn, so the snake moves over something.
+                    let lawn = if (x + y) % 2 == 0 { Color::Rgb(26, 38, 34) } else { Color::Rgb(31, 45, 40) };
+                    let base = Style::new().bg(lawn);
+                    if let Some(i) = self.body.iter().position(|&c| c == (x, y)) {
+                        if i == 0 {
+                            return Span::styled("◉", base.fg(ACCENT).add_modifier(Modifier::BOLD));
+                        }
+                        // Bright near the head, darker towards the tail.
+                        let t = i * 100 / last;
+                        let green = Color::Rgb((130 - t as i32 * 70 / 100) as u8, (210 - t as i32 * 90 / 100) as u8, (140 - t as i32 * 70 / 100) as u8);
+                        Span::styled(if i == last { "•" } else { "●" }, base.fg(green))
                     } else if self.food == (x, y) {
-                        Span::styled("♥", Style::new().fg(BAD))
+                        Span::styled("♥", base.fg(pulse).add_modifier(Modifier::BOLD))
                     } else {
-                        Span::raw(" ")
+                        Span::styled(" ", base)
                     }
                 })
                 .collect();
@@ -643,8 +691,8 @@ impl Snake {
 
 // ---------------------------------------------------------------- dodge
 
-/// Rocks fall in waves of eight; every rock that lands without hitting the pet counts.
-const DODGE_ROCKS: u8 = 40;
+/// Rocks fall in five waves of six; every rock that lands without hitting the pet counts.
+const DODGE_ROCKS: u8 = 30;
 const DODGE_ROUNDS: u8 = 5;
 const DODGE_PLAYER: i32 = 3;
 
@@ -673,7 +721,7 @@ impl Dodge {
             since_spawn: 0,
             moved: Instant::now(),
             last: Instant::now(),
-            step_ms: 110,
+            step_ms: 150,
         }
     }
 
@@ -719,11 +767,11 @@ impl Dodge {
             return Outcome::Done { wins: DODGE_ROUNDS, rounds: DODGE_ROUNDS };
         }
         self.since_spawn += 1;
-        if self.since_spawn >= 2 && self.spawned < DODGE_ROCKS {
+        if self.since_spawn >= 3 && self.spawned < DODGE_ROCKS {
             self.since_spawn = 0;
             self.spawned += 1;
             self.rocks.push((pet.rand(PW as u64) as i32, 0));
-            self.step_ms = (self.step_ms * 98 / 100).max(60);
+            self.step_ms = (self.step_ms * 98 / 100).max(90);
         }
         Outcome::Continue
     }
