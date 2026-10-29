@@ -1,10 +1,10 @@
 # Changelog
 
-## 0.23.1
+## 1.0.0
+
+The terminal game becomes a window game. Saves, profile and config are unchanged.
 
 - Dev panel: ← and → step through the forms (`[` and `]` still work).
-
-## 0.23.0
 
 - tama now opens a pixel-art window (macroquad) instead of drawing in the terminal. The scene is
   240x160 pixels, scaled to fit by whole numbers.
