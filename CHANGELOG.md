@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.1.2
+
+- The egg wobble is back; the pet still only bobs up and down.
+
 ## 1.1.1
 
 - The pet no longer wanders side to side (and the egg and the scolding no longer shake it sideways); it only bobs up and down.

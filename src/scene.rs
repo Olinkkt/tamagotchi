@@ -167,16 +167,18 @@ fn calm(p: &Pet) -> bool {
     p.alive() && p.stage != Stage::Egg && !p.asleep && !p.sick
 }
 
-/// The pet's offset from where it normally stands: it only bobs up and down, never sideways.
+/// The pet's offset from where it normally stands. It only bobs up and down; the one sideways
+/// movement is an egg wobbling as it gets close to hatching.
 fn motion(m: &Moment) -> (i32, i32) {
     let p = m.pet;
     let beat = m.beat() as i32;
-    let dy = match p.stage {
-        Stage::Dead | Stage::Egg => 0,
-        _ if p.asleep => -(beat / 3 % 2),
-        _ => -(beat % 2),
-    };
-    (0, dy)
+    match p.stage {
+        Stage::Dead => (0, 0),
+        Stage::Egg if p.stage_age as f32 / 30.0 > 0.35 => ([0, 1, 0, -1][(beat % 4) as usize], 0),
+        Stage::Egg => (0, 0),
+        _ if p.asleep => (0, -(beat / 3 % 2)),
+        _ => (0, -(beat % 2)),
+    }
 }
 
 /// The pet with its face (or egg cracks) laid on.
@@ -454,10 +456,16 @@ mod tests {
     }
 
     #[test]
-    fn the_pet_never_moves_sideways() {
-        for stage in [Stage::Egg, Stage::Baby, Stage::Adult] {
+    fn only_a_hatching_egg_moves_sideways() {
+        let at = |p: &Pet, i: u64| motion(&Moment { pet: p, fx: None, ms: i * 350 }).0;
+        let mut egg = pet(Stage::Egg);
+        egg.stage_age = 5;
+        assert!((0..40).all(|i| at(&egg, i) == 0), "a young egg sits still");
+        egg.stage_age = 20;
+        let xs: Vec<i32> = (0..4).map(|i| at(&egg, i)).collect();
+        assert_eq!(xs, [0, 1, 0, -1], "an egg about to hatch wobbles");
+        for stage in [Stage::Baby, Stage::Adult] {
             let mut p = pet(stage);
-            p.stage_age = 20;
             for state in 0..3 {
                 p.sick = state == 1;
                 p.asleep = state == 2;
