@@ -18,11 +18,6 @@ impl Frame {
         Frame { w, h, px: vec![fill; (w * h) as usize] }
     }
 
-    /// The pixel at (`x`, `y`), clamped to the edges.
-    pub fn at(&self, x: i32, y: i32) -> Pal {
-        self.px[(y.clamp(0, self.h - 1) * self.w + x.clamp(0, self.w - 1)) as usize]
-    }
-
     #[cfg(test)]
     pub fn get(&self, x: i32, y: i32) -> Option<Pal> {
         (x >= 0 && y >= 0 && x < self.w && y < self.h).then(|| self.px[(y * self.w + x) as usize])

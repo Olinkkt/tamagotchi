@@ -78,13 +78,6 @@ impl Game {
             Game::Pong(_) => "HOLD UP/DOWN (W/S) TO MOVE - RETURN IT 5 TIMES",
         }
     }
-
-    pub fn keys(&self) -> &'static [(&'static str, &'static str)] {
-        match self {
-            Game::Memory(_) => &[("1-4", "repeat the pattern"), ("esc", "quit game")],
-            Game::Pong(_) => &[("↑/↓", "hold to move"), ("esc", "quit game")],
-        }
-    }
 }
 
 // ---------------------------------------------------------------- shared backdrop
@@ -657,7 +650,7 @@ mod tests {
             let g = Game::new(kind, &mut p);
             let f = g.draw();
             assert_eq!((f.w, f.h), (GW, GH), "game {kind}");
-            assert!(!g.keys().is_empty() && !g.hint().is_empty());
+            assert!(!g.hint().is_empty());
         }
     }
 }

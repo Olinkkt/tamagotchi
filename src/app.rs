@@ -1,13 +1,12 @@
 //! The game state and everything the player can do, independent of how it is drawn.
-//! A frontend (the window, or the old terminal UI behind `--tui`) calls `update` every frame,
-//! feeds it keys, and draws whatever it finds here.
+//! The window calls `update` every frame, feeds it keys, and draws whatever it finds here.
 
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
-use crate::{fmt_age, games, save, sprites, sysinfo, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
+use crate::{fmt_age, games, save, scene, sysinfo, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
 
 /// A key press, in the terms the game cares about. Each frontend translates its own events.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -47,7 +46,7 @@ pub struct App {
     dev_load_override: bool,
     was_calling: bool,
     pub started: Instant,
-    fx: Option<(sprites::Fx, Instant)>,
+    fx: Option<(scene::Fx, Instant)>,
     last_stage: Stage,
     confirm_reset: bool,
     pub dev: bool,
@@ -215,7 +214,7 @@ impl App {
         p
     }
 
-    fn trigger(&mut self, fx: sprites::Fx) {
+    fn trigger(&mut self, fx: scene::Fx) {
         self.fx = Some((fx, Instant::now()));
     }
 
@@ -228,15 +227,15 @@ impl App {
     fn react(&mut self, before: Snapshot) {
         let after = self.snapshot();
         let fx = if after.0 > before.0 {
-            Some(sprites::Fx::Eat)
+            Some(scene::Fx::Eat)
         } else if after.1 > before.1 {
-            Some(sprites::Fx::Hearts)
+            Some(scene::Fx::Hearts)
         } else if after.2 < before.2 || (before.3 && !after.3) {
-            Some(sprites::Fx::Heal)
+            Some(scene::Fx::Heal)
         } else if after.4 < before.4 {
-            Some(sprites::Fx::Clean)
+            Some(scene::Fx::Clean)
         } else if (before.5 && !after.5) || after.1 < before.1 {
-            Some(sprites::Fx::Scold)
+            Some(scene::Fx::Scold)
         } else {
             None
         };
@@ -250,7 +249,7 @@ impl App {
         self.confirm_reset
     }
 
-    pub fn current_fx(&self) -> Option<(sprites::Fx, f32)> {
+    pub fn current_fx(&self) -> Option<(scene::Fx, f32)> {
         let (fx, at) = self.fx?;
         let p = at.elapsed().as_secs_f32() / fx.duration_secs();
         (p < 1.0).then_some((fx, p))
@@ -285,7 +284,7 @@ impl App {
         self.drain_events();
         if self.pet.stage != self.last_stage {
             if self.pet.alive() {
-                self.trigger(sprites::Fx::Evolve);
+                self.trigger(scene::Fx::Evolve);
             }
             self.last_stage = self.pet.stage;
         }

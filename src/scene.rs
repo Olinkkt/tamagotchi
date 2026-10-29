@@ -9,7 +9,30 @@ use crate::frame::Frame;
 use crate::icons;
 use crate::palette::Pal;
 use crate::pet::{Pet, Stage};
-use crate::sprites::Fx;
+
+/// A one-shot animation after an action: what happened, picked by `App::react`.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Fx {
+    Eat,
+    Hearts,
+    Heal,
+    Clean,
+    Scold,
+    Evolve,
+}
+
+impl Fx {
+    pub fn duration_secs(self) -> f32 {
+        match self {
+            Fx::Eat => 1.8,
+            Fx::Hearts => 1.6,
+            Fx::Heal => 1.4,
+            Fx::Clean => 1.0,
+            Fx::Scold => 1.2,
+            Fx::Evolve => 2.6,
+        }
+    }
+}
 
 pub const W: i32 = 160;
 pub const H: i32 = 116;
