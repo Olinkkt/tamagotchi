@@ -1,0 +1,91 @@
+//! A canvas of palette pixels. The whole scene is drawn into one of these, then turned into
+//! RGBA once per frame. Nothing here needs a window, so it is easy to test.
+
+use crate::art::Sprite;
+use crate::faces;
+use crate::palette::Pal;
+
+#[derive(Clone, PartialEq, Debug)]
+pub struct Frame {
+    pub w: i32,
+    pub h: i32,
+    px: Vec<Pal>,
+}
+
+impl Frame {
+    pub fn new(w: i32, h: i32, fill: Pal) -> Frame {
+        Frame { w, h, px: vec![fill; (w * h) as usize] }
+    }
+
+    #[cfg(test)]
+    pub fn get(&self, x: i32, y: i32) -> Option<Pal> {
+        (x >= 0 && y >= 0 && x < self.w && y < self.h).then(|| self.px[(y * self.w + x) as usize])
+    }
+
+    pub fn set(&mut self, x: i32, y: i32, p: Pal) {
+        if x >= 0 && y >= 0 && x < self.w && y < self.h {
+            self.px[(y * self.w + x) as usize] = p;
+        }
+    }
+
+    pub fn rect(&mut self, x: i32, y: i32, w: i32, h: i32, p: Pal) {
+        for yy in y..y + h {
+            for xx in x..x + w {
+                self.set(xx, yy, p);
+            }
+        }
+    }
+
+    /// A rectangle with a 1px border.
+    pub fn boxed(&mut self, x: i32, y: i32, w: i32, h: i32, fill: Pal, border: Pal) {
+        self.rect(x, y, w, h, border);
+        self.rect(x + 1, y + 1, w - 2, h - 2, fill);
+    }
+
+    pub fn sprite(&mut self, s: &Sprite, x: i32, y: i32) {
+        self.sprite_with(s, x, y, |p| p);
+    }
+
+    /// Draw a sprite with every colour passed through `f` (for flashes and dark rooms).
+    pub fn sprite_with(&mut self, s: &Sprite, x: i32, y: i32, f: impl Fn(Pal) -> Pal) {
+        for sy in 0..s.h {
+            for sx in 0..s.w {
+                if let Some(p) = s.get(sx, sy) {
+                    self.set(x + sx, y + sy, f(p));
+                }
+            }
+        }
+    }
+
+    /// Draw a pixel grid (see `faces::colour`) with its top-left corner at (`x`, `y`).
+    pub fn grid(&mut self, rows: &[&str], x: i32, y: i32) {
+        for (dx, dy, p) in faces::pixels(rows) {
+            self.set(x + dx, y + dy, p);
+        }
+    }
+
+    pub fn frame(&mut self, src: &Frame, x: i32, y: i32) {
+        for sy in 0..src.h {
+            for sx in 0..src.w {
+                self.set(x + sx, y + sy, src.px[(sy * src.w + sx) as usize]);
+            }
+        }
+    }
+
+    /// Recolour every pixel in a rectangle.
+    pub fn tint(&mut self, x: i32, y: i32, w: i32, h: i32, f: impl Fn(Pal) -> Pal) {
+        for yy in y.max(0)..(y + h).min(self.h) {
+            for xx in x.max(0)..(x + w).min(self.w) {
+                let i = (yy * self.w + xx) as usize;
+                self.px[i] = f(self.px[i]);
+            }
+        }
+    }
+
+    pub fn rgba(&self) -> Vec<u8> {
+        self.px.iter().flat_map(|p| {
+            let (r, g, b) = p.rgb();
+            [r, g, b, 255]
+        }).collect()
+    }
+}

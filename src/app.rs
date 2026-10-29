@@ -57,6 +57,37 @@ pub struct App {
 
 type Snapshot = (u8, u8, u8, bool, u8, bool);
 
+/// Every form the pet can take, in the order the dev panel steps through them.
+pub const FORMS: [(Stage, &str); 11] = [
+    (Stage::Egg, "Egg"),
+    (Stage::Baby, "Babytchi"),
+    (Stage::Child, "Marutchi"),
+    (Stage::Teen, "Tonmarutchi"),
+    (Stage::Teen, "Hashitamatchi"),
+    (Stage::Adult, "Mametchi"),
+    (Stage::Adult, "Kuchipatchi"),
+    (Stage::Adult, "Tarakotchi"),
+    (Stage::Adult, "Ichigotchi"),
+    (Stage::Adult, "Nyorotchi"),
+    (Stage::Dead, "Departed"),
+];
+
+/// Turn the pet into `FORMS[i]` straight away (dev panel only).
+fn set_form(p: &mut Pet, i: usize) {
+    let (stage, species) = FORMS[i];
+    if stage == Stage::Dead {
+        p.dev_kill();
+        return;
+    }
+    if !p.alive() {
+        p.cause_of_death = None;
+        p.buried = false;
+    }
+    p.stage = stage;
+    p.species = species.into();
+    p.stage_age = 0;
+}
+
 impl App {
     pub fn new() -> Self {
         let args: Vec<String> = std::env::args().collect();
@@ -311,7 +342,17 @@ impl App {
         }
     }
 
+    /// A key from the keyboard. While the dev panel is open, dev keys come first.
     pub fn on_key(&mut self, code: Key) {
+        self.handle(code, true);
+    }
+
+    /// A button clicked with the mouse: always the action itself, never a dev key.
+    pub fn press(&mut self, code: Key) {
+        self.handle(code, false);
+    }
+
+    fn handle(&mut self, code: Key, dev_keys: bool) {
         match &mut self.mode {
             Mode::Game(g) => {
                 let outcome = g.key(code);
@@ -367,7 +408,7 @@ impl App {
             self.dev_open = !self.dev_open;
             return;
         }
-        if self.dev_open && self.on_dev_key(code) {
+        if dev_keys && self.dev_open && self.on_dev_key(code) {
             return;
         }
         let before = self.snapshot();
@@ -491,6 +532,24 @@ impl App {
                 p.dev_set_hour(12);
                 "clock set to 12:00".into()
             }
+            '[' | ']' => {
+                let now = FORMS.iter().position(|&(s, n)| s == p.stage && (s == Stage::Dead || n == p.species)).unwrap_or(0);
+                let next = if c == ']' { (now + 1) % FORMS.len() } else { (now + FORMS.len() - 1) % FORMS.len() };
+                set_form(p, next);
+                self.last_stage = p.stage;
+                format!("form = {} ({})", p.species, p.stage.label())
+            }
+            'e' => {
+                if p.stage == Stage::Egg {
+                    p.stage_age = (p.stage_age + 8).min(29);
+                }
+                format!("egg age = {}s of 30", p.stage_age)
+            }
+            ',' | '.' => {
+                let hour = (p.local_hour() + if c == '.' { 1 } else { 23 }) % 24;
+                p.dev_set_hour(hour);
+                format!("clock set to {hour:02}:00")
+            }
             'f' => {
                 self.speed = match self.speed as u32 {
                     1 => 10.0,
@@ -556,6 +615,36 @@ pub(crate) mod tests {
         assert!(app.message.contains("coins"), "{}", app.message);
         app.handle_outcome(games::Outcome::Done { wins: 1, rounds: 5 });
         assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
+    }
+
+    #[test]
+    fn the_dev_panel_steps_through_every_form_and_back() {
+        save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Egg, |p| p.species = "Egg".into());
+            app.dev = true;
+            app.on_key(Key::Tab);
+            let mut seen = Vec::new();
+            for _ in 0..FORMS.len() {
+                app.on_key(Key::Char(']'));
+                seen.push((app.pet.stage, app.pet.species.clone()));
+            }
+            assert_eq!(seen.last().map(|s| s.0), Some(Stage::Egg), "wraps round to the egg");
+            assert!(seen.iter().any(|s| s.0 == Stage::Dead));
+            assert!(app.pet.alive(), "stepping past death brings a living pet back");
+            app.on_key(Key::Char('['));
+            assert_eq!(app.pet.stage, Stage::Dead);
+        });
+    }
+
+    #[test]
+    fn a_click_does_the_action_even_while_the_dev_panel_is_open() {
+        let mut app = app_with(Stage::Adult, |p| p.hunger = 1);
+        app.dev = true;
+        app.dev_open = true;
+        app.press(Key::Char('f'));
+        assert_eq!(app.pet.hunger, 2, "f on the panel is the speed key, but the click feeds");
+        app.on_key(Key::Char('f'));
+        assert_eq!((app.pet.hunger, app.speed), (2, 10.0));
     }
 
     #[test]

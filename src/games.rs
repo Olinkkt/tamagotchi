@@ -48,6 +48,14 @@ impl Game {
         }
     }
 
+    /// The game as a small pixel canvas.
+    pub fn canvas(&self) -> Canvas {
+        match self {
+            Game::Memory(g) => g.canvas(),
+            Game::Pong(g) => g.canvas(),
+        }
+    }
+
     /// The game drawn into a `w` x `h` cell area.
     pub fn lines(&self, w: usize, h: usize) -> Vec<Line<'static>> {
         match self {
@@ -224,6 +232,10 @@ impl Memory {
     }
 
     fn lines(&self, w: usize, h: usize) -> Vec<Line<'static>> {
+        to_lines(&self.canvas(), w, h, OUTSIDE)
+    }
+
+    fn canvas(&self) -> Canvas {
         let t = anim_clock(self.born);
         let mut c = room_backdrop();
         let pausing = matches!(self.phase, MPhase::Pause(_));
@@ -268,7 +280,7 @@ impl Memory {
                 c.rect(x0 + i * 3, FH as i32 - 1, x0 + i * 3 + 1, FH as i32 - 1, if i < pos as i32 { GOLD } else { (200, 200, 215) });
             }
         }
-        to_lines(&c, w, h, OUTSIDE)
+        c
     }
 }
 
@@ -404,6 +416,10 @@ impl Pong {
     }
 
     fn lines(&self, w: usize, h: usize) -> Vec<Line<'static>> {
+        to_lines(&self.canvas(), w, h, OUTSIDE)
+    }
+
+    fn canvas(&self) -> Canvas {
         let (fw, fh) = (FW as i32, FH as i32);
         let mut c = Canvas::sized(FW, FH);
         for y in 0..fh {
@@ -443,7 +459,7 @@ impl Pong {
         for i in 0..PONG_GOAL as i32 {
             c.rect(3 + i * 3, 0, 4 + i * 3, 0, if i < self.hits as i32 { GOLD } else { PIP_OFF });
         }
-        to_lines(&c, w, h, OUTSIDE)
+        c
     }
 }
 
@@ -478,6 +494,10 @@ impl Finish {
     }
 
     pub fn lines(&self, w: usize, h: usize) -> Vec<Line<'static>> {
+        to_lines(&self.canvas(), w, h, OUTSIDE)
+    }
+
+    pub fn canvas(&self) -> Canvas {
         let won = self.coins > 0;
         let ms = self.born.elapsed().as_millis() as i32;
         let mut c = room_backdrop();
@@ -508,7 +528,7 @@ impl Finish {
                 digit(&mut c, ch as u8 - b'0', 23 + k as i32 * 4, 11, WHITE);
             }
         }
-        to_lines(&c, w, h, OUTSIDE)
+        c
     }
 }
 

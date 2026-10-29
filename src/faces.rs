@@ -52,6 +52,19 @@ pub fn colour(ch: char) -> Option<Pal> {
         'g' => Pal::Green,
         'l' => Pal::Lime,
         'v' => Pal::Violet,
+        'x' => Pal::Night,
+        'z' => Pal::Dusk,
+        'a' => Pal::Slate,
+        'h' => Pal::Mist,
+        'u' => Pal::Rust,
+        'o' => Pal::Orange,
+        'y' => Pal::Yellow,
+        'c' => Pal::Cream,
+        'f' => Pal::Forest,
+        'd' => Pal::DeepTeal,
+        'e' => Pal::Teal,
+        'n' => Pal::Brown,
+        't' => Pal::Tan,
         _ => return None,
     })
 }
@@ -138,6 +151,34 @@ pub const EGG_CRACKS: [[&str; 3]; 2] = [
         "k.k..k.k..kk.k",
         "...kk...kk....",
     ],
+];
+
+/// Spinning rings in place of the eyes while the machine's memory is nearly full, with the
+/// idle mouth. `phase` moves the gap in each ring.
+pub fn dizzy(style: FaceStyle, phase: usize) -> Vec<(i32, i32, Pal)> {
+    let (eyes, mouth) = match style {
+        FaceStyle::Small => ([(2, 1), (9, 1)], [(5, 4), (6, 4)]),
+    };
+    let ring = [(-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0)];
+    let mut out: Vec<(i32, i32, Pal)> = mouth.iter().map(|&(x, y)| (x, y, Pal::Ink)).collect();
+    for (side, (cx, cy)) in eyes.into_iter().enumerate() {
+        out.push((cx, cy, Pal::Ink));
+        for (i, (dx, dy)) in ring.iter().enumerate() {
+            if i != (phase + side * 4) % ring.len() {
+                out.push((cx + dx, cy + dy, Pal::Ink));
+            }
+        }
+    }
+    out
+}
+
+/// The ghost of a pet that has passed away.
+pub const GHOST_FACE: [&str; 5] = [
+    "kk..kk",
+    "kk..kk",
+    "......",
+    "..kk..",
+    "..kk..",
 ];
 
 /// Every coloured pixel of a grid, as (x, y, colour) relative to its top-left corner.

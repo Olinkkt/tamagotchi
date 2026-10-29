@@ -1,10 +1,23 @@
 mod app;
+mod art;
+// palette, faces and cast are shared with tools/spritegen, which uses parts the game does not.
+#[allow(dead_code)]
+mod cast;
 mod cli;
 mod config;
+#[allow(dead_code)]
+mod faces;
+mod font;
+mod frame;
 mod games;
+mod hud;
+mod icons;
+#[allow(dead_code)]
+mod palette;
 mod pet;
 mod profile;
 mod save;
+mod scene;
 mod sprites;
 mod sysinfo;
 mod tui;

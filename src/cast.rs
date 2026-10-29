@@ -50,7 +50,13 @@ pub const BABY: Character = Character {
     parts: &[],
 };
 
-pub const ALL: [Character; 2] = [EGG, BABY];
+pub const POOP: Character = Character { name: "poop", size: 16, face: None, parts: &[] };
+pub const GRAVE: Character = Character { name: "grave", size: 32, face: None, parts: &[] };
+pub const GHOST: Character = Character { name: "ghost", size: 24, face: None, parts: &[] };
+
+pub const ALL: [Character; 5] = [EGG, BABY, POOP, GRAVE, GHOST];
 
 /// The spot on the egg where the cracks go.
 pub const EGG_CRACK_AT: (i32, i32) = (9, 15);
+/// Where the ghost's face goes.
+pub const GHOST_FACE_AT: (i32, i32) = (9, 8);

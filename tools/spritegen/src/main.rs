@@ -94,6 +94,14 @@ fn build(c: &Character, sprites: &Path, preview: &Path) {
 
     let looks: Vec<(String, Img)> = if c.face.is_some() {
         Expr::ALL.iter().map(|e| (e.name().to_string(), with_face(c, &cells[0], *e))).collect()
+    } else if c.name == "ghost" {
+        let mut ghost = cells[0].clone();
+        for (x, y, p) in faces::pixels(&faces::GHOST_FACE) {
+            ghost.set(cast::GHOST_FACE_AT.0 + x, cast::GHOST_FACE_AT.1 + y, Some(p));
+        }
+        vec![("face".to_string(), ghost)]
+    } else if c.name != "egg" {
+        vec![("plain".to_string(), cells[0].clone())]
     } else {
         egg_stages(&cells[0]).into_iter().enumerate().map(|(i, img)| (format!("stage{i}"), img)).collect()
     };
