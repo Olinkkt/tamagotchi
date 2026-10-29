@@ -1,3 +1,4 @@
 [alias]
 fast = "run --release -- --fast"
 dev = "run --release -- --dev"
+art = "run -p spritegen --release --"
