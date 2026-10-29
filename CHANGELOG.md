@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0
+
+- Hatching is now an animation: the finished egg shakes hard, flashes white and bursts. The baby
+  pops up out of the bowl, the cap is thrown in an arc to one side and the bowl hops to the other,
+  then they stay on the floor for a few seconds.
+- The yellow glow in the cracks is gone; the cracks are plain dark lines, and the last stage has a
+  dark chip broken out of the shell.
+
 ## 1.2.0
 
 - The egg cracks in five detailed stages (the last two glow, with a chip breaking open), instead of

@@ -82,8 +82,9 @@ Prices and rewards are first guesses.
 Egg -30s-> Baby -10 min-> Child -1 h-> Teen -2 h-> Adult -2 days-> old age
 ```
 
-The egg shows how close it is: it cracks in five stages (the last ones glow), wobbles wider and
-faster, hops just before it hatches, and leaves its shell on the floor for a few seconds.
+The egg shows how close it is: it cracks in five stages, wobbles wider and faster, and hops just
+before it hatches. Then it shakes hard, flashes and bursts: the baby pops out, the cap flies off
+in an arc, and the two halves of the shell stay on the floor for a few seconds.
 
 Care mistakes (counted over its whole life) decide what it grows into:
 

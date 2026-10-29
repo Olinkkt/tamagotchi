@@ -179,6 +179,16 @@ const HOP_MS: u64 = 210;
 const HOP_PX: i32 = 2;
 /// How long the shell lies on the floor after hatching.
 pub const SHELL_SECS: f32 = 7.0;
+/// The hatching, in seconds after the egg breaks: the finished egg shakes hard, flashes white,
+/// then bursts: the baby pops out, the cap flies off in an arc and the bowl hops aside.
+const HATCH_SHAKE: f32 = 0.55;
+const HATCH_FLASH: f32 = 0.12;
+const HATCH_POP: f32 = 0.45;
+const HATCH_BOWL: f32 = 0.6;
+const HATCH_CAP: f32 = 0.8;
+const POP_PX: f32 = 9.0;
+const BOWL_HOP_PX: f32 = 5.0;
+const CAP_ARC_PX: f32 = 26.0;
 
 /// How many crack stages the egg has reached: 0 (whole) to 5 (about to burst).
 fn egg_stage(p: &Pet) -> usize {
@@ -209,7 +219,7 @@ fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
     let p = m.pet;
     let mut overlay: Vec<(i32, i32, Pal)> = Vec::new();
     if p.stage == Stage::Egg {
-        overlay = cracks(p, m.beat());
+        overlay = cracks(p);
     } else if let Some(spot) = c.face {
         let dizzy = p.load.low_ram && calm(p) && expression(m) != Expr::Sleeping;
         let face: Vec<(i32, i32, Pal)> =
@@ -219,23 +229,25 @@ fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
     assemble(p, c, &overlay, m.beat())
 }
 
-/// Cracks in the shell as an egg gets close to hatching. In the last stage the glow pulses
-/// between yellow and orange on every other beat.
-fn cracks(p: &Pet, beat: u64) -> Vec<(i32, i32, Pal)> {
-    let n = egg_stage(p);
+/// Cracks in the shell as an egg gets close to hatching.
+fn cracks(p: &Pet) -> Vec<(i32, i32, Pal)> {
+    cracks_at(egg_stage(p))
+}
+
+/// The cracks of crack stage `n` (1 to 5); none for a whole egg.
+fn cracks_at(n: usize) -> Vec<(i32, i32, Pal)> {
     if n == 0 {
         return Vec::new();
     }
     let (x, y) = cast::EGG_CRACK_AT;
-    let pulse = n == 5 && beat % 2 == 1;
-    faces::pixels(&faces::EGG_CRACKS[n - 1]).map(|(dx, dy, c)| (x + dx, y + dy, if pulse && c == Pal::Yellow { Pal::Orange } else { c })).collect()
+    faces::pixels(&faces::EGG_CRACKS[n - 1]).map(|(dx, dy, c)| (x + dx, y + dy, c)).collect()
 }
 
 /// The pet with a given face (an egg shows its cracks instead), for the games and the gallery.
 pub fn posed(p: &Pet, e: Expr) -> Sprite {
     let c = character(p);
     let face: Vec<(i32, i32, Pal)> = match c.face {
-        None if p.stage == Stage::Egg => cracks(p, 0),
+        None if p.stage == Stage::Egg => cracks(p),
         Some(spot) => faces::pixels(faces::grid(spot.style, e)).map(|(x, y, col)| (spot.x + x, spot.y + y, col)).collect(),
         None => Vec::new(),
     };
@@ -271,15 +283,56 @@ fn draw_poop(f: &mut Frame, m: &Moment, s: Size) {
     }
 }
 
-/// The two halves of the egg, left on the floor either side of the pet; they blink out at the end.
+/// 0 at both ends and 1 in the middle: the height of a jump or a throw as it goes from 0 to 1.
+fn arc(u: f32) -> f32 {
+    4.0 * u * (1.0 - u)
+}
+
+/// How far (0 to 1) through a stretch of the hatching, starting `from` seconds in and lasting `len`.
+fn progress(t: f32, from: f32, len: f32) -> f32 {
+    ((t - from) / len).clamp(0.0, 1.0)
+}
+
+/// Where the shell's bowl and cap are (top-left corners), `t` seconds after the egg burst: at
+/// first on top of each other where the egg was, then the bowl hops left and the cap is thrown
+/// right, landing in the places they stay.
+fn shell_pieces(t: f32, s: Size) -> [(i32, i32); 2] {
+    let cells = art::cells(&cast::SHELL);
+    let floor = s.floor() + 2;
+    let (bowl_y, cap_y) = ((floor - cells[0].bottom()) as f32, (floor - cells[1].bottom()) as f32);
+    let (start_x, bowl_x, cap_x) = ((s.centre() - 12) as f32, (s.centre() - 46) as f32, (s.centre() + 22) as f32);
+    let lerp = |a: f32, b: f32, u: f32| a + (b - a) * u;
+    let ease = |u: f32| 1.0 - (1.0 - u) * (1.0 - u);
+    let (ub, uc) = (progress(t, HATCH_SHAKE, HATCH_BOWL), progress(t, HATCH_SHAKE, HATCH_CAP));
+    let bowl = (lerp(start_x, bowl_x, ease(ub)), bowl_y - BOWL_HOP_PX * arc(ub));
+    // The cap starts perched on the bowl.
+    let cap = (lerp(start_x, cap_x, ease(uc)), lerp(bowl_y - 12.0, cap_y, uc) - CAP_ARC_PX * arc(uc));
+    [(bowl.0.round() as i32, bowl.1.round() as i32), (cap.0.round() as i32, cap.1.round() as i32)]
+}
+
+/// The two halves of the egg: thrown apart when it bursts, then left on the floor either side of
+/// the pet; they blink out at the end.
 fn draw_shell(f: &mut Frame, t: f32, s: Size) {
-    if t > SHELL_SECS - 1.5 && (t * 8.0) as i32 % 2 == 1 {
+    if t < HATCH_SHAKE || (t > SHELL_SECS - 1.5 && (t * 8.0) as i32 % 2 == 1) {
         return;
     }
     let cells = art::cells(&cast::SHELL);
-    let floor = s.floor() + 2;
-    f.sprite(&cells[0], s.centre() - 46, floor - cells[0].bottom());
-    f.sprite(&cells[1], s.centre() + 22, floor - cells[1].bottom());
+    let [bowl, cap] = shell_pieces(t, s);
+    f.sprite(&cells[0], bowl.0, bowl.1);
+    f.sprite(&cells[1], cap.0, cap.1);
+}
+
+/// The finished egg just before it bursts: shaking hard, and flashing white at the very end.
+fn draw_hatching_egg(f: &mut Frame, m: &Moment, t: f32, s: Size) -> Place {
+    let c = cast::EGG;
+    let body = art::body(&c);
+    let shake = if (t * 22.0) as i32 % 2 == 0 { 3 } else { -3 };
+    let y = s.floor() - body.bottom();
+    let at = Place { x: s.centre() - c.size as i32 / 2 + shake, y, size: c.size as i32, head: y + body.top() };
+    let sprite = assemble(m.pet, &c, &cracks_at(5), m.beat());
+    let flash = t > HATCH_SHAKE - HATCH_FLASH;
+    f.sprite_with(&sprite, at.x, at.y, |c| if flash { Pal::White } else { c });
+    at
 }
 
 fn draw_dead(f: &mut Frame, m: &Moment, s: Size) {
@@ -401,8 +454,18 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
         draw_dead(&mut f, m, s);
         return f;
     }
+    if let Some(t) = m.shell.filter(|&t| t < HATCH_SHAKE) {
+        let egg = draw_hatching_egg(&mut f, m, t, s);
+        draw_effects(&mut f, m, egg, s);
+        return f;
+    }
     let c = character(p);
-    let at = place(m, &c, s);
+    let mut at = place(m, &c, s);
+    if let Some(t) = m.shell {
+        // The baby pops up out of the shell.
+        let pop = (POP_PX * arc(progress(t, HATCH_SHAKE, HATCH_POP))).round() as i32;
+        (at.y, at.head) = (at.y - pop, at.head - pop);
+    }
     let sprite = pet_sprite(m, &c);
     let flash = m.fx_is(Fx::Evolve).is_some_and(|t| t < 0.6 && (t * 14.0) as i32 % 2 == 0);
     f.sprite_with(&sprite, at.x, at.y, |c| if flash { Pal::White } else { c });
@@ -547,19 +610,35 @@ mod tests {
         let room_at = |shell: Option<f32>| room(&Moment { pet: &p, fx: None, ms: 0, shell }, W, H);
         let none = room_at(None);
         assert!(none != room_at(Some(1.0)), "the halves are on the floor");
-        assert!(room_at(Some(1.0)) == room_at(Some(3.0)), "and stay put");
+        assert!(room_at(Some(2.0)) == room_at(Some(3.0)), "and stay put once landed");
         assert!(none == room_at(Some(5.7)), "at 5.7s it is in a blink");
         assert!(none != room_at(Some(5.8)), "and back for a moment");
     }
 
     #[test]
-    fn the_cracks_get_bigger_each_stage_and_pulse_at_the_end() {
-        let count = |age| cracks(&egg_at(age), 0).len();
-        let counts: Vec<usize> = [3, 8, 13, 19, 25, 28].iter().map(|&a| count(a)).collect();
+    fn the_cracks_get_bigger_each_stage() {
+        let counts: Vec<usize> = [3, 8, 13, 19, 25, 28].iter().map(|&a| cracks(&egg_at(a)).len()).collect();
         assert_eq!(counts[0], 0);
         assert!(counts.windows(2).all(|w| w[0] < w[1]), "{counts:?}");
-        assert_ne!(cracks(&egg_at(28), 0), cracks(&egg_at(28), 1), "the light pulses");
-        assert_eq!(cracks(&egg_at(25), 0), cracks(&egg_at(25), 1), "but only at the end");
+        assert!(cracks(&egg_at(28)).iter().all(|c| c.2 == Pal::Ink || c.2 == Pal::Night), "ink cracks only, no glow");
+    }
+
+    #[test]
+    fn the_egg_bursts_then_the_baby_pops_out_and_the_shell_lands() {
+        let p = pet(Stage::Baby);
+        let at = |t: f32| room(&Moment { pet: &p, fx: None, ms: 0, shell: Some(t) }, W, H);
+        // The baby's pink body, above the rug.
+        let pink = |f: &Frame| (66..88).flat_map(|y| (60..100).map(move |x| (x, y))).filter(|&(x, y)| f.get(x, y) == Some(Pal::Pink)).count();
+        assert_eq!(pink(&at(0.2)), 0, "still just an egg");
+        assert!(pink(&at(0.7)) > 100, "the baby is out");
+        let s = Size { w: W, h: H };
+        let (start, rest) = (shell_pieces(HATCH_SHAKE, s), shell_pieces(HATCH_SHAKE + HATCH_CAP, s));
+        assert_eq!(rest, shell_pieces(3.0, s), "it stays where it landed");
+        assert!(start[0].0 > rest[0].0 && start[1].0 < rest[1].0, "the bowl goes left and the cap goes right");
+        let mid = shell_pieces(HATCH_SHAKE + HATCH_CAP / 2.0, s);
+        assert!(mid[1].1 < start[1].1.min(rest[1].1) - 10, "the cap flies up through the air: {mid:?}");
+        let xs: Vec<i32> = (0..=20).map(|i| shell_pieces(HATCH_SHAKE + HATCH_CAP * i as f32 / 20.0, s)[1].0).collect();
+        assert!(xs.windows(2).all(|w| w[0] <= w[1]), "and never comes back: {xs:?}");
     }
 
     #[test]
