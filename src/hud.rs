@@ -4,11 +4,13 @@
 
 use crate::app::{App, Key, Mode};
 use crate::fmt_age;
+use crate::font;
 use crate::frame::Frame;
 use crate::games::Game;
 use crate::icons::{self, Grid};
 use crate::palette::Pal;
 use crate::pet::{self, Stage, MAX_HEARTS};
+use crate::panel;
 use crate::profile;
 use crate::scene;
 
@@ -18,6 +20,8 @@ pub const H: i32 = 160;
 pub const ROOM: (i32, i32) = (0, 12);
 pub const PANEL_X: i32 = 160;
 const HINT_Y: i32 = 128;
+/// The message about the last thing that happened sits on a dimmed strip along the room's foot.
+const MESSAGE_Y: i32 = 117;
 const BAR_Y: i32 = 140;
 const BUTTON: i32 = 16;
 const GAP: i32 = 3;
@@ -167,8 +171,12 @@ pub fn frame(app: &App, hover: Option<Key>) -> Frame {
     f.rect(0, 0, PANEL_X, ROOM.1, Pal::Night);
     f.rect(0, ROOM.1 - 1, PANEL_X, 1, Pal::Dusk);
     f.frame(&scene::area(app), ROOM.0, ROOM.1);
+    if !app.message.is_empty() && !matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) {
+        f.tint(0, MESSAGE_Y, PANEL_X, HINT_Y - MESSAGE_Y, Pal::dark);
+    }
     f.boxed(PANEL_X, 0, W - PANEL_X, HINT_Y, Pal::Night, Pal::Dusk);
     f.rect(PANEL_X + 1, 11, W - PANEL_X - 2, 1, Pal::Dusk);
+    panel::draw(&mut f, app);
     // Hint line and the button bar.
     f.rect(0, HINT_Y, W, BAR_Y - HINT_Y, Pal::Ink);
     f.rect(0, BAR_Y, W, H - BAR_Y, Pal::Night);
@@ -212,8 +220,18 @@ fn mode_lines(app: &App) -> Vec<(String, Pal)> {
     }
 }
 
-/// Every piece of text on screen.
-pub fn labels(app: &App) -> Vec<Label> {
+/// The most urgent thing to do, for the line under the room.
+fn hint(app: &App) -> Option<(String, Pal)> {
+    let p = &app.pet;
+    match p.top_need() {
+        Some((k, text)) => Some((format!("→ PRESS {}: {}", k.to_ascii_uppercase(), text.to_uppercase()), Pal::Yellow)),
+        None if p.stage == Stage::Egg => Some(("IT'S AN EGG - GIVE IT A MOMENT TO HATCH.".into(), Pal::Mist)),
+        None => None,
+    }
+}
+
+/// Every piece of text on screen. `ratio` is scene pixels per font pixel at the current scale.
+pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
     let p = &app.pet;
     let mut out = Vec::new();
     let mut head = format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age));
@@ -222,7 +240,19 @@ pub fn labels(app: &App) -> Vec<Label> {
     }
     out.push(label(head, 4.0, 6.0, Pal::White, Align::Left));
     out.push(label("STATUS", PANEL_X as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
-    out.push(label(app.message.clone(), W as f32 / 2.0, HINT_Y as f32 + 6.0, Pal::White, Align::Centre));
+    if matches!(app.mode, Mode::Normal) {
+        if let Some((text, colour)) = hint(app) {
+            out.push(label(text, W as f32 / 2.0, HINT_Y as f32 + 6.0, colour, Align::Centre));
+        }
+    }
+    if !app.message.is_empty() && !matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) {
+        // One line only: long messages lose their tail rather than spill over the panel.
+        let max = ((PANEL_X - 8) as f32 / ratio) as i32;
+        let mut text = app.message.clone();
+        while font::width(&text) > max && text.pop().is_some() {}
+        out.push(label(text, PANEL_X as f32 / 2.0, (MESSAGE_Y + HINT_Y) as f32 / 2.0, Pal::White, Align::Centre));
+    }
+    out.extend(panel::labels(app, ratio));
     for b in buttons(app) {
         if b.icon.is_some() {
             let bounce = if b.look == Look::Urgent { ((app.started.elapsed().as_millis() / 350) % 2) as f32 } else { 0.0 };
@@ -277,9 +307,18 @@ mod tests {
     #[test]
     fn the_header_and_message_are_on_screen() {
         let app = app_with(Stage::Baby, |_| {});
-        let text: Vec<String> = labels(&app).into_iter().map(|l| l.text).collect();
+        let text: Vec<String> = labels(&app, 0.5).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t.starts_with("Babytchi · Baby")), "{text:?}");
         assert!(text.contains(&"hello".to_string()));
+    }
+
+    #[test]
+    fn the_hint_line_says_what_to_press() {
+        let app = app_with(Stage::Baby, |p| p.hunger = 0);
+        let text: Vec<String> = labels(&app, 0.5).into_iter().map(|l| l.text).collect();
+        assert!(text.iter().any(|t| t.starts_with("→ PRESS F: STARVING")), "{text:?}");
+        let egg = app_with(Stage::Egg, |_| {});
+        assert!(labels(&egg, 0.5).iter().any(|l| l.text.starts_with("IT'S AN EGG")));
     }
 
     #[test]

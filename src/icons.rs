@@ -202,6 +202,10 @@ pub fn for_key(key: char) -> Option<Grid> {
     })
 }
 
+pub const HEART_FULL: Grid = &[".kk.kk.", "krwkrrk", "krrrrrk", ".krrrk.", "..krk..", "...k..."];
+pub const HEART_EMPTY: Grid = &[".aa.aa.", "azzazza", "azzzzza", ".azzza.", "..aza..", "...a..."];
+pub const COIN: Grid = &[".kkkk.", "kyccyk", "kycyyk", "kyyyok", "kyyook", ".kkkk."];
+
 pub const Z: Grid = &["iiiii", "...i.", "..i..", ".i...", "iiiii"];
 pub const SWEAT: Grid = &[".k..", "ksk.", "ksik", "kssk", ".kk."];
 pub const BATTERY: Grid = &[
@@ -224,7 +228,7 @@ mod tests {
     #[test]
     fn icons_are_rectangular_and_use_palette_letters() {
         let keys = "fsplmcdbagqn".chars().map(|k| for_key(k).unwrap());
-        for g in keys.chain([Z, SWEAT, BATTERY, HEART, SPARKLE, ANGER, APPLE]) {
+        for g in keys.chain([HEART_FULL, HEART_EMPTY, COIN, Z, SWEAT, BATTERY, HEART, SPARKLE, ANGER, APPLE]) {
             for row in g {
                 assert_eq!(row.len(), g[0].len(), "{g:?}");
                 assert!(row.chars().all(|c| c == '.' || colour(c).is_some()), "{row}");

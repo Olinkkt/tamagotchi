@@ -14,6 +14,7 @@ mod hud;
 mod icons;
 #[allow(dead_code)]
 mod palette;
+mod panel;
 mod pet;
 mod profile;
 mod save;

@@ -141,7 +141,7 @@ async fn main_loop(mut app: App) {
         clear_background(colour(LETTERBOX));
         let size = vec2(hud::W as f32 * v.scale, hud::H as f32 * v.scale);
         draw_texture_ex(&texture, v.x, v.y, WHITE, DrawTextureParams { dest_size: Some(size), ..Default::default() });
-        for l in hud::labels(&app) {
+        for l in hud::labels(&app, v.text_px() / v.scale) {
             draw_label(&v, &l);
         }
         if app.dev_open {

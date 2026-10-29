@@ -106,6 +106,7 @@ pub fn glyph(c: char) -> &'static [&'static str] {
         '}' => &["#..", ".#.", ".#.", "..#", ".#.", ".#.", "#.."],
         '~' => &[".....", ".....", ".#...", "#.#.#", "...#."],
         '→' => &[".....", "..#..", "...#.", "#####", "...#.", "..#.."],
+        '•' => &["..", "..", "..", "##", "##"],
         '·' => &[".", ".", ".", "#"],
         '♥' => &[".....", ".#.#.", "#####", "#####", ".###.", "..#.."],
         '◎' => &[".....", ".###.", "#...#", "#.#.#", "#...#", ".###."],
@@ -142,6 +143,24 @@ pub fn pixels(text: &str) -> Vec<(i32, i32)> {
     out
 }
 
+/// Split `text` into lines no wider than `max` font pixels, breaking between words.
+pub fn wrap(text: &str, max: i32) -> Vec<String> {
+    let mut lines: Vec<String> = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        let candidate = if line.is_empty() { word.to_string() } else { format!("{line} {word}") };
+        if width(&candidate) <= max || line.is_empty() {
+            line = candidate;
+        } else {
+            lines.push(std::mem::replace(&mut line, word.to_string()));
+        }
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    lines
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -156,7 +175,7 @@ mod tests {
 
     #[test]
     fn glyphs_are_rectangular_and_fit_the_line() {
-        for c in (33u8..127).map(char::from).chain("→·♥◎✓".chars()) {
+        for c in (33u8..127).map(char::from).chain("→·•♥◎✓".chars()) {
             let g = glyph(c);
             assert!(g.len() as i32 <= HEIGHT, "{c:?}");
             assert!(g.iter().all(|r| r.len() == g[0].len()), "{c:?}");
@@ -169,5 +188,7 @@ mod tests {
         assert_eq!(width("AB"), 11);
         assert_eq!(width("A B"), 15);
         assert_eq!(width(""), 0);
+        assert_eq!(wrap("feed the pet a meal", width("feed the pet")), ["feed the pet", "a meal"]);
+        assert_eq!(wrap("", 10), Vec::<String>::new());
     }
 }
