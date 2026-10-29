@@ -44,7 +44,8 @@ up in the menu, and the pet shows a bubble with an icon for it.
 Any game makes the pet a little lighter, and winning makes it happier. A perfect game forgives
 one care mistake.
 
-Both are drawn in the same pixel art as the pet.
+Both are drawn in the same pixel art as the pet, scores included. When a game ends, a result
+screen shows a star per round won and the coins earned for three seconds (any key skips it).
 
 1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4. Your pet watches and cheers or sulks.
 2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. A direction key keeps the paddle going until you press the other way or space, so it does not rely on your terminal's key repeat.

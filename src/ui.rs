@@ -182,7 +182,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     f.render_widget(Paragraph::new(header).block(panel("tamagotchi")), rows[0]);
 
     // A game gets the whole width; the status panel comes back when it ends.
-    let in_game = matches!(app.mode, Mode::Game(_));
+    let in_game = matches!(app.mode, Mode::Game(_) | Mode::Finish(_));
     let cols = Layout::horizontal([Constraint::Min(34), Constraint::Length(if in_game { 0 } else { 30 })]).split(rows[1]);
 
     // Room
@@ -200,6 +200,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     };
     let body: Vec<Line> = match &app.mode {
         Mode::Game(g) => g.lines(inner.width as usize, inner.height as usize),
+        Mode::Finish(f) => f.lines(inner.width as usize, inner.height as usize),
         Mode::Chooser => {
             let mut v = vec![
                 Line::from(Span::styled("PICK A GAME", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),
@@ -356,7 +357,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     let items: &[(&str, &str)] = match &app.mode {
         Mode::Game(g) => g.keys(),
         Mode::Chooser => &[("1-2", "choose"), ("esc", "back")],
-        Mode::Graveyard(_) | Mode::Awards => &[("any key", "back")],
+        Mode::Graveyard(_) | Mode::Awards | Mode::Finish(_) => &[("any key", "back")],
         Mode::Shop => &[("1-4", "buy"), ("esc", "back")],
         Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("a", "awards"), ("g", "graveyard"), ("q", "quit")],
         Mode::Normal => &[("f", "feed"), ("s", "snack"), ("p", "play"), ("l", "light"), ("m", "medicine"), ("c", "clean"), ("d", "scold"), ("b", "shop"), ("a", "awards"), ("g", "graveyard"), ("q", "quit")],

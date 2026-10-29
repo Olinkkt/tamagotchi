@@ -4,14 +4,10 @@
 use std::time::{Duration, Instant};
 
 use crossterm::event::KeyCode;
-use ratatui::{
-    style::{Modifier, Style},
-    text::{Line, Span},
-};
+use ratatui::text::Line;
 
 use crate::pet::Pet;
 use crate::sprites::{body_colour, darken, mini_pet, mix, to_lines, Canvas, Mood, C, INK, WHITE};
-use crate::ui::{ACCENT, DIM};
 
 pub enum Outcome {
     Continue,
@@ -20,14 +16,6 @@ pub enum Outcome {
 }
 
 pub const CHOICES: [(&str, &str); 2] = [("1", "memory"), ("2", "pong")];
-
-/// A title and a short status on one line, for the games that need every row for the field.
-fn heading(name: &str, info: String) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(format!("{name}  "), Style::new().fg(ACCENT).add_modifier(Modifier::BOLD)),
-        Span::styled(info, Style::new().fg(DIM)),
-    ])
-}
 
 pub enum Game {
     Memory(Memory),
@@ -79,9 +67,9 @@ impl Game {
 // ---------------------------------------------------------------- shared pixel stage
 
 /// Every game draws onto a canvas of this many pixels (two per terminal row), which fits the
-/// smallest room under a one-line heading and is scaled up in bigger windows.
+/// smallest room and is scaled up in bigger windows. Scores are drawn in pixels too.
 const FW: usize = 32;
-const FH: usize = 18;
+const FH: usize = 20;
 const OUTSIDE: C = (20, 22, 34);
 
 /// The room's wall gradient with a strip of wooden floor, like the pet's own room.
@@ -94,20 +82,27 @@ fn room_backdrop() -> Canvas {
     c
 }
 
-fn stage(heading_line: Line<'static>, c: &Canvas, w: usize, h: usize) -> Vec<Line<'static>> {
-    let mut out = vec![heading_line];
-    out.extend(to_lines(c, w, h.saturating_sub(1), OUTSIDE));
-    out
-}
+const GOLD: C = (250, 205, 80);
+const PIP_OFF: C = (70, 72, 92);
 
-/// A 3x5 pixel digit, 1 to 4.
+/// A 3x5 pixel digit.
 fn digit(c: &mut Canvas, n: u8, x: i32, y: i32, col: C) {
     let rows: [&str; 5] = match n {
+        0 => ["###", "#.#", "#.#", "#.#", "###"],
         1 => [".#.", "##.", ".#.", ".#.", "###"],
         2 => ["##.", "..#", ".#.", "#..", "###"],
         3 => ["##.", "..#", ".#.", "..#", "##."],
-        _ => ["#.#", "#.#", "###", "..#", "..#"],
+        4 => ["#.#", "#.#", "###", "..#", "..#"],
+        5 => ["###", "#..", "##.", "..#", "##."],
+        6 => [".##", "#..", "###", "#.#", "###"],
+        7 => ["###", "..#", ".#.", ".#.", ".#."],
+        8 => ["###", "#.#", "###", "#.#", "###"],
+        _ => ["###", "#.#", "###", "..#", "##."],
     };
+    sprite(c, &rows, x, y, col);
+}
+
+fn sprite(c: &mut Canvas, rows: &[&str], x: i32, y: i32, col: C) {
     for (dy, row) in rows.iter().enumerate() {
         for (dx, ch) in row.chars().enumerate() {
             if ch == '#' {
@@ -127,7 +122,7 @@ const MEMORY_ROUNDS: u8 = 3;
 const MEMORY_COLORS: [C; 4] = [(240, 95, 105), (245, 200, 90), (130, 210, 140), (110, 160, 250)];
 /// Left edge of each 7-pixel pad.
 const PAD_X: [i32; 4] = [0, 8, 16, 24];
-const PAD_Y: i32 = 10;
+const PAD_Y: i32 = 11;
 
 enum MPhase {
     /// `idx` is the next/current step; `lit` means that step is showing.
@@ -141,9 +136,8 @@ pub struct Memory {
     wins: u8,
     seq: Vec<u8>,
     phase: MPhase,
-    note: String,
-    /// The last round's result, so the pet can cheer or sulk during the pause.
-    last_ok: Option<bool>,
+    /// Whether each finished round was repeated correctly.
+    results: Vec<bool>,
     /// A pad you just pressed glows briefly.
     flash: Option<(u8, Instant)>,
     look: Box<Pet>,
@@ -161,8 +155,7 @@ impl Memory {
             wins: 0,
             seq: Vec::new(),
             phase: MPhase::Pause(after_ms(0)),
-            note: String::new(),
-            last_ok: None,
+            results: Vec::new(),
             flash: None,
             look: Box::new(pet.clone()),
             born: Instant::now(),
@@ -174,8 +167,6 @@ impl Memory {
     fn start_round(&mut self, pet: &mut Pet) {
         let len = self.round as usize + 2;
         self.seq = (0..len).map(|_| pet.rand(4) as u8 + 1).collect();
-        self.note = "watch...".into();
-        self.last_ok = None;
         self.phase = MPhase::Show { idx: 0, lit: false, until: after_ms(600) };
     }
 
@@ -189,16 +180,13 @@ impl Memory {
         if pressed == self.seq[pos] {
             if pos + 1 == self.seq.len() {
                 self.wins += 1;
-                self.note = "Correct!".into();
-                self.last_ok = Some(true);
+                self.results.push(true);
                 self.phase = MPhase::Pause(after_ms(1000));
             } else {
                 self.phase = MPhase::Input(pos + 1);
             }
         } else {
-            let answer: Vec<String> = self.seq.iter().map(|n| n.to_string()).collect();
-            self.note = format!("Wrong - it was {}", answer.join(" "));
-            self.last_ok = Some(false);
+            self.results.push(false);
             self.phase = MPhase::Pause(after_ms(1500));
         }
         Outcome::Continue
@@ -211,7 +199,6 @@ impl Memory {
                 self.phase = if !lit {
                     MPhase::Show { idx, lit: true, until: after_ms(500) }
                 } else if idx + 1 >= self.seq.len() {
-                    self.note = "your turn".into();
                     MPhase::Input(0)
                 } else {
                     MPhase::Show { idx: idx + 1, lit: false, until: after_ms(200) }
@@ -239,14 +226,15 @@ impl Memory {
     fn lines(&self, w: usize, h: usize) -> Vec<Line<'static>> {
         let t = anim_clock(self.born);
         let mut c = room_backdrop();
-        let mood = match self.last_ok {
-            Some(true) => Mood::Happy,
-            Some(false) => Mood::Sad,
-            None => Mood::Neutral,
+        let pausing = matches!(self.phase, MPhase::Pause(_));
+        let mood = match self.results.last() {
+            Some(true) if pausing => Mood::Happy,
+            Some(false) if pausing => Mood::Sad,
+            _ => Mood::Neutral,
         };
         // The pet watches from behind the pads and bobs while it waits for you.
         let bob = if matches!(self.phase, MPhase::Input(_)) { (t % 2) as i32 } else { 0 };
-        c.blit(&mini_pet(&self.look, t, mood), 8, bob, None);
+        c.blit(&mini_pet(&self.look, t, mood), 8, bob + 1, None);
         let lit = self.lit();
         for n in 1..=4u8 {
             let base = MEMORY_COLORS[n as usize - 1];
@@ -262,11 +250,25 @@ impl Memory {
             c.rect(x, PAD_Y + 6, x + 6, PAD_Y + 6, darken(base, if on { 0.25 } else { 0.7 }));
             digit(&mut c, n, x + 2, PAD_Y + 1, if on { INK } else { darken(base, 0.15) });
         }
-        let info = match self.phase {
-            MPhase::Input(pos) => format!("your turn {pos}/{}", self.seq.len()),
-            _ => self.note.clone(),
-        };
-        stage(heading("MEMORY", format!("{}/{}  {info}", self.round, MEMORY_ROUNDS)), &c, w, h)
+        // Rounds, top left: green for a win, red for a miss, white for the one being played.
+        for r in 0..MEMORY_ROUNDS as usize {
+            let col = match self.results.get(r) {
+                Some(true) => (130, 210, 140),
+                Some(false) => (240, 95, 105),
+                None if r + 1 == self.round as usize => WHITE,
+                None => PIP_OFF,
+            };
+            c.rect(1 + r as i32 * 3, 1, 2 + r as i32 * 3, 2, col);
+        }
+        // Your progress through the pattern, as dots on the floor once it is your turn.
+        if let MPhase::Input(pos) = self.phase {
+            let n = self.seq.len() as i32;
+            let x0 = (FW as i32 - (n * 3 - 1)) / 2;
+            for i in 0..n {
+                c.rect(x0 + i * 3, FH as i32 - 1, x0 + i * 3 + 1, FH as i32 - 1, if i < pos as i32 { GOLD } else { (200, 200, 215) });
+            }
+        }
+        to_lines(&c, w, h, OUTSIDE)
     }
 }
 
@@ -437,7 +439,76 @@ impl Pong {
                 c.pixels(&[(x, y - 1), (x, y + 2), (x - 1, y), (x + 1, y + 1)], (255, 245, 170));
             }
         }
-        stage(heading("PONG", format!("returns {}/{}", self.hits, PONG_GOAL)), &c, w, h)
+        // Returns so far, as gold pips in the top rail.
+        for i in 0..PONG_GOAL as i32 {
+            c.rect(3 + i * 3, 0, 4 + i * 3, 0, if i < self.hits as i32 { GOLD } else { PIP_OFF });
+        }
+        to_lines(&c, w, h, OUTSIDE)
+    }
+}
+
+// ---------------------------------------------------------------- result screen
+
+const STAR: [&str; 5] = ["..#..", ".###.", "#####", ".###.", ".#.#."];
+/// How long the result stays up, and how soon a key may skip it.
+const FINISH_SECS: u64 = 3;
+const FINISH_SKIP_MS: u64 = 500;
+
+/// Shown for a few seconds after a game ends: a star per round won, the coins earned,
+/// and the pet cheering (with confetti) or sulking.
+pub struct Finish {
+    wins: u8,
+    rounds: u8,
+    coins: u32,
+    look: Box<Pet>,
+    born: Instant,
+}
+
+impl Finish {
+    pub fn new(pet: &Pet, wins: u8, rounds: u8, coins: u32) -> Self {
+        Finish { wins, rounds, coins, look: Box::new(pet.clone()), born: Instant::now() }
+    }
+
+    pub fn expired(&self) -> bool {
+        self.born.elapsed() >= Duration::from_secs(FINISH_SECS)
+    }
+
+    pub fn skippable(&self) -> bool {
+        self.born.elapsed() >= Duration::from_millis(FINISH_SKIP_MS)
+    }
+
+    pub fn lines(&self, w: usize, h: usize) -> Vec<Line<'static>> {
+        let won = self.coins > 0;
+        let ms = self.born.elapsed().as_millis() as i32;
+        let mut c = room_backdrop();
+        if won {
+            let colours = [(255, 110, 150), GOLD, (130, 210, 140), (110, 160, 250), WHITE];
+            for i in 0..16i32 {
+                let x = (i * 13 + 5) % FW as i32;
+                let y = (ms / 90 + i * 7) % (FH as i32 + 4) - 3;
+                c.rect(x, y, x, y + (i % 2), colours[i as usize % colours.len()]);
+            }
+        }
+        // Stars, centred along the top.
+        let n = self.rounds as i32;
+        let x0 = (FW as i32 - (n * 6 - 1)) / 2;
+        for i in 0..n {
+            sprite(&mut c, &STAR, x0 + i * 6, 1, if i < self.wins as i32 { GOLD } else { PIP_OFF });
+        }
+        // The pet hops when it won and hangs its head when it lost.
+        let hop = if won { [0, -2, -3, -2, 0, 0][(ms / 110) as usize % 6] } else { 1 };
+        let mood = if won { Mood::Happy } else { Mood::Sad };
+        let px = if won { 2 } else { 8 };
+        c.blit(&mini_pet(&self.look, (ms / 350) as u32, mood), px, 8 + hop, None);
+        if won {
+            c.ellipse(18.5, 13.5, 2.6, 2.6, GOLD);
+            c.ellipse(18.5, 13.5, 1.4, 1.4, darken(GOLD, 0.25));
+            let text = self.coins.to_string();
+            for (k, ch) in text.chars().enumerate() {
+                digit(&mut c, ch as u8 - b'0', 23 + k as i32 * 4, 11, WHITE);
+            }
+        }
+        to_lines(&c, w, h, OUTSIDE)
     }
 }
 
@@ -467,14 +538,14 @@ mod tests {
             m.key(KeyCode::Char((b'0' + n) as char));
         }
         assert_eq!(m.wins, 1);
-        assert_eq!(m.note, "Correct!");
+        assert_eq!(m.results, [true]);
         assert!(m.lit().is_some(), "the last pad pressed glows");
 
         let mut m = Memory::new(&mut p);
         m.phase = MPhase::Input(0);
         let wrong = (m.seq[0] % 4) + 1;
         m.key(KeyCode::Char((b'0' + wrong) as char));
-        assert!(m.note.starts_with("Wrong"));
+        assert_eq!(m.results, [false]);
         assert_eq!(m.wins, 0);
     }
 
@@ -550,6 +621,15 @@ mod tests {
     }
 
     #[test]
+    fn the_result_screen_stays_a_moment_then_goes() {
+        let mut f = Finish::new(&pet(), 5, 5, 10);
+        assert!(!f.skippable() && !f.expired());
+        assert_eq!(f.lines(32, 10).len(), 10);
+        f.born = Instant::now() - Duration::from_secs(FINISH_SECS);
+        assert!(f.skippable() && f.expired());
+    }
+
+    #[test]
     fn every_game_fits_the_smallest_room() {
         // The room is 10 rows tall in the smallest supported window (64x22).
         for kind in 1..=2 {
@@ -557,7 +637,7 @@ mod tests {
             let g = Game::new(kind, &mut p);
             let lines = g.lines(32, 10);
             assert_eq!(lines.len(), 10, "game {kind}");
-            assert!(lines.iter().skip(1).all(|l| l.width() == 32), "game {kind} spills sideways");
+            assert!(lines.iter().all(|l| l.width() == 32), "game {kind} spills sideways");
         }
     }
 

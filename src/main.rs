@@ -29,6 +29,8 @@ enum Mode {
     Normal,
     Chooser,
     Game(games::Game),
+    /// The result screen after a game.
+    Finish(games::Finish),
     Graveyard(Vec<String>),
     Shop,
     Awards,
@@ -252,6 +254,9 @@ impl App {
             self.mode = Mode::Normal;
         }
         self.tick_game();
+        if matches!(&self.mode, Mode::Finish(f) if f.expired()) {
+            self.mode = Mode::Normal;
+        }
         for a in self.profile.check(&self.pet) {
             let note = format!("Achievement unlocked: {} - {}", a.name, a.how);
             self.message = note.clone();
@@ -297,7 +302,7 @@ impl App {
                     self.profile.games_won += 1;
                     self.message.push_str(&format!(" +{coins} coins."));
                 }
-                self.mode = Mode::Normal;
+                self.mode = Mode::Finish(games::Finish::new(&self.pet, wins, rounds, coins));
                 self.react(before);
             }
         }
@@ -326,6 +331,12 @@ impl App {
                     KeyCode::Char(c @ '1'..='4') => self.buy(pet::Item::ALL[(c as u8 - b'1') as usize]),
                     KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('b') => self.mode = Mode::Normal,
                     _ => {}
+                }
+                return;
+            }
+            Mode::Finish(f) => {
+                if f.skippable() {
+                    self.mode = Mode::Normal;
                 }
                 return;
             }
@@ -626,6 +637,7 @@ mod tests {
         let mut app = app_with(Stage::Adult, |_| {});
         app.handle_outcome(games::Outcome::Done { wins: 5, rounds: 5 });
         assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
+        assert!(matches!(app.mode, Mode::Finish(_)), "a finished game shows the result screen");
         assert!(app.message.contains("coins"), "{}", app.message);
         app.handle_outcome(games::Outcome::Done { wins: 1, rounds: 5 });
         assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
@@ -680,8 +692,7 @@ mod tests {
         let g = games::Game::new(2, &mut app.pet);
         app.mode = Mode::Game(g);
         let screen = render(&app, 64, 22).join("\n");
-        assert!(screen.contains("PONG"), "pong lost its heading at 64x22:\n{screen}");
-        assert!(screen.matches('▀').count() >= 32 * 9, "pong court is not fully drawn at 64x22:\n{screen}");
+        assert!(screen.matches('▀').count() >= 32 * 10, "pong court is not fully drawn at 64x22:\n{screen}");
     }
 
     #[test]
