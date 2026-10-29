@@ -57,14 +57,25 @@ fn strip(imgs: &[Img]) -> Img {
     out
 }
 
-/// The body with a face grid laid over it, as the game draws it.
-fn with_face(c: &Character, body: &Img, e: Expr) -> Img {
-    let mut out = body.clone();
+/// The character as the game draws it: parts behind, body, face, parts in front.
+/// `frame` picks the frame of every animated part; `None` leaves the parts off.
+fn posed(c: &Character, cells: &[Img], e: Expr, frame: Option<usize>) -> Img {
+    let parts = |front: bool, out: &mut Img| {
+        if let Some(f) = frame {
+            for (i, part) in c.parts.iter().enumerate().filter(|(_, p)| p.front == front) {
+                out.blit(&cells[c.part_cell(i, f.min(part.frames - 1))], 0, 0);
+            }
+        }
+    };
+    let mut out = Img::new(c.size, c.size);
+    parts(false, &mut out);
+    out.blit(&cells[0], 0, 0);
     if let Some(spot) = c.face {
         for (x, y, p) in faces::pixels(faces::grid(spot.style, e)) {
             out.set(spot.x + x, spot.y + y, Some(p));
         }
     }
+    parts(true, &mut out);
     out
 }
 
@@ -80,7 +91,8 @@ fn egg_stages(body: &Img) -> Vec<Img> {
     out
 }
 
-fn build(c: &Character, sprites: &Path, preview: &Path) {
+/// Writes the sheet and previews; returns the row of looks for the cast contact sheet.
+fn build(c: &Character, sprites: &Path, preview: &Path) -> Img {
     let cells = chars::cells(c);
     assert_eq!(cells.len(), c.cells(), "{} has the wrong number of cells", c.name);
     let sheet = strip(&cells);
@@ -93,7 +105,12 @@ fn build(c: &Character, sprites: &Path, preview: &Path) {
     img::save_preview(&sheet, &preview.join(format!("{}_sheet.png", c.name)), PREVIEW_SCALE);
 
     let looks: Vec<(String, Img)> = if c.face.is_some() {
-        Expr::ALL.iter().map(|e| (e.name().to_string(), with_face(c, &cells[0], *e))).collect()
+        let mut looks: Vec<(String, Img)> = Expr::ALL.iter().map(|e| (e.name().to_string(), posed(c, &cells, *e, Some(1)))).collect();
+        if !c.parts.is_empty() {
+            looks.push(("bare".into(), posed(c, &cells, Expr::Idle, None)));
+            looks.extend((0..3).map(|f| (format!("frame{f}"), posed(c, &cells, Expr::Idle, Some(f)))));
+        }
+        looks
     } else if c.name == "ghost" {
         let mut ghost = cells[0].clone();
         for (x, y, p) in faces::pixels(&faces::GHOST_FACE) {
@@ -109,18 +126,25 @@ fn build(c: &Character, sprites: &Path, preview: &Path) {
         img::save_preview(img, &preview.join(format!("{}_{name}.png", c.name)), PREVIEW_SCALE);
     }
     let all: Vec<Img> = looks.into_iter().map(|(_, i)| i).collect();
-    img::save_preview(&strip(&all), &preview.join(format!("{}_all.png", c.name)), PREVIEW_SCALE);
-    img::save_preview(&strip(&all), &preview.join(format!("{}_all_1x.png", c.name)), 1);
+    let row = strip(&all);
+    img::save_preview(&row, &preview.join(format!("{}_all.png", c.name)), PREVIEW_SCALE);
+    img::save_preview(&row, &preview.join(format!("{}_all_1x.png", c.name)), 1);
+    row
 }
 
 fn main() {
     let sprites = root().join("assets/sprites");
     let preview = root().join("assets/preview");
     img::save_preview(&palette_sheet(), &preview.join("palette.png"), PREVIEW_SCALE);
-    for c in &cast::ALL {
-        build(c, &sprites, &preview);
+    let rows: Vec<Img> = cast::ALL.iter().map(|c| build(c, &sprites, &preview)).collect();
+    let mut sheet = Img::new(rows.iter().map(|r| r.w).max().unwrap_or(0), rows.iter().map(|r| r.h + 2).sum());
+    let mut y = 0;
+    for r in &rows {
+        sheet.blit(r, 0, y);
+        y += r.h as i32 + 2;
     }
-    let baby = with_face(&cast::BABY, &chars::cells(&cast::BABY)[0], Expr::Happy);
+    img::save_preview(&sheet, &preview.join("cast.png"), 4);
+    let baby = posed(&cast::BABY, &chars::cells(&cast::BABY), Expr::Happy, None);
     for (light, name) in [(room::Light::Day, "day"), (room::Light::Lamp, "lamp"), (room::Light::Dark, "dark")] {
         let r = room::room(light);
         img::save(&r, &sprites.join(format!("room_{name}.png")));

@@ -442,6 +442,7 @@ pub fn render(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec
 
 /// Like `render`, but the whole sprite stays put (no wander, bob or egg wobble),
 /// so only the part animations can differ between two frames. Used by `--gallery`.
+#[cfg(test)]
 pub fn render_still(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize) -> Vec<Line<'static>> {
     render_scene(p, t, fx, w, h, false)
 }

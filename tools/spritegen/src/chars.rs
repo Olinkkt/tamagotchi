@@ -3,7 +3,7 @@
 
 use crate::cast::Character;
 use crate::img::Img;
-use crate::palette::Pal::*;
+use crate::palette::Pal::{self, *};
 use crate::process::{layer, stack, BODY};
 use crate::sketch::Sketch;
 
@@ -46,6 +46,165 @@ pub fn baby(c: &Character) -> Vec<Img> {
     vec![stack(&[finish(c, &feet), finish(c, &body)])]
 }
 
+/// The swing of an animated part across its three frames, in degrees.
+fn swing(c: &Character, amount: f32) -> [f32; 3] {
+    debug_assert!(c.parts.iter().all(|p| p.frames == 3));
+    [-amount, 0.0, amount]
+}
+
+/// One finished layer per angle, each drawn by `draw` with that angle.
+fn frames(c: &Character, amount: f32, draw: impl Fn(&mut Sketch, f32)) -> Vec<Img> {
+    swing(c, amount)
+        .iter()
+        .map(|&a| {
+            let mut s = Sketch::new(SRC, SRC);
+            draw(&mut s, a);
+            finish(c, &s)
+        })
+        .collect()
+}
+
+fn feet(c: &Character, y: f32, spread: f32, rx: f32, p: Pal) -> Img {
+    let mut s = Sketch::new(SRC, SRC);
+    s.ellipse(64.0 - spread, y, rx, 8.0, p);
+    s.ellipse(64.0 + spread, y, rx, 8.0, p);
+    finish(c, &s)
+}
+
+pub fn marutchi(c: &Character) -> Vec<Img> {
+    let mut ears = Sketch::new(SRC, SRC);
+    ears.ellipse(36.0, 42.0, 13.0, 15.0, Yellow);
+    ears.ellipse(92.0, 42.0, 13.0, 15.0, Yellow);
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 76.0, 45.0, 39.0, Yellow);
+    body.ellipse(64.0, 96.0, 24.0, 13.0, Cream);
+    vec![stack(&[finish(c, &ears), feet(c, 111.0, 21.0, 14.0, Orange), finish(c, &body)])]
+}
+
+pub fn tonmarutchi(c: &Character) -> Vec<Img> {
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 77.0, 48.0, 41.0, Sky);
+    body.ellipse(64.0, 97.0, 27.0, 14.0, Ice);
+    let mut cells = vec![stack(&[feet(c, 113.0, 24.0, 15.0, Sky), finish(c, &body)])];
+    // Two long ears that wiggle in opposite directions from their roots.
+    cells.extend(frames(c, 9.0, |s, a| {
+        s.turn(-a, 44.0, 46.0);
+        s.ellipse(40.0, 26.0, 10.0, 22.0, Sky);
+        s.turn(a, 84.0, 46.0);
+        s.ellipse(88.0, 26.0, 10.0, 22.0, Sky);
+    }));
+    cells
+}
+
+pub fn hashitamatchi(c: &Character) -> Vec<Img> {
+    let mut spikes = Sketch::new(SRC, SRC);
+    spikes.poly(&[(38.0, 50.0), (46.0, 16.0), (60.0, 42.0)], Violet);
+    spikes.poly(&[(52.0, 40.0), (64.0, 6.0), (76.0, 40.0)], Violet);
+    spikes.poly(&[(68.0, 42.0), (82.0, 16.0), (90.0, 50.0)], Violet);
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 77.0, 48.0, 41.0, Violet);
+    body.ellipse(64.0, 97.0, 27.0, 14.0, Blush);
+    vec![stack(&[finish(c, &spikes), feet(c, 113.0, 24.0, 15.0, Violet), finish(c, &body)])]
+}
+
+pub fn mametchi(c: &Character) -> Vec<Img> {
+    let mut arms = Sketch::new(SRC, SRC);
+    arms.ellipse(19.0, 80.0, 9.0, 14.0, Green);
+    arms.ellipse(109.0, 80.0, 9.0, 14.0, Green);
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 72.0, 43.0, 47.0, Green);
+    body.ellipse(64.0, 94.0, 25.0, 19.0, Cream);
+    let mut cells = vec![stack(&[finish(c, &arms), feet(c, 117.0, 20.0, 15.0, Green), finish(c, &body)])];
+    cells.extend(frames(c, 8.0, |s, a| {
+        s.turn(-a, 46.0, 36.0);
+        s.ellipse(42.0, 20.0, 10.0, 16.0, Green);
+        s.turn(a, 82.0, 36.0);
+        s.ellipse(86.0, 20.0, 10.0, 16.0, Green);
+    }));
+    cells
+}
+
+pub fn kuchipatchi(c: &Character) -> Vec<Img> {
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 76.0, 44.0, 41.0, Yellow);
+    body.line(&[(64.0, 36.0), (60.0, 24.0), (69.0, 18.0)], 9.0, Orange);
+    // Big orange lips, where the face's mouth lands.
+    body.ellipse(64.0, 70.0, 17.0, 8.0, Orange);
+    let mut cells = vec![stack(&[feet(c, 117.0, 24.0, 17.0, Orange), finish(c, &body)])];
+    // Little wings flapping from the shoulders.
+    cells.extend(frames(c, 16.0, |s, a| {
+        s.turn(a, 28.0, 70.0);
+        s.ellipse(20.0, 78.0, 10.0, 16.0, Yellow);
+        s.turn(-a, 100.0, 70.0);
+        s.ellipse(108.0, 78.0, 10.0, 16.0, Yellow);
+    }));
+    cells
+}
+
+pub fn tarakotchi(c: &Character) -> Vec<Img> {
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 76.0, 49.0, 43.0, Orange);
+    body.ellipse(64.0, 72.0, 13.0, 7.0, Pink);
+    for side in [-1.0f32, 1.0] {
+        for dy in [-5.0, 2.0] {
+            let x = 64.0 + side * 38.0;
+            body.line(&[(x - side * 7.0, 70.0 + dy), (x + side * 5.0, 68.0 + dy * 1.6)], 3.0, Rust);
+        }
+    }
+    let mut cells = vec![stack(&[feet(c, 117.0, 24.0, 16.0, Rust), finish(c, &body)])];
+    // A tuft of hair swaying on top.
+    cells.extend(frames(c, 10.0, |s, a| {
+        s.turn(a, 64.0, 38.0);
+        for (x, y) in [(50.0, 14.0), (64.0, 6.0), (78.0, 14.0)] {
+            s.line(&[(64.0, 38.0), (x, y)], 9.0, Rust);
+        }
+    }));
+    cells
+}
+
+pub fn ichigotchi(c: &Character) -> Vec<Img> {
+    let mut body = Sketch::new(SRC, SRC);
+    // A strawberry: wide and round on top, narrowing to a soft point.
+    body.shape(
+        |p| {
+            p.move_to(64.0, 30.0);
+            p.cubic_to(100.0, 28.0, 116.0, 52.0, 112.0, 78.0);
+            p.cubic_to(108.0, 100.0, 84.0, 116.0, 64.0, 116.0);
+            p.cubic_to(44.0, 116.0, 20.0, 100.0, 16.0, 78.0);
+            p.cubic_to(12.0, 52.0, 28.0, 28.0, 64.0, 30.0);
+        },
+        Red,
+    );
+    for (x, y) in [(28.0, 70.0), (100.0, 70.0), (36.0, 92.0), (92.0, 92.0), (52.0, 104.0), (76.0, 104.0), (26.0, 52.0), (102.0, 52.0)] {
+        body.ellipse(x, y, 2.5, 3.5, Yellow);
+    }
+    let mut cells = vec![stack(&[feet(c, 117.0, 18.0, 14.0, Maroon), finish(c, &body)])];
+    // Two leaves and a stem, fluttering.
+    cells.extend(frames(c, 10.0, |s, a| {
+        s.turn(-a, 62.0, 34.0);
+        s.ellipse(48.0, 30.0, 15.0, 7.0, Green);
+        s.turn(a, 66.0, 34.0);
+        s.ellipse(80.0, 30.0, 15.0, 7.0, Green);
+        s.turn(a * 0.5, 64.0, 34.0);
+        s.line(&[(64.0, 34.0), (64.0, 14.0)], 6.0, Forest);
+    }));
+    cells
+}
+
+pub fn nyorotchi(c: &Character) -> Vec<Img> {
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 72.0, 33.0, 47.0, Teal);
+    body.line(&[(64.0, 28.0), (60.0, 16.0), (68.0, 10.0)], 8.0, Teal);
+    body.ellipse(64.0, 92.0, 18.0, 24.0, Ice);
+    let mut cells = vec![finish(c, &body)];
+    // A tail curling out to the right, swishing about its root.
+    cells.extend(frames(c, 9.0, |s, a| {
+        s.turn(a, 88.0, 104.0);
+        s.line(&[(80.0, 108.0), (102.0, 106.0), (114.0, 92.0), (112.0, 76.0), (102.0, 70.0)], 13.0, Teal);
+    }));
+    cells
+}
+
 pub fn poop(c: &Character) -> Vec<Img> {
     // Three coils, each its own layer so the outline separates them.
     let coils = [(64.0, 100.0, 48.0, 20.0), (62.0, 74.0, 36.0, 17.0), (66.0, 50.0, 24.0, 14.0)].map(|(x, y, rx, ry)| {
@@ -85,6 +244,14 @@ pub fn cells(c: &Character) -> Vec<Img> {
     match c.name {
         "egg" => egg(c),
         "baby" => baby(c),
+        "marutchi" => marutchi(c),
+        "tonmarutchi" => tonmarutchi(c),
+        "hashitamatchi" => hashitamatchi(c),
+        "mametchi" => mametchi(c),
+        "kuchipatchi" => kuchipatchi(c),
+        "tarakotchi" => tarakotchi(c),
+        "ichigotchi" => ichigotchi(c),
+        "nyorotchi" => nyorotchi(c),
         "poop" => poop(c),
         "grave" => grave(c),
         "ghost" => ghost(c),

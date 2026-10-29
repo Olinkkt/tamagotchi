@@ -9,8 +9,6 @@ use std::time::{Duration, Instant};
 use crate::config::Config;
 use crate::pet::{Pet, Stage, MAX_HEARTS};
 use crate::save;
-use crate::sprites;
-use ratatui::{style::Color, text::Span};
 
 /// Load the real save, caught up to the present, without writing anything back.
 /// The simulation is deterministic, so the game reaches the same state when it next opens.
@@ -322,57 +320,19 @@ pub fn run(args: &[String]) -> Option<i32> {
     })
 }
 
-/// `--gallery`: print every character once, following the `animate_parts` setting
-/// (the ears, wings, tail etc. only appear when it is on).
-fn gallery() {
-    let cases: [(Stage, &str); 10] = [
-        (Stage::Egg, "Egg"),
-        (Stage::Baby, "Babytchi"),
-        (Stage::Child, "Marutchi"),
-        (Stage::Teen, "Tonmarutchi"),
-        (Stage::Teen, "Hashitamatchi"),
-        (Stage::Adult, "Mametchi"),
-        (Stage::Adult, "Kuchipatchi"),
-        (Stage::Adult, "Tarakotchi"),
-        (Stage::Adult, "Ichigotchi"),
-        (Stage::Adult, "Nyorotchi"),
-    ];
+/// `--gallery`: write a PNG of every form in every expression, without opening a window.
+fn gallery() -> i32 {
     let (cfg, _) = Config::load();
-    println!("Animated parts (ears, wings, tuft, leaves, tail): {}  (change with `tama --animate on|off`)\n", if cfg.animate_parts { "on" } else { "off" });
-    let mut pets: Vec<Pet> = cases
-        .iter()
-        .map(|(stage, name)| {
-            let mut p = Pet::new(1);
-            p.stage = *stage;
-            p.species = name.to_string();
-            p.happy = 4;
-            p.hunger = 4;
-            p
-        })
-        .collect();
-    let mut dead = Pet::new(1);
-    dead.stage = Stage::Dead;
-    dead.species = "Departed".into();
-    pets.push(dead);
-    let ansi = |spans: &[Span]| -> String {
-        let mut out = String::new();
-        for s in spans {
-            if let Some(Color::Rgb(r, g, b)) = s.style.fg {
-                out.push_str(&format!("\x1b[38;2;{r};{g};{b}m"));
-            }
-            if let Some(Color::Rgb(r, g, b)) = s.style.bg {
-                out.push_str(&format!("\x1b[48;2;{r};{g};{b}m"));
-            }
-            out.push_str(&s.content);
-            out.push_str("\x1b[0m");
+    let path = std::path::PathBuf::from("tama-gallery.png");
+    match crate::gallery::write(&path, &cfg) {
+        Ok(()) => {
+            let parts = if cfg.animate_parts { "on" } else { "off (`tama --animate on` to show them)" };
+            println!("Wrote {}. Animated parts: {parts}.", path.display());
+            0
         }
-        out
-    };
-    for p in &mut pets {
-        p.set_env(cfg.clone(), 0);
-        println!("-- {} --", p.species);
-        for line in sprites::render_still(p, 0, None, 32, 10) {
-            println!("{}", ansi(&line.spans));
+        Err(e) => {
+            eprintln!("Could not write the gallery: {e}");
+            1
         }
     }
 }
@@ -436,12 +396,11 @@ pub fn flags(args: &[String]) -> Option<i32> {
         return Some(0);
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|clean|medicine|scold|light   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
+        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|clean|medicine|scold|light   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  write tama-gallery.png with every character and expression");
         return Some(0);
     }
     if args.iter().any(|a| a == "--gallery") {
-        gallery();
-        return Some(0);
+        return Some(gallery());
     }
     None
 }

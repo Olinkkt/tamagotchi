@@ -44,12 +44,45 @@ impl<'a> Moment<'a> {
     }
 }
 
-/// The sprite set for the pet's current form. Forms without their own art yet use the baby's.
+/// The sprite set for the pet's current form.
 pub fn character(p: &Pet) -> Character {
     match p.stage {
         Stage::Egg => cast::EGG,
-        _ => cast::BABY,
+        Stage::Baby => cast::BABY,
+        Stage::Child => cast::CHILD,
+        _ => cast::for_species(&p.species).unwrap_or(match p.stage {
+            Stage::Teen => cast::TONMARUTCHI,
+            _ => cast::KUCHIPATCHI,
+        }),
     }
+}
+
+/// Which frame each animated part shows: a gentle back-and-forth, wings a little quicker.
+fn part_frame(part: &cast::Part, beat: u64) -> usize {
+    let step = if part.name == "wings" { beat } else { beat / 2 };
+    [1, 0, 1, 2][(step % 4) as usize].min(part.frames - 1)
+}
+
+/// The pet's sprite: parts behind, the body with `face` laid on, parts in front. The parts
+/// (ears, wings, tuft, leaves, tail) only appear when `animate_parts` is on.
+fn assemble(p: &Pet, c: &Character, face: &[(i32, i32, Pal)], beat: u64) -> Sprite {
+    let cells = art::cells(c);
+    let mut s = Sprite::empty(c.size as i32);
+    let parts = |front: bool, s: &mut Sprite| {
+        if !p.cfg.animate_parts {
+            return;
+        }
+        for (i, part) in c.parts.iter().enumerate().filter(|(_, part)| part.front == front) {
+            s.over(&cells[c.part_cell(i, part_frame(part, beat))]);
+        }
+    };
+    parts(false, &mut s);
+    s.over(&cells[0]);
+    for &(x, y, col) in face {
+        s.put(x, y, col);
+    }
+    parts(true, &mut s);
+    s
 }
 
 pub fn light(p: &Pet) -> Light {
@@ -124,38 +157,36 @@ fn motion(m: &Moment) -> (i32, i32) {
 
 /// The pet with its face (or egg cracks) laid on.
 fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
-    let mut s = art::body(c).clone();
     let p = m.pet;
     let mut overlay: Vec<(i32, i32, Pal)> = Vec::new();
     if p.stage == Stage::Egg {
-        let progress = p.stage_age as f32 / 30.0;
-        let cracks = [(0.5, 0), (0.8, 1)].iter().rev().find(|(at, _)| progress > *at).map(|(_, i)| *i);
-        if let Some(i) = cracks {
-            let (x, y) = cast::EGG_CRACK_AT;
-            overlay.extend(faces::pixels(&faces::EGG_CRACKS[i]).map(|(dx, dy, p)| (x + dx, y + dy, p)));
-        }
+        overlay = cracks(p);
     } else if let Some(spot) = c.face {
         let dizzy = p.load.low_ram && calm(p) && expression(m) != Expr::Sleeping;
         let face: Vec<(i32, i32, Pal)> =
             if dizzy { faces::dizzy(spot.style, m.beat() as usize) } else { faces::pixels(faces::grid(spot.style, expression(m))).collect() };
         overlay.extend(face.into_iter().map(|(dx, dy, p)| (spot.x + dx, spot.y + dy, p)));
     }
-    for (x, y, p) in overlay {
-        s.put(x, y, p);
-    }
-    s
+    assemble(p, c, &overlay, m.beat())
 }
 
-/// The pet with a given face, for the mini-games and the result screen.
+/// Cracks in the shell as an egg gets close to hatching.
+fn cracks(p: &Pet) -> Vec<(i32, i32, Pal)> {
+    let progress = p.stage_age as f32 / 30.0;
+    let Some(i) = [(0.5, 0), (0.8, 1)].iter().rev().find(|(at, _)| progress > *at).map(|(_, i)| *i) else { return Vec::new() };
+    let (x, y) = cast::EGG_CRACK_AT;
+    faces::pixels(&faces::EGG_CRACKS[i]).map(|(dx, dy, p)| (x + dx, y + dy, p)).collect()
+}
+
+/// The pet with a given face (an egg shows its cracks instead), for the games and the gallery.
 pub fn posed(p: &Pet, e: Expr) -> Sprite {
     let c = character(p);
-    let mut s = art::body(&c).clone();
-    if let Some(spot) = c.face {
-        for (x, y, col) in faces::pixels(faces::grid(spot.style, e)) {
-            s.put(spot.x + x, spot.y + y, col);
-        }
-    }
-    s
+    let face: Vec<(i32, i32, Pal)> = match c.face {
+        None if p.stage == Stage::Egg => cracks(p),
+        Some(spot) => faces::pixels(faces::grid(spot.style, e)).map(|(x, y, col)| (spot.x + x, spot.y + y, col)).collect(),
+        None => Vec::new(),
+    };
+    assemble(p, &c, &face, 1)
 }
 
 /// Where the pet's sprite goes in the room.
@@ -355,6 +386,24 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn every_form_has_its_own_sprite_and_parts_follow_the_setting() {
+        let mut seen = Vec::new();
+        for (stage, species) in crate::app::FORMS.iter().filter(|f| f.0 != Stage::Dead) {
+            let mut p = pet(*stage);
+            p.species = species.to_string();
+            let c = character(&p);
+            assert!(!seen.contains(&c.name), "{species} shares a sprite with another form");
+            seen.push(c.name);
+        }
+        let mut p = pet(Stage::Adult);
+        p.species = "Mametchi".into();
+        let bare = look(&p, 0);
+        p.cfg.animate_parts = true;
+        assert_ne!(bare, look(&p, 0), "the ears show when animate_parts is on");
+        assert_ne!(look(&p, 0), look(&p, 700), "and they move");
     }
 
     #[test]

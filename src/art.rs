@@ -28,6 +28,19 @@ impl Sprite {
         self.px[(y * self.w + x) as usize]
     }
 
+    pub fn empty(size: i32) -> Sprite {
+        Sprite { w: size, h: size, px: vec![None; (size * size) as usize] }
+    }
+
+    /// Lay `top` (the same size) over this sprite.
+    pub fn over(&mut self, top: &Sprite) {
+        for (a, b) in self.px.iter_mut().zip(&top.px) {
+            if b.is_some() {
+                *a = *b;
+            }
+        }
+    }
+
     pub fn put(&mut self, x: i32, y: i32, p: Pal) {
         if x >= 0 && y >= 0 && x < self.w && y < self.h {
             self.px[(y * self.w + x) as usize] = Some(p);
@@ -72,6 +85,14 @@ fn sheet_bytes(name: &str) -> &'static [u8] {
     match name {
         "egg" => include_bytes!("../assets/sprites/egg.png"),
         "baby" => include_bytes!("../assets/sprites/baby.png"),
+        "marutchi" => include_bytes!("../assets/sprites/marutchi.png"),
+        "tonmarutchi" => include_bytes!("../assets/sprites/tonmarutchi.png"),
+        "hashitamatchi" => include_bytes!("../assets/sprites/hashitamatchi.png"),
+        "mametchi" => include_bytes!("../assets/sprites/mametchi.png"),
+        "kuchipatchi" => include_bytes!("../assets/sprites/kuchipatchi.png"),
+        "tarakotchi" => include_bytes!("../assets/sprites/tarakotchi.png"),
+        "ichigotchi" => include_bytes!("../assets/sprites/ichigotchi.png"),
+        "nyorotchi" => include_bytes!("../assets/sprites/nyorotchi.png"),
         "poop" => include_bytes!("../assets/sprites/poop.png"),
         "grave" => include_bytes!("../assets/sprites/grave.png"),
         "ghost" => include_bytes!("../assets/sprites/ghost.png"),

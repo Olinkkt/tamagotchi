@@ -7,6 +7,8 @@ use crate::palette::Pal;
 
 pub struct Sketch {
     pix: Pixmap,
+    /// The authoring scale; `xf` is this plus any rotation in force.
+    base: Transform,
     xf: Transform,
 }
 
@@ -24,13 +26,20 @@ fn paint(p: Option<Pal>) -> Paint<'static> {
 
 impl Sketch {
     pub fn new(w: u32, h: u32) -> Sketch {
-        Sketch { pix: Pixmap::new(w, h).expect("non-zero size"), xf: Transform::identity() }
+        Sketch { pix: Pixmap::new(w, h).expect("non-zero size"), base: Transform::identity(), xf: Transform::identity() }
     }
 
     /// Author in `k`-times smaller units (the room is drawn in its own pixels on a 4x canvas).
     pub fn scaled(mut self, k: f32) -> Sketch {
-        self.xf = self.xf.pre_scale(k, k);
+        self.base = self.base.pre_scale(k, k);
+        self.xf = self.base;
         self
+    }
+
+    /// Shapes drawn from here on are turned `deg` degrees (clockwise) about (`px`, `py`),
+    /// until the next call. Animated parts use this to make their frames.
+    pub fn turn(&mut self, deg: f32, px: f32, py: f32) {
+        self.xf = self.base.pre_concat(Transform::from_rotate_at(deg, px, py));
     }
 
     fn fill(&mut self, path: Option<Path>, p: Option<Pal>) {

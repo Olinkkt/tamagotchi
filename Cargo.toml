@@ -8,6 +8,7 @@ rust-version = "1.86"
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "std"] }
 crossterm = "0.29.0"
 macroquad = { version = "=0.4.16", default-features = false }
+png = "=0.17.16"
 # Not used directly: holds macroquad's font crate at a release that builds on stable Rust 1.86
 # (0.9.5 needs 1.87). `cargo install` ignores Cargo.lock, so the pin has to live here.
 fontdue = "=0.9.3"

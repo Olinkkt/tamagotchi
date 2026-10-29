@@ -9,6 +9,7 @@ mod config;
 mod faces;
 mod font;
 mod frame;
+mod gallery;
 mod games;
 mod hud;
 mod icons;
