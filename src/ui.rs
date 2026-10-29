@@ -351,7 +351,7 @@ pub fn draw(f: &mut Frame, app: &App) {
     let mut spans: Vec<Span<'static>> = Vec::new();
     let items: &[(&str, &str)] = match &app.mode {
         Mode::Game(g) => g.keys(),
-        Mode::Chooser => &[("1-6", "choose"), ("esc", "back")],
+        Mode::Chooser => &[("1-2", "choose"), ("esc", "back")],
         Mode::Graveyard(_) | Mode::Awards => &[("any key", "back")],
         Mode::Shop => &[("1-4", "buy"), ("esc", "back")],
         Mode::Normal if p.stage == Stage::Dead => &[("n", "new egg"), ("a", "awards"), ("g", "graveyard"), ("q", "quit")],

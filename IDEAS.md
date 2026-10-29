@@ -6,7 +6,7 @@ Possible next steps, not a roadmap. Roughly in order of payoff within each group
 
 - [ ] **Balance pass**: the shop prices and coin rewards are first guesses; playtest the economy.
 - [ ] **Inventory and accessories**: hats, room decorations and wallpapers, so coins have a lasting use.
-- [ ] **More mini-games**: tic-tac-toe, a typing game. (Snake and dodge are in.)
+- [ ] **More mini-games**: tic-tac-toe, a typing game.
 - [ ] **Random events and moods**: a visitor, a gift, the pet getting lonely when you stay away.
 - [ ] **Seasons and holidays**: time-of-day or date-based sprites and events.
 - [ ] **Genetics or breeding**: two adults produce an egg that inherits a trait.

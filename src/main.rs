@@ -312,7 +312,7 @@ impl App {
             }
             Mode::Chooser => {
                 match code {
-                    KeyCode::Char(c @ '1'..='6') => {
+                    KeyCode::Char(c @ '1'..='2') => {
                         let g = games::Game::new(c as u8 - b'0', &mut self.pet);
                         self.mode = Mode::Game(g);
                     }
@@ -675,16 +675,14 @@ mod tests {
     }
 
     #[test]
-    fn the_catch_basket_and_the_pong_court_are_fully_visible_at_the_smallest_size() {
-        for (kind, mark) in [(5u8, "╰"), (4u8, "█")] {
-            let mut app = app_with(Stage::Adult, |_| {});
-            let g = games::Game::new(kind, &mut app.pet);
-            app.mode = Mode::Game(g);
-            let screen = render(&app, 64, 22).join("\n");
-            assert!(screen.contains(mark), "game {kind} lost its {mark} at 64x22:\n{screen}");
-            let bottom_wall = "─".repeat(28);
-            assert!(screen.contains(&bottom_wall), "game {kind} lost its bottom edge at 64x22:\n{screen}");
-        }
+    fn the_pong_court_is_fully_visible_at_the_smallest_size() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        let g = games::Game::new(2, &mut app.pet);
+        app.mode = Mode::Game(g);
+        let screen = render(&app, 64, 22).join("\n");
+        assert!(screen.contains("█"), "pong lost its paddle at 64x22:\n{screen}");
+        let bottom_wall = "─".repeat(28);
+        assert!(screen.contains(&bottom_wall), "pong lost its bottom edge at 64x22:\n{screen}");
     }
 
     #[test]
