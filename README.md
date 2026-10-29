@@ -44,8 +44,10 @@ up in the menu, and the pet shows a bubble with an icon for it.
 Any game makes the pet a little lighter, and winning makes it happier. A perfect game forgives
 one care mistake.
 
-Both are drawn in the same pixel art as the pet, scores included. When a game ends, a result
-screen shows a star per round won and the coins earned for three seconds (any key skips it).
+Both are drawn in the same pixel art as the pet, scores included, and take the full width of
+the window while you play (the status panel comes back afterwards). When a game ends, a result
+screen shows a star per round won, the coins earned and the pet cheering or sulking for three
+seconds (any key skips it).
 
 1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4. Your pet watches and cheers or sulks.
 2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. A direction key keeps the paddle going until you press the other way or space, so it does not rely on your terminal's key repeat.
@@ -227,8 +229,21 @@ machine reactions (CPU, RAM, battery) on and off.
 
 Shift+R (then `y`) throws the current pet away and starts a new egg.
 
-Source layout: `pet.rs` (the simulation), `sprites.rs` (pixel art), `main.rs` (UI and game
-loop), `games.rs` (mini-games), `profile.rs` (coins, achievements), `sysinfo.rs` (machine load), `cli.rs` (shell commands, status bar, notifications),
-`save.rs` (files and lock), `config.rs`.
+Source layout:
+
+| File | What it holds |
+|---|---|
+| `main.rs` | app state, key handling and the game loop |
+| `ui.rs` | drawing the screen: header, room, status panel, menu |
+| `pet.rs` | the simulation: needs, growth, evolution, shop items |
+| `sprites.rs` | pixel art: the pet, the room, and the shared pixel canvas the games draw on |
+| `games.rs` | mini-games and the result screen |
+| `profile.rs` | coins, achievements, the adult collection |
+| `cli.rs` | shell commands, `--flags`, status bar, notifications, `--gallery`, `--update` |
+| `save.rs` | save files (with a format `version`), profile, graveyard, lock |
+| `sysinfo.rs` | machine load |
+| `config.rs` | settings |
+
+New mini-games should draw on the `sprites::Canvas` like the existing ones, not with text.
 
 Versions follow `MAJOR.MINOR.PATCH`; see `CLAUDE.md` for the rules.
