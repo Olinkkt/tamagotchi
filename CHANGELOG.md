@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.4.0
+
+- Every egg now follows a 30-second schedule of its own: shaking in five phases, from rare 1px
+  nudges to rapid irregular shaking, with a tilt from 15 seconds, jumps from 20 seconds, a
+  strongest shake at 29 seconds, a held breath and a white flash at the end.
+- The pattern comes from a seed (when the egg was laid, already in the save), so the same egg shakes
+  the same way after a restart, and different eggs shake differently.
+- Six crack stages (the first is three pixels at 20 seconds), a shell that lifts apart from 24
+  seconds and flying shell bits from 26 seconds. The old wobble and the post-hatch shake are gone;
+  the burst now happens the moment the egg breaks.
 ## 1.3.1
 
 - The egg wobble and the final hatch shake are random now: every lurch leans a different way and

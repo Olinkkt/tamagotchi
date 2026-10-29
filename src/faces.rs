@@ -222,9 +222,35 @@ pub fn grid(style: FaceStyle, e: Expr) -> &'static [&'static str] {
 }
 
 /// Cracks in the egg shell as it gets close to hatching, one grid per stage, each including the
-/// ones before it. The last stage has a chip broken out near the top. Laid over the egg at
+/// ones before it (the first is just three pixels). The last stage has a chip broken out near the top. Laid over the egg at
 /// `cast::EGG_CRACK_AT`.
-pub const EGG_CRACKS: [[&str; 24]; 5] = [
+pub const EGG_CRACKS: [[&str; 24]; 6] = [
+    [
+        "..................",
+        "..................",
+        ".........k........",
+        "........k.........",
+        ".........k........",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+        "..................",
+    ],
     [
         "..................",
         "..................",

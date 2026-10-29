@@ -58,6 +58,37 @@ impl Sprite {
         Sprite { w: size, h: size, px }
     }
 
+    /// Turned `deg` degrees clockwise around `(px, py)`, a pixel at a time (nearest, so no blur).
+    pub fn tilted(&self, deg: i32, px: f32, py: f32) -> Sprite {
+        if deg == 0 {
+            return self.clone();
+        }
+        let (sin, cos) = (deg as f32).to_radians().sin_cos();
+        let mut out = Sprite { w: self.w, h: self.h, px: vec![None; self.px.len()] };
+        for y in 0..self.h {
+            for x in 0..self.w {
+                let (rx, ry) = (x as f32 + 0.5 - px, y as f32 + 0.5 - py);
+                let (sx, sy) = (rx * cos + ry * sin + px, -rx * sin + ry * cos + py);
+                out.px[(y * self.w + x) as usize] = self.get(sx.floor() as i32, sy.floor() as i32);
+            }
+        }
+        out
+    }
+
+    /// Everything above row `split` raised `lift` pixels, leaving a gap.
+    pub fn lifted(&self, split: i32, lift: i32) -> Sprite {
+        let mut out = Sprite { w: self.w, h: self.h, px: vec![None; self.px.len()] };
+        for y in 0..self.h {
+            let to = if y < split { y - lift } else { y };
+            for x in 0..self.w {
+                if to >= 0 {
+                    out.px[(to * self.w + x) as usize] = self.get(x, y);
+                }
+            }
+        }
+        out
+    }
+
     /// The highest row with anything in it.
     pub fn top(&self) -> i32 {
         (0..self.h).find(|&y| (0..self.w).any(|x| self.get(x, y).is_some())).unwrap_or(0)

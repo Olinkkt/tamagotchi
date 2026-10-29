@@ -268,6 +268,11 @@ impl App {
         (age < scene::SHELL_SECS).then_some(age)
     }
 
+    /// Milliseconds of the pet's current second that have gone by, so the egg moves between ticks.
+    pub fn sub_ms(&self) -> u64 {
+        (self.tick_acc.clamp(0.0, 0.999) * 1000.0) as u64
+    }
+
     pub fn current_fx(&self) -> Option<(scene::Fx, f32)> {
         let (fx, at) = self.fx?;
         let p = at.elapsed().as_secs_f32() / fx.duration_secs();
