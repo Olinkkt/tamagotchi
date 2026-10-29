@@ -146,6 +146,18 @@ fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
     s
 }
 
+/// The pet with a given face, for the mini-games and the result screen.
+pub fn posed(p: &Pet, e: Expr) -> Sprite {
+    let c = character(p);
+    let mut s = art::body(&c).clone();
+    if let Some(spot) = c.face {
+        for (x, y, col) in faces::pixels(faces::grid(spot.style, e)) {
+            s.put(spot.x + x, spot.y + y, col);
+        }
+    }
+    s
+}
+
 /// Where the pet's sprite goes in the room.
 #[derive(Clone, Copy)]
 struct Place {
@@ -301,32 +313,11 @@ pub fn room(m: &Moment) -> Frame {
     f
 }
 
-/// The room area for any mode. Menus and lists dim the room behind their text.
+/// The room area for the modes that show the room. Menus and lists dim it behind their text.
 pub fn area(app: &App) -> Frame {
-    let m = Moment::of(app);
-    match &app.mode {
-        Mode::Normal => room(&m),
-        Mode::Game(g) => old_canvas(&g.canvas()),
-        Mode::Finish(fin) => old_canvas(&fin.canvas()),
-        Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Graveyard(_) => {
-            let mut f = room(&m);
-            f.tint(0, 0, W, H, Pal::dark);
-            f
-        }
-    }
-}
-
-/// A mini-game drawn on the old 32x20 canvas, blown up 5x and snapped to the palette.
-/// Only until the games are redrawn for the window.
-fn old_canvas(c: &crate::sprites::Canvas) -> Frame {
-    let mut f = Frame::new(W, H, Pal::Ink);
-    let (k, oy) = (5, (H - c.h as i32 * 5) / 2);
-    for y in 0..c.h as i32 {
-        for x in 0..c.w as i32 {
-            if let Some(rgb) = c.get(x, y) {
-                f.rect(x * k, oy + y * k, k, k, Pal::nearest(rgb));
-            }
-        }
+    let mut f = room(&Moment::of(app));
+    if !matches!(app.mode, Mode::Normal) {
+        f.tint(0, 0, W, H, Pal::dark);
     }
     f
 }

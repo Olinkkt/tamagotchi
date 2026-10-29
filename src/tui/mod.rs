@@ -19,15 +19,29 @@ fn key(code: KeyCode) -> Option<Key> {
     })
 }
 
+/// Terminals only report key presses, so a direction key keeps the paddle going until the
+/// other direction or space is pressed.
+fn steer(held: &mut (bool, bool), k: Key) {
+    match k {
+        Key::Up | Key::Char('w') | Key::Char('k') => *held = (true, false),
+        Key::Down | Key::Char('s') | Key::Char('j') => *held = (false, true),
+        Key::Char(' ') => *held = (false, false),
+        _ => {}
+    }
+}
+
 pub fn run(app: &mut App) -> std::io::Result<()> {
     let mut terminal = ratatui::init();
+    let mut held = (false, false);
     let res = (|| {
         while !app.quit {
+            app.hold(held.0, held.1);
             app.update();
             terminal.draw(|f| draw::draw(f, app))?;
             if event::poll(Duration::from_millis(50))? {
                 if let Event::Key(k) = event::read()? {
                     if let (KeyEventKind::Press, Some(k)) = (k.kind, key(k.code)) {
+                        steer(&mut held, k);
                         app.on_key(k);
                     }
                 }
@@ -130,12 +144,12 @@ mod tests {
     }
 
     #[test]
-    fn the_pong_court_is_fully_visible_at_the_smallest_size() {
+    fn a_game_draws_at_the_smallest_size() {
         let mut app = app_with(Stage::Adult, |_| {});
         let g = games::Game::new(2, &mut app.pet);
         app.mode = Mode::Game(g);
         let screen = render(&app, 64, 22).join("\n");
-        assert!(screen.matches('▀').count() >= 32 * 10, "pong court is not fully drawn at 64x22:\n{screen}");
+        assert!(screen.matches('▀').count() >= 32 * 10, "the game is not drawn at 64x22:\n{screen}");
     }
 
     #[test]

@@ -9,6 +9,7 @@ use ratatui::{
 use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
 use crate::app::{App, Mode};
+use crate::frame::Frame as PixelFrame;
 use crate::{fmt_age, games, sprites};
 
 pub const BORDER: Color = Color::Rgb(86, 90, 125);
@@ -139,6 +140,15 @@ fn awards_lines(profile: &Profile) -> Vec<Line<'static>> {
     v
 }
 
+/// A palette frame squeezed into `w` x `h` terminal cells, two pixels per cell.
+fn frame_lines(f: &PixelFrame, w: usize, h: usize) -> Vec<Line<'static>> {
+    let pick = |x: usize, y: usize| {
+        let (r, g, b) = f.at(x as i32 * f.w / w.max(1) as i32, y as i32 * f.h / (h * 2).max(1) as i32).rgb();
+        Color::Rgb(r, g, b)
+    };
+    (0..h).map(|row| Line::from((0..w).map(|x| Span::styled("▀", Style::new().fg(pick(x, row * 2)).bg(pick(x, row * 2 + 1)))).collect::<Vec<_>>())).collect()
+}
+
 /// The smallest window the layout is designed for.
 const MIN_W: u16 = 64;
 const MIN_H: u16 = 22;
@@ -200,8 +210,8 @@ pub fn draw(f: &mut Frame, app: &App) {
         v
     };
     let body: Vec<Line> = match &app.mode {
-        Mode::Game(g) => g.lines(inner.width as usize, inner.height as usize),
-        Mode::Finish(f) => f.lines(inner.width as usize, inner.height as usize),
+        Mode::Game(g) => frame_lines(&g.draw(), inner.width as usize, inner.height as usize),
+        Mode::Finish(f) => frame_lines(&f.draw(), inner.width as usize, inner.height as usize),
         Mode::Chooser => {
             let mut v = vec![
                 Line::from(Span::styled("PICK A GAME", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),

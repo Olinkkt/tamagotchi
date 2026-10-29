@@ -134,7 +134,8 @@ pub fn buttons(app: &App) -> Vec<Button> {
         Mode::Chooser => vec![text_button('1'), text_button('2'), BACK],
         Mode::Shop => vec![text_button('1'), text_button('2'), text_button('3'), text_button('4'), BACK],
         Mode::Game(Game::Memory(_)) => vec![text_button('1'), text_button('2'), text_button('3'), text_button('4'), BACK],
-        Mode::Game(_) | Mode::Finish(_) | Mode::Awards | Mode::Graveyard(_) => vec![BACK],
+        Mode::Game(Game::Pong(_)) => vec![(Key::Up, Some(icons::UP), "w", Look::Normal), (Key::Down, Some(icons::DOWN), "s", Look::Normal), BACK],
+        Mode::Finish(_) | Mode::Awards | Mode::Graveyard(_) => vec![BACK],
     })
 }
 
@@ -160,13 +161,26 @@ fn draw_button(f: &mut Frame, b: &Button, hover: bool, bounce: i32) {
         }
         f.frame(&glyph, b.x + 2, y + 2);
         // A little keycap in the corner for the key's letter.
-        f.boxed(b.x - 2, y - 2, KEYCAP, KEYCAP, Pal::Ink, border);
+        if matches!(b.key, Key::Char(_)) {
+            f.boxed(b.x - 2, y - 2, KEYCAP, KEYCAP, Pal::Ink, border);
+        }
     }
 }
 
 /// The full 240x160 picture, with `hover` the key under the mouse.
 pub fn frame(app: &App, hover: Option<Key>) -> Frame {
     let mut f = Frame::new(W, H, Pal::Ink);
+    // A game takes the whole width above the hint line; the status panel comes back afterwards.
+    let game = match &app.mode {
+        Mode::Game(g) => Some(g.draw()),
+        Mode::Finish(fin) => Some(fin.draw()),
+        _ => None,
+    };
+    if let Some(g) = game {
+        f.frame(&g, 0, 0);
+        draw_bar(&mut f, app, hover);
+        return f;
+    }
     // Header strip over the room, status panel to its right.
     f.rect(0, 0, PANEL_X, ROOM.1, Pal::Night);
     f.rect(0, ROOM.1 - 1, PANEL_X, 1, Pal::Dusk);
@@ -177,15 +191,19 @@ pub fn frame(app: &App, hover: Option<Key>) -> Frame {
     f.boxed(PANEL_X, 0, W - PANEL_X, HINT_Y, Pal::Night, Pal::Dusk);
     f.rect(PANEL_X + 1, 11, W - PANEL_X - 2, 1, Pal::Dusk);
     panel::draw(&mut f, app);
-    // Hint line and the button bar.
+    draw_bar(&mut f, app, hover);
+    f
+}
+
+/// The hint line and the button bar under it.
+fn draw_bar(f: &mut Frame, app: &App, hover: Option<Key>) {
     f.rect(0, HINT_Y, W, BAR_Y - HINT_Y, Pal::Ink);
     f.rect(0, BAR_Y, W, H - BAR_Y, Pal::Night);
     f.rect(0, BAR_Y, W, 1, Pal::Dusk);
     let bounce = ((app.started.elapsed().as_millis() / 350) % 2) as i32;
     for b in buttons(app) {
-        draw_button(&mut f, &b, hover == Some(b.key), bounce);
+        draw_button(f, &b, hover == Some(b.key), bounce);
     }
-    f
 }
 
 fn mode_lines(app: &App) -> Vec<(String, Pal)> {
@@ -223,6 +241,12 @@ fn mode_lines(app: &App) -> Vec<(String, Pal)> {
 /// The most urgent thing to do, for the line under the room.
 fn hint(app: &App) -> Option<(String, Pal)> {
     let p = &app.pet;
+    match &app.mode {
+        Mode::Game(g) => return Some((g.hint().into(), Pal::Yellow)),
+        Mode::Finish(_) => return Some(("ANY KEY TO GO ON".into(), Pal::Mist)),
+        Mode::Normal => {}
+        _ => return None,
+    }
     match p.top_need() {
         Some((k, text)) => Some((format!("→ PRESS {}: {}", k.to_ascii_uppercase(), text.to_uppercase()), Pal::Yellow)),
         None if p.stage == Stage::Egg => Some(("IT'S AN EGG - GIVE IT A MOMENT TO HATCH.".into(), Pal::Mist)),
@@ -234,16 +258,17 @@ fn hint(app: &App) -> Option<(String, Pal)> {
 pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
     let p = &app.pet;
     let mut out = Vec::new();
+    let in_game = matches!(app.mode, Mode::Game(_) | Mode::Finish(_));
     let mut head = format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age));
     if app.dev {
         head.push_str(" · DEV");
     }
-    out.push(label(head, 4.0, 6.0, Pal::White, Align::Left));
-    out.push(label("STATUS", PANEL_X as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
-    if matches!(app.mode, Mode::Normal) {
-        if let Some((text, colour)) = hint(app) {
-            out.push(label(text, W as f32 / 2.0, HINT_Y as f32 + 6.0, colour, Align::Centre));
-        }
+    if !in_game {
+        out.push(label(head, 4.0, 6.0, Pal::White, Align::Left));
+        out.push(label("STATUS", PANEL_X as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
+    }
+    if let Some((text, colour)) = hint(app) {
+        out.push(label(text, W as f32 / 2.0, HINT_Y as f32 + 6.0, colour, Align::Centre));
     }
     if !app.message.is_empty() && !matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) {
         // One line only: long messages lose their tail rather than spill over the panel.
@@ -252,13 +277,15 @@ pub fn labels(app: &App, ratio: f32) -> Vec<Label> {
         while font::width(&text) > max && text.pop().is_some() {}
         out.push(label(text, PANEL_X as f32 / 2.0, (MESSAGE_Y + HINT_Y) as f32 / 2.0, Pal::White, Align::Centre));
     }
-    out.extend(panel::labels(app, ratio));
+    if !in_game {
+        out.extend(panel::labels(app, ratio));
+    }
     for b in buttons(app) {
-        if b.icon.is_some() {
+        if b.icon.is_some() && matches!(b.key, Key::Char(_)) {
             let bounce = if b.look == Look::Urgent { ((app.started.elapsed().as_millis() / 350) % 2) as f32 } else { 0.0 };
             let cap = KEYCAP as f32 / 2.0;
             out.push(label(b.label, b.x as f32 - 2.0 + cap, b.y as f32 - 2.0 + cap - bounce, Pal::White, Align::Centre));
-        } else {
+        } else if b.icon.is_none() {
             out.push(label(b.label, b.x as f32 + BUTTON as f32 / 2.0, b.y as f32 + BUTTON as f32 / 2.0, Pal::White, Align::Centre));
         }
     }
@@ -319,6 +346,17 @@ mod tests {
         assert!(text.iter().any(|t| t.starts_with("→ PRESS F: STARVING")), "{text:?}");
         let egg = app_with(Stage::Egg, |_| {});
         assert!(labels(&egg, 0.5).iter().any(|l| l.text.starts_with("IT'S AN EGG")));
+    }
+
+    #[test]
+    fn a_game_fills_the_screen_and_says_what_to_do() {
+        let mut app = app_with(Stage::Baby, |_| {});
+        app.mode = Mode::Game(Game::new(2, &mut app.pet));
+        let text: Vec<String> = labels(&app, 0.5).into_iter().map(|l| l.text).collect();
+        assert!(text.iter().any(|t| t.starts_with("HOLD UP/DOWN")), "{text:?}");
+        assert!(!text.iter().any(|t| t == "STATUS"), "the panel makes way for the game");
+        let keys: Vec<Key> = buttons(&app).iter().map(|b| b.key).collect();
+        assert_eq!(keys, [Key::Up, Key::Down, Key::Esc]);
     }
 
     #[test]

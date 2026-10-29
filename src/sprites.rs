@@ -586,60 +586,6 @@ fn render_scene(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize, body
     compose(&scene, w, h, p.asleep, t)
 }
 
-/// The pet at half size (16x10), for the mini-games. Faces and outlines win over the body
-/// colour when a 2x2 block is shrunk to one pixel, so the pet stays recognisable.
-pub fn mini_pet(p: &Pet, t: u32, mood: Mood) -> Canvas {
-    let mut body = draw_body(p, 1.0, t);
-    if let Some(face) = &body.face {
-        draw_face(&mut body.canvas, face, mood, t % 9 == 8, false, None);
-    }
-    let mut out = Canvas::sized(W / 2, H / 2);
-    for y in 0..(H / 2) as i32 {
-        for x in 0..(W / 2) as i32 {
-            let block: Vec<C> = [(0, 0), (1, 0), (0, 1), (1, 1)].iter().filter_map(|(dx, dy)| body.canvas.get(x * 2 + dx, y * 2 + dy)).collect();
-            let pick = if block.contains(&INK) {
-                Some(INK)
-            } else if block.len() < 4 && block.contains(&body.outline) {
-                Some(body.outline)
-            } else {
-                block.iter().copied().find(|&c| c != body.outline).or(block.first().copied())
-            };
-            if let Some(c) = pick {
-                out.set(x, y, c);
-            }
-        }
-    }
-    out
-}
-
-/// The pet's main body colour, for things drawn in its likeness.
-pub fn body_colour(p: &Pet) -> C {
-    draw_body(p, 1.0, 0).body
-}
-
-/// Turn a canvas into terminal rows, two pixels per cell, scaled up as far as the `w` x `h`
-/// cell area allows (keeping its shape), centred, with `outside` filling the rest.
-pub fn to_lines(c: &Canvas, w: usize, h: usize, outside: C) -> Vec<Line<'static>> {
-    let ph = h * 2;
-    let s = (w as f32 / c.w.max(1) as f32).min(ph as f32 / c.h.max(1) as f32).max(1.0);
-    let (sw, sh) = ((c.w as f32 * s) as usize, (c.h as f32 * s) as usize);
-    let ox = w.saturating_sub(sw) / 2;
-    let oy = ph.saturating_sub(sh) / 2;
-    let pix = |x: usize, y: usize| -> C {
-        if x >= ox && y >= oy && x < ox + sw && y < oy + sh {
-            let (cx, cy) = (((x - ox) as f32 / s) as i32, ((y - oy) as f32 / s) as i32);
-            if let Some(p) = c.get(cx, cy) {
-                return p;
-            }
-        }
-        outside
-    };
-    let rgb = |p: C| Color::Rgb(p.0, p.1, p.2);
-    (0..h)
-        .map(|row| Line::from((0..w).map(|x| Span::styled("▀", Style::new().fg(rgb(pix(x, row * 2))).bg(rgb(pix(x, row * 2 + 1))))).collect::<Vec<_>>()))
-        .collect()
-}
-
 fn wall(y: usize, ph: usize, night: bool) -> C {
     let k = y as f32 / ph.max(1) as f32;
     let (a, b) = if night { ((8, 10, 26), (22, 18, 44)) } else { ((34, 40, 74), (74, 58, 92)) };

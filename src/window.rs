@@ -3,8 +3,8 @@
 //! the same size. Text is drawn on top at full window resolution with the pixel font.
 
 use macroquad::prelude::{
-    clear_background, draw_rectangle, draw_text, draw_texture_ex, get_char_pressed, is_key_pressed,
-    is_mouse_button_pressed, is_quit_requested, mouse_position, next_frame, prevent_quit, screen_height, screen_width,
+    clear_background, draw_rectangle, draw_text, draw_texture_ex, get_char_pressed, is_key_down, is_key_pressed,
+    is_mouse_button_down, is_mouse_button_pressed, is_quit_requested, mouse_position, next_frame, prevent_quit, screen_height, screen_width,
     vec2, Color, Conf, DrawTextureParams, FilterMode, Image, KeyCode, MouseButton, Texture2D, WHITE,
 };
 
@@ -129,11 +129,17 @@ async fn main_loop(mut app: App) {
         for k in keys_pressed() {
             app.on_key(k);
         }
+        let under_mouse = hud::button_at(&app, sx, sy);
         if is_mouse_button_pressed(MouseButton::Left) {
-            if let Some(k) = hud::button_at(&app, sx, sy) {
+            if let Some(k) = under_mouse {
                 app.press(k);
             }
         }
+        // Real key-down state, so the Pong paddle moves exactly while a key or button is held.
+        let held = |keys: [KeyCode; 3], button: Key| {
+            keys.iter().any(|&k| is_key_down(k)) || (is_mouse_button_down(MouseButton::Left) && under_mouse == Some(button))
+        };
+        app.hold(held([KeyCode::Up, KeyCode::W, KeyCode::K], Key::Up), held([KeyCode::Down, KeyCode::S, KeyCode::J], Key::Down));
         app.update();
 
         image.bytes = hud::frame(&app, hud::button_at(&app, sx, sy)).rgba();

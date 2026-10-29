@@ -3,6 +3,7 @@
 
 use crate::art::Sprite;
 use crate::faces;
+use crate::font;
 use crate::palette::Pal;
 
 #[derive(Clone, PartialEq, Debug)]
@@ -15,6 +16,11 @@ pub struct Frame {
 impl Frame {
     pub fn new(w: i32, h: i32, fill: Pal) -> Frame {
         Frame { w, h, px: vec![fill; (w * h) as usize] }
+    }
+
+    /// The pixel at (`x`, `y`), clamped to the edges.
+    pub fn at(&self, x: i32, y: i32) -> Pal {
+        self.px[(y.clamp(0, self.h - 1) * self.w + x.clamp(0, self.w - 1)) as usize]
     }
 
     #[cfg(test)]
@@ -61,6 +67,20 @@ impl Frame {
     pub fn grid(&mut self, rows: &[&str], x: i32, y: i32) {
         for (dx, dy, p) in faces::pixels(rows) {
             self.set(x + dx, y + dy, p);
+        }
+    }
+
+    /// A grid with every pixel blown up to a `k` x `k` block and passed through `f`.
+    pub fn grid_scaled(&mut self, rows: &[&str], x: i32, y: i32, k: i32, f: impl Fn(Pal) -> Pal) {
+        for (dx, dy, p) in faces::pixels(rows) {
+            self.rect(x + dx * k, y + dy * k, k, k, f(p));
+        }
+    }
+
+    /// Text in the pixel font as part of the picture (for scores), `k` scene pixels per font pixel.
+    pub fn text(&mut self, text: &str, x: i32, y: i32, k: i32, p: Pal) {
+        for (dx, dy) in font::pixels(text) {
+            self.rect(x + dx * k, y + dy * k, k, k, p);
         }
     }
 
