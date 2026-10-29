@@ -56,7 +56,6 @@ fn short_label(label: &str) -> &str {
         "quit game" => "quit",
         "repeat the pattern" => "repeat",
         "move paddle" => "move",
-        "higher/lower" => "hi/lo",
         other => other,
     }
 }

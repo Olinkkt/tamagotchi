@@ -1,6 +1,7 @@
 //! Mini-games. Each one reports how many rounds it won; the pet's happiness
 //! reward is decided by `Pet::finish_game`.
 
+use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 
 use crossterm::event::KeyCode;
@@ -9,6 +10,7 @@ use ratatui::{
     text::{Line, Span},
 };
 
+use crate::cli::face;
 use crate::pet::Pet;
 use crate::ui::{ACCENT, BAD, DIM, EMPTY, GOOD, TEXT, WARN};
 
@@ -19,7 +21,7 @@ pub enum Outcome {
 }
 
 pub const CHOICES: [(&str, &str); 6] =
-    [("1", "higher/lower"), ("2", "reaction"), ("3", "memory"), ("4", "pong"), ("5", "catch"), ("6", "rock-paper-scissors")];
+    [("1", "snake"), ("2", "reaction"), ("3", "memory"), ("4", "pong"), ("5", "catch"), ("6", "dodge")];
 
 const INK: Color = Color::Rgb(20, 20, 30);
 
@@ -44,123 +46,72 @@ fn text(t: String) -> Line<'static> {
 }
 
 pub enum Game {
-    HigherLower(HigherLower),
+    Snake(Snake),
     Reaction(Reaction),
     Memory(Memory),
     Pong(Pong),
     Catch(Catch),
-    Rps(Rps),
+    Dodge(Dodge),
 }
 
 impl Game {
     pub fn new(kind: u8, pet: &mut Pet) -> Game {
         match kind {
-            1 => Game::HigherLower(HigherLower::new(pet)),
+            1 => Game::Snake(Snake::new(pet)),
             2 => Game::Reaction(Reaction::new(pet)),
             3 => Game::Memory(Memory::new(pet)),
             5 => Game::Catch(Catch::new(pet)),
-            6 => Game::Rps(Rps::new()),
+            6 => Game::Dodge(Dodge::new(pet)),
             _ => Game::Pong(Pong::new(pet)),
         }
     }
 
-    pub fn key(&mut self, code: KeyCode, pet: &mut Pet) -> Outcome {
+    pub fn key(&mut self, code: KeyCode) -> Outcome {
         if matches!(code, KeyCode::Esc | KeyCode::Char('q')) {
             return Outcome::Quit;
         }
         match self {
-            Game::HigherLower(g) => g.key(code, pet),
+            Game::Snake(g) => g.key(code),
             Game::Reaction(g) => g.key(code),
             Game::Memory(g) => g.key(code),
             Game::Pong(g) => g.key(code),
             Game::Catch(g) => g.key(code),
-            Game::Rps(g) => g.key(code, pet),
+            Game::Dodge(g) => g.key(code),
         }
     }
 
     /// Called every frame for the time-based games.
     pub fn tick(&mut self, pet: &mut Pet) -> Outcome {
         match self {
-            Game::HigherLower(_) => Outcome::Continue,
+            Game::Snake(g) => g.tick(pet),
             Game::Reaction(g) => g.tick(pet),
             Game::Memory(g) => g.tick(pet),
             Game::Pong(g) => g.tick(),
             Game::Catch(g) => g.tick(pet),
-            Game::Rps(_) => Outcome::Continue,
+            Game::Dodge(g) => g.tick(pet),
         }
     }
 
     pub fn lines(&self) -> Vec<Line<'static>> {
         match self {
-            Game::HigherLower(g) => g.lines(),
+            Game::Snake(g) => g.lines(),
             Game::Reaction(g) => g.lines(),
             Game::Memory(g) => g.lines(),
             Game::Pong(g) => g.lines(),
             Game::Catch(g) => g.lines(),
-            Game::Rps(g) => g.lines(),
+            Game::Dodge(g) => g.lines(),
         }
     }
 
     pub fn keys(&self) -> &'static [(&'static str, &'static str)] {
         match self {
-            Game::HigherLower(_) => &[("h", "higher"), ("l", "lower"), ("esc", "quit game")],
+            Game::Snake(_) => &[("↑↓←→", "steer"), ("esc", "quit game")],
             Game::Reaction(_) => &[("space", "react"), ("esc", "quit game")],
             Game::Memory(_) => &[("1-4", "repeat the pattern"), ("esc", "quit game")],
-            Game::Pong(_) => &[("↑/↓", "move paddle"), ("esc", "quit game")],
-            Game::Catch(_) => &[("←/→", "move basket"), ("esc", "quit game")],
-            Game::Rps(_) => &[("r", "rock"), ("p", "paper"), ("s", "scissors"), ("esc", "quit game")],
+            Game::Pong(_) => &[("↑/↓", "steer"), ("space", "stop"), ("esc", "quit game")],
+            Game::Catch(_) => &[("←/→", "steer"), ("space", "stop"), ("esc", "quit game")],
+            Game::Dodge(_) => &[("←/→", "steer"), ("space", "stop"), ("esc", "quit game")],
         }
-    }
-}
-
-// ---------------------------------------------------------------- higher / lower
-
-pub struct HigherLower {
-    current: u8,
-    round: u8,
-    wins: u8,
-    note: String,
-}
-
-const HL_ROUNDS: u8 = 5;
-
-impl HigherLower {
-    fn new(pet: &mut Pet) -> Self {
-        HigherLower { current: pet.rand(9) as u8 + 1, round: 1, wins: 0, note: "Will the next number be higher or lower?".into() }
-    }
-
-    fn key(&mut self, code: KeyCode, pet: &mut Pet) -> Outcome {
-        let higher = match code {
-            KeyCode::Char('h') | KeyCode::Up => true,
-            KeyCode::Char('l') | KeyCode::Down => false,
-            _ => return Outcome::Continue,
-        };
-        let mut next = pet.rand(9) as u8 + 1;
-        while next == self.current {
-            next = pet.rand(9) as u8 + 1;
-        }
-        let correct = (next > self.current) == higher;
-        if correct {
-            self.wins += 1;
-        }
-        self.note = format!("{} -> {next}: {}", self.current, if correct { "right!" } else { "wrong." });
-        self.current = next;
-        if self.round >= HL_ROUNDS {
-            return Outcome::Done { wins: self.wins, rounds: HL_ROUNDS };
-        }
-        self.round += 1;
-        Outcome::Continue
-    }
-
-    fn lines(&self) -> Vec<Line<'static>> {
-        vec![
-            title("HIGHER  or  LOWER"),
-            dim(format!("round {}/{}   wins {}", self.round, HL_ROUNDS, self.wins)),
-            Line::from(""),
-            Line::from(Span::styled(format!("  {}  ", self.current), Style::new().fg(INK).bg(WARN).add_modifier(Modifier::BOLD))),
-            Line::from(""),
-            text(self.note.clone()),
-        ]
     }
 }
 
@@ -375,8 +326,30 @@ const PADDLE: i32 = 3;
 /// Return the ball this many times to win outright.
 const PONG_GOAL: u8 = 5;
 
+/// How often a steered paddle, basket or pet moves one cell.
+const MOVE_MS: u64 = 55;
+
+/// Press a direction once and it keeps going until you press the other way or space, so the
+/// game does not depend on the terminal's key repeat.
+fn steer(code: KeyCode, neg: &[KeyCode], pos: &[KeyCode], dir: &mut i32) {
+    if neg.contains(&code) {
+        *dir = -1;
+    } else if pos.contains(&code) {
+        *dir = 1;
+    } else if code == KeyCode::Char(' ') {
+        *dir = 0;
+    }
+}
+
+const LEFT: [KeyCode; 3] = [KeyCode::Left, KeyCode::Char('a'), KeyCode::Char('h')];
+const RIGHT: [KeyCode; 3] = [KeyCode::Right, KeyCode::Char('d'), KeyCode::Char('l')];
+const UP: [KeyCode; 3] = [KeyCode::Up, KeyCode::Char('w'), KeyCode::Char('k')];
+const DOWN: [KeyCode; 3] = [KeyCode::Down, KeyCode::Char('s'), KeyCode::Char('j')];
+
 pub struct Pong {
     py: i32,
+    dir: i32,
+    moved: Instant,
     bx: i32,
     by: i32,
     dx: i32,
@@ -390,6 +363,8 @@ impl Pong {
     fn new(pet: &mut Pet) -> Self {
         Pong {
             py: PH / 2 - 1,
+            dir: 0,
+            moved: Instant::now(),
             bx: PW - 2,
             by: pet.rand(PH as u64) as i32,
             dx: -1,
@@ -401,15 +376,19 @@ impl Pong {
     }
 
     fn key(&mut self, code: KeyCode) -> Outcome {
-        match code {
-            KeyCode::Up | KeyCode::Char('k') | KeyCode::Char('w') => self.py = (self.py - 1).max(0),
-            KeyCode::Down | KeyCode::Char('j') | KeyCode::Char('s') => self.py = (self.py + 1).min(PH - PADDLE),
-            _ => {}
-        }
+        steer(code, &UP, &DOWN, &mut self.dir);
         Outcome::Continue
     }
 
+    fn nudge(&mut self) {
+        self.py = (self.py + self.dir).clamp(0, PH - PADDLE);
+    }
+
     fn tick(&mut self) -> Outcome {
+        if self.moved.elapsed() >= Duration::from_millis(MOVE_MS + 25) {
+            self.moved = Instant::now();
+            self.nudge();
+        }
         if self.last.elapsed() < Duration::from_millis(self.step_ms) {
             return Outcome::Continue;
         }
@@ -454,6 +433,8 @@ impl Pong {
                         Span::styled("●", Style::new().fg(WARN))
                     } else if x == PW - 1 {
                         Span::styled("│", wall)
+                    } else if x == PW / 2 && y % 2 == 0 {
+                        Span::styled("┊", wall)
                     } else {
                         Span::raw(" ")
                     }
@@ -462,7 +443,6 @@ impl Pong {
             out.push(Line::from(row));
         }
         out.push(Line::from(Span::styled("─".repeat(PW as usize), wall)));
-        let _ = BAD;
         out
     }
 }
@@ -472,8 +452,12 @@ impl Pong {
 /// Five pieces of food fall one after another; catch them in the basket.
 const CATCH_ITEMS: u8 = 5;
 const BASKET: i32 = 5;
+const CATCH_FOOD: [(&str, Color); 3] = [("●", BAD), ("◆", WARN), ("♥", GOOD)];
 
 pub struct Catch {
+    face: &'static str,
+    dir: i32,
+    moved: Instant,
     bx: i32,
     ix: i32,
     iy: i32,
@@ -485,19 +469,23 @@ pub struct Catch {
 
 impl Catch {
     fn new(pet: &mut Pet) -> Self {
-        Catch { bx: PW / 2 - 2, ix: pet.rand(PW as u64) as i32, iy: 0, item: 1, caught: 0, last: Instant::now(), step_ms: 130 }
+        Catch { face: face(pet), dir: 0, moved: Instant::now(), bx: PW / 2 - 2, ix: pet.rand(PW as u64) as i32, iy: 0, item: 1, caught: 0, last: Instant::now(), step_ms: 130 }
     }
 
     fn key(&mut self, code: KeyCode) -> Outcome {
-        match code {
-            KeyCode::Left | KeyCode::Char('a') | KeyCode::Char('h') => self.bx = (self.bx - 2).max(0),
-            KeyCode::Right | KeyCode::Char('d') | KeyCode::Char('l') => self.bx = (self.bx + 2).min(PW - BASKET),
-            _ => {}
-        }
+        steer(code, &LEFT, &RIGHT, &mut self.dir);
         Outcome::Continue
     }
 
+    fn nudge(&mut self) {
+        self.bx = (self.bx + self.dir).clamp(0, PW - BASKET);
+    }
+
     fn tick(&mut self, pet: &mut Pet) -> Outcome {
+        if self.moved.elapsed() >= Duration::from_millis(MOVE_MS) {
+            self.moved = Instant::now();
+            self.nudge();
+        }
         if self.last.elapsed() < Duration::from_millis(self.step_ms) {
             return Outcome::Continue;
         }
@@ -526,16 +514,17 @@ impl Catch {
             let row: Vec<Span<'static>> = (0..PW)
                 .map(|x| {
                     if y == PH - 1 && (self.bx..self.bx + BASKET).contains(&x) {
-                        let glyph = if x == self.bx {
-                            "╰"
-                        } else if x == self.bx + BASKET - 1 {
-                            "╯"
+                        let i = (x - self.bx) as usize;
+                        if i == 0 {
+                            Span::styled("╰", Style::new().fg(ACCENT))
+                        } else if i == BASKET as usize - 1 {
+                            Span::styled("╯", Style::new().fg(ACCENT))
                         } else {
-                            "─"
-                        };
-                        Span::styled(glyph, Style::new().fg(ACCENT))
+                            Span::styled(self.face.chars().nth(i - 1).unwrap_or('─').to_string(), Style::new().fg(TEXT))
+                        }
                     } else if x == self.ix && y == self.iy {
-                        Span::styled("●", Style::new().fg(BAD))
+                        let (glyph, colour) = CATCH_FOOD[self.item as usize % CATCH_FOOD.len()];
+                        Span::styled(glyph, Style::new().fg(colour))
                     } else {
                         Span::raw(" ")
                     }
@@ -548,56 +537,217 @@ impl Catch {
     }
 }
 
-// ---------------------------------------------------------------- rock-paper-scissors
+// ---------------------------------------------------------------- snake
 
-const RPS_ROUNDS: u8 = 5;
-const RPS_NAMES: [&str; 3] = ["rock", "paper", "scissors"];
+/// Eat this much food to win outright; hitting a wall or yourself ends the game.
+const SNAKE_GOAL: u8 = 8;
 
-/// 0 = draw, 1 = the first player wins, 2 = the second wins (0 rock, 1 paper, 2 scissors).
-fn rps_result(mine: usize, theirs: usize) -> usize {
-    (mine + 3 - theirs) % 3
+pub struct Snake {
+    body: VecDeque<(i32, i32)>,
+    dir: (i32, i32),
+    want: (i32, i32),
+    food: (i32, i32),
+    eaten: u8,
+    last: Instant,
+    step_ms: u64,
 }
 
-pub struct Rps {
-    round: u8,
-    wins: u8,
-    note: String,
-}
-
-impl Rps {
-    fn new() -> Self {
-        Rps { round: 1, wins: 0, note: "Pick rock, paper or scissors.".into() }
+impl Snake {
+    fn new(pet: &mut Pet) -> Self {
+        let body: VecDeque<(i32, i32)> = [(5, PH / 2), (4, PH / 2), (3, PH / 2)].into();
+        let mut s = Snake { body, dir: (1, 0), want: (1, 0), food: (0, 0), eaten: 0, last: Instant::now(), step_ms: 150 };
+        s.place_food(pet);
+        s
     }
 
-    fn key(&mut self, code: KeyCode, pet: &mut Pet) -> Outcome {
-        let mine = match code {
-            KeyCode::Char('r') => 0,
-            KeyCode::Char('p') => 1,
-            KeyCode::Char('s') => 2,
-            _ => return Outcome::Continue,
+    fn place_food(&mut self, pet: &mut Pet) {
+        loop {
+            let f = (pet.rand(PW as u64) as i32, pet.rand(PH as u64) as i32);
+            if !self.body.contains(&f) {
+                self.food = f;
+                return;
+            }
+        }
+    }
+
+    fn key(&mut self, code: KeyCode) -> Outcome {
+        let want = if UP.contains(&code) {
+            (0, -1)
+        } else if DOWN.contains(&code) {
+            (0, 1)
+        } else if LEFT.contains(&code) {
+            (-1, 0)
+        } else if RIGHT.contains(&code) {
+            (1, 0)
+        } else {
+            return Outcome::Continue;
         };
-        let theirs = pet.rand(3) as usize;
-        let result = rps_result(mine, theirs);
-        if result == 1 {
-            self.wins += 1;
+        // Turning straight back would be instant death, so it is ignored.
+        if (want.0 + self.dir.0, want.1 + self.dir.1) != (0, 0) {
+            self.want = want;
         }
-        self.note = format!("You: {}  Pet: {}  ->  {}", RPS_NAMES[mine], RPS_NAMES[theirs], ["a draw", "you win!", "it wins."][result]);
-        if self.round >= RPS_ROUNDS {
-            return Outcome::Done { wins: self.wins, rounds: RPS_ROUNDS };
+        Outcome::Continue
+    }
+
+    fn tick(&mut self, pet: &mut Pet) -> Outcome {
+        // A cell is twice as tall as it is wide, so up/down steps take longer to look as fast.
+        let wait = if self.want.1 != 0 { self.step_ms * 2 } else { self.step_ms };
+        if self.last.elapsed() < Duration::from_millis(wait) {
+            return Outcome::Continue;
         }
-        self.round += 1;
+        self.last = Instant::now();
+        self.dir = self.want;
+        let head = self.body[0];
+        let next = (head.0 + self.dir.0, head.1 + self.dir.1);
+        // The tail moves out of the way this step, unless we grow.
+        let hits_self = self.body.iter().take(self.body.len() - 1).any(|&c| c == next);
+        if !(0..PW).contains(&next.0) || !(0..PH).contains(&next.1) || hits_self {
+            return Outcome::Done { wins: self.eaten, rounds: SNAKE_GOAL };
+        }
+        self.body.push_front(next);
+        if next == self.food {
+            self.eaten += 1;
+            if self.eaten >= SNAKE_GOAL {
+                return Outcome::Done { wins: SNAKE_GOAL, rounds: SNAKE_GOAL };
+            }
+            self.step_ms = (self.step_ms * 94 / 100).max(80);
+            self.place_food(pet);
+        } else {
+            self.body.pop_back();
+        }
         Outcome::Continue
     }
 
     fn lines(&self) -> Vec<Line<'static>> {
-        vec![
-            title("ROCK  PAPER  SCISSORS"),
-            dim(format!("round {}/{}   wins {}", self.round, RPS_ROUNDS, self.wins)),
-            Line::from(""),
-            text(self.note.clone()),
-            Line::from(""),
-            dim("a draw counts as no win".to_string()),
-        ]
+        let mut out = vec![heading("SNAKE", format!("food {}/{}  (a crash ends it)", self.eaten, SNAKE_GOAL))];
+        for y in 0..PH {
+            let row: Vec<Span<'static>> = (0..PW)
+                .map(|x| {
+                    if self.body[0] == (x, y) {
+                        Span::styled("◆", Style::new().fg(ACCENT))
+                    } else if self.body.contains(&(x, y)) {
+                        Span::styled("●", Style::new().fg(GOOD))
+                    } else if self.food == (x, y) {
+                        Span::styled("♥", Style::new().fg(BAD))
+                    } else {
+                        Span::raw(" ")
+                    }
+                })
+                .collect();
+            out.push(Line::from(row));
+        }
+        out.push(Line::from(Span::styled("─".repeat(PW as usize), Style::new().fg(EMPTY))));
+        out
+    }
+}
+
+// ---------------------------------------------------------------- dodge
+
+/// Rocks fall in waves of eight; every rock that lands without hitting the pet counts.
+const DODGE_ROCKS: u8 = 40;
+const DODGE_ROUNDS: u8 = 5;
+const DODGE_PLAYER: i32 = 3;
+
+pub struct Dodge {
+    face: &'static str,
+    px: i32,
+    dir: i32,
+    rocks: Vec<(i32, i32)>,
+    spawned: u8,
+    passed: u8,
+    since_spawn: u8,
+    moved: Instant,
+    last: Instant,
+    step_ms: u64,
+}
+
+impl Dodge {
+    fn new(pet: &mut Pet) -> Self {
+        Dodge {
+            face: face(pet),
+            px: PW / 2 - 1,
+            dir: 0,
+            rocks: Vec::new(),
+            spawned: 0,
+            passed: 0,
+            since_spawn: 0,
+            moved: Instant::now(),
+            last: Instant::now(),
+            step_ms: 110,
+        }
+    }
+
+    fn key(&mut self, code: KeyCode) -> Outcome {
+        steer(code, &LEFT, &RIGHT, &mut self.dir);
+        Outcome::Continue
+    }
+
+    fn nudge(&mut self) {
+        self.px = (self.px + self.dir).clamp(0, PW - DODGE_PLAYER);
+    }
+
+    fn hit(&self) -> bool {
+        self.rocks.iter().any(|&(x, y)| y == PH - 1 && (self.px..self.px + DODGE_PLAYER).contains(&x))
+    }
+
+    fn over(&self) -> Outcome {
+        Outcome::Done { wins: self.passed / (DODGE_ROCKS / DODGE_ROUNDS), rounds: DODGE_ROUNDS }
+    }
+
+    fn tick(&mut self, pet: &mut Pet) -> Outcome {
+        if self.moved.elapsed() >= Duration::from_millis(MOVE_MS) {
+            self.moved = Instant::now();
+            self.nudge();
+            if self.hit() {
+                return self.over();
+            }
+        }
+        if self.last.elapsed() < Duration::from_millis(self.step_ms) {
+            return Outcome::Continue;
+        }
+        self.last = Instant::now();
+        for r in &mut self.rocks {
+            r.1 += 1;
+        }
+        if self.hit() {
+            return self.over();
+        }
+        let before = self.rocks.len();
+        self.rocks.retain(|r| r.1 < PH);
+        self.passed += (before - self.rocks.len()) as u8;
+        if self.passed >= DODGE_ROCKS {
+            return Outcome::Done { wins: DODGE_ROUNDS, rounds: DODGE_ROUNDS };
+        }
+        self.since_spawn += 1;
+        if self.since_spawn >= 2 && self.spawned < DODGE_ROCKS {
+            self.since_spawn = 0;
+            self.spawned += 1;
+            self.rocks.push((pet.rand(PW as u64) as i32, 0));
+            self.step_ms = (self.step_ms * 98 / 100).max(60);
+        }
+        Outcome::Continue
+    }
+
+    fn lines(&self) -> Vec<Line<'static>> {
+        let wave = (self.passed / (DODGE_ROCKS / DODGE_ROUNDS) + 1).min(DODGE_ROUNDS);
+        let mut out = vec![heading("DODGE", format!("wave {wave}/{DODGE_ROUNDS}  (a hit ends it)"))];
+        for y in 0..PH {
+            let row: Vec<Span<'static>> = (0..PW)
+                .map(|x| {
+                    let i = (x - self.px) as usize;
+                    if y == PH - 1 && (self.px..self.px + DODGE_PLAYER).contains(&x) {
+                        Span::styled(self.face.chars().nth(i).unwrap_or(' ').to_string(), Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))
+                    } else if self.rocks.contains(&(x, y)) {
+                        Span::styled("▼", Style::new().fg(WARN))
+                    } else {
+                        Span::raw(" ")
+                    }
+                })
+                .collect();
+            out.push(Line::from(row));
+        }
+        out.push(Line::from(Span::styled("─".repeat(PW as usize), Style::new().fg(EMPTY))));
+        out
     }
 }
 
@@ -610,31 +760,11 @@ mod tests {
     }
 
     #[test]
-    fn higher_lower_finishes_on_the_fifth_guess() {
-        let mut p = pet();
-        let mut g = Game::new(1, &mut p);
-        for guess in 1..=5 {
-            let out = g.key(KeyCode::Char('h'), &mut p);
-            if guess < 5 {
-                assert!(matches!(out, Outcome::Continue), "guess {guess} should not end the game");
-            } else {
-                match out {
-                    Outcome::Done { wins, rounds } => {
-                        assert_eq!(rounds, 5);
-                        assert!(wins <= 5);
-                    }
-                    _ => panic!("the fifth guess should end the game"),
-                }
-            }
-        }
-    }
-
-    #[test]
     fn escape_quits_every_game() {
-        for kind in 1..=4 {
+        for kind in 1..=6 {
             let mut p = pet();
             let mut g = Game::new(kind, &mut p);
-            assert!(matches!(g.key(KeyCode::Esc, &mut p), Outcome::Quit), "game {kind}");
+            assert!(matches!(g.key(KeyCode::Esc), Outcome::Quit), "game {kind}");
         }
     }
 
@@ -716,45 +846,96 @@ mod tests {
     }
 
     #[test]
-    fn pong_paddle_stays_inside_the_court() {
+    fn pong_paddle_keeps_moving_until_stopped_and_stays_in_the_court() {
         let mut p = pet();
         let mut pong = Pong::new(&mut p);
+        pong.key(KeyCode::Up);
         for _ in 0..30 {
-            pong.key(KeyCode::Up);
+            pong.nudge();
         }
         assert_eq!(pong.py, 0);
+        pong.key(KeyCode::Down);
         for _ in 0..30 {
-            pong.key(KeyCode::Down);
+            pong.nudge();
         }
         assert_eq!(pong.py, PH - PADDLE);
+        pong.key(KeyCode::Up);
+        pong.nudge();
+        pong.key(KeyCode::Char(' '));
+        let at = pong.py;
+        pong.nudge();
+        assert_eq!(pong.py, at, "space stops the paddle");
     }
 
     #[test]
-    fn rock_paper_scissors_follows_the_rules() {
-        // (mine, theirs) -> 1 means I win
-        for (mine, theirs) in [(0, 2), (1, 0), (2, 1)] {
-            assert_eq!(rps_result(mine, theirs), 1, "{} beats {}", RPS_NAMES[mine], RPS_NAMES[theirs]);
-            assert_eq!(rps_result(theirs, mine), 2, "{} loses to {}", RPS_NAMES[theirs], RPS_NAMES[mine]);
-        }
-        for a in 0..3 {
-            assert_eq!(rps_result(a, a), 0);
-        }
-    }
-
-    #[test]
-    fn rock_paper_scissors_ends_after_five_rounds_and_ignores_other_keys() {
+    fn the_basket_keeps_moving_and_stays_inside_the_field() {
         let mut p = pet();
-        let mut g = Rps::new();
-        assert!(matches!(g.key(KeyCode::Char('x'), &mut p), Outcome::Continue));
-        assert_eq!(g.round, 1, "an unrelated key must not use up a round");
-        for round in 1..=RPS_ROUNDS {
-            let out = g.key(KeyCode::Char('r'), &mut p);
-            if round < RPS_ROUNDS {
-                assert!(matches!(out, Outcome::Continue));
-            } else {
-                assert!(matches!(out, Outcome::Done { rounds: 5, .. }));
+        let mut c = Catch::new(&mut p);
+        c.key(KeyCode::Left);
+        for _ in 0..30 {
+            c.nudge();
+        }
+        assert_eq!(c.bx, 0);
+        c.key(KeyCode::Right);
+        for _ in 0..30 {
+            c.nudge();
+        }
+        assert_eq!(c.bx, PW - BASKET);
+    }
+
+    #[test]
+    fn snake_eats_grows_and_cannot_reverse_into_itself() {
+        let mut p = pet();
+        let mut s = Snake::new(&mut p);
+        s.food = (s.body[0].0 + 1, s.body[0].1);
+        s.key(KeyCode::Left);
+        assert_eq!(s.want, (1, 0), "reversing is ignored");
+        s.last = Instant::now() - Duration::from_millis(1000);
+        assert!(matches!(s.tick(&mut p), Outcome::Continue));
+        assert_eq!((s.eaten, s.body.len()), (1, 4));
+    }
+
+    #[test]
+    fn snake_dies_on_the_wall_and_reports_what_it_ate() {
+        let mut p = pet();
+        let mut s = Snake::new(&mut p);
+        s.eaten = 3;
+        for _ in 0..PW {
+            s.last = Instant::now() - Duration::from_millis(1000);
+            if let Outcome::Done { wins, rounds } = s.tick(&mut p) {
+                assert_eq!((wins, rounds), (3, SNAKE_GOAL));
+                return;
             }
         }
+        panic!("snake never hit the wall");
+    }
+
+    #[test]
+    fn dodge_a_rock_on_the_pet_ends_it_and_a_rock_beside_it_does_not() {
+        let mut p = pet();
+        let mut d = Dodge::new(&mut p);
+        d.rocks.push((0, PH - 2));
+        d.px = PW - DODGE_PLAYER;
+        d.last = Instant::now() - Duration::from_millis(500);
+        assert!(matches!(d.tick(&mut p), Outcome::Continue));
+        d.rocks.push((d.px + 1, PH - 2));
+        d.last = Instant::now() - Duration::from_millis(500);
+        assert!(matches!(d.tick(&mut p), Outcome::Done { rounds: DODGE_ROUNDS, .. }));
+    }
+
+    #[test]
+    fn dodge_always_ends_and_never_reports_more_than_the_rounds() {
+        let mut p = pet();
+        let mut d = Dodge::new(&mut p);
+        for _ in 0..20_000 {
+            d.last = Instant::now() - Duration::from_millis(500);
+            if let Outcome::Done { wins, rounds } = d.tick(&mut p) {
+                assert_eq!(rounds, DODGE_ROUNDS);
+                assert!(wins <= DODGE_ROUNDS);
+                return;
+            }
+        }
+        panic!("dodge never ended");
     }
 
     #[test]
@@ -788,20 +969,6 @@ mod tests {
             }
         }
         panic!("catch never ended");
-    }
-
-    #[test]
-    fn the_basket_stays_inside_the_field() {
-        let mut p = pet();
-        let mut c = Catch::new(&mut p);
-        for _ in 0..30 {
-            c.key(KeyCode::Left);
-        }
-        assert_eq!(c.bx, 0);
-        for _ in 0..30 {
-            c.key(KeyCode::Right);
-        }
-        assert_eq!(c.bx, PW - BASKET);
     }
 
     #[test]

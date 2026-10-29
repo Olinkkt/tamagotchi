@@ -306,7 +306,7 @@ impl App {
     fn on_key(&mut self, code: KeyCode) {
         match &mut self.mode {
             Mode::Game(g) => {
-                let outcome = g.key(code, &mut self.pet);
+                let outcome = g.key(code);
                 self.handle_outcome(outcome);
                 return;
             }

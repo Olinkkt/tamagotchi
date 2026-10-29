@@ -42,7 +42,7 @@ fn hearts(n: u8) -> String {
     "♥".repeat(n as usize) + &"♡".repeat((MAX_HEARTS - n) as usize)
 }
 
-fn face(p: &Pet) -> &'static str {
+pub fn face(p: &Pet) -> &'static str {
     if !p.alive() {
         "x_x"
     } else if p.asleep {

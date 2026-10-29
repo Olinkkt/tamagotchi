@@ -44,12 +44,15 @@ up in the menu, and the pet shows a bubble with an icon for it.
 Any game makes the pet a little lighter, and winning makes it happier. A perfect game forgives
 one care mistake.
 
-1. **Higher/lower**: five guesses.
+1. **Snake**: eat eight hearts; hitting a wall or yourself ends it.
 2. **Reaction**: press space within 500 ms of "GO", three rounds.
 3. **Memory**: repeat patterns of 3, 4 and 5 with keys 1 to 4.
 4. **Pong**: return the ball five times; one miss ends it.
-5. **Catch**: move the basket (arrow keys) under five pieces of falling food.
-6. **Rock-paper-scissors**: five rounds against the pet (keys `r`, `p`, `s`); a draw is no win.
+5. **Catch**: steer the basket under five pieces of falling food.
+6. **Dodge**: steer the pet between 40 falling rocks; one hit ends it.
+
+In Pong, Catch and Dodge a direction key keeps going until you press the other way or space, so
+it does not rely on your terminal's key repeat. Snake is steered with the arrow keys, `wasd` or `hjkl`.
 
 ### Coins, shop and awards
 
