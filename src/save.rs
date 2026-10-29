@@ -73,6 +73,7 @@ pub fn save(pet: &Pet) -> io::Result<()> {
     fs::rename(&tmp, &path)
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum Loaded {
     Pet(Pet, u64),
     None,

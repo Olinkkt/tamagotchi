@@ -415,7 +415,7 @@ impl Pong {
         }
         self.last = Instant::now();
         let mut ny = self.by + self.dy;
-        if ny < 0 || ny >= PH {
+        if !(0..PH).contains(&ny) {
             self.dy = -self.dy;
             ny = self.by + self.dy;
         }

@@ -169,16 +169,14 @@ pub fn draw(f: &mut Frame, app: &App) {
 
     // Header
     let mood_dot = if !p.alive() { ("●", DIM) } else if p.needs_attention() { ("●", BAD) } else { ("●", GOOD) };
-    let header = Line::from(vec![
+    let mut header = Line::from(vec![
         Span::styled(format!("{} ", mood_dot.0), Style::new().fg(mood_dot.1)),
         Span::styled(p.species.clone(), Style::new().fg(TEXT).add_modifier(Modifier::BOLD)),
         Span::styled(format!("  ·  {}  ·  age {}", p.stage.label(), fmt_age(p.age)), Style::new().fg(DIM)),
     ]);
-    let mut header = header;
     if p.stage != Stage::Egg && p.alive() {
         header.spans.push(Span::styled(format!("  ·  {}", p.quirk.label()), Style::new().fg(ACCENT)));
     }
-    let mut header = header;
     if app.dev {
         header.spans.push(Span::styled("   DEV", Style::new().fg(Color::Rgb(20, 20, 30)).bg(WARN).add_modifier(Modifier::BOLD)));
     }

@@ -279,7 +279,7 @@ impl Pet {
         }
         match kind {
             "commit" => {
-                let due = self.last_commit_meal.map_or(true, |t| self.clock - t >= self.cfg.commit_meal_gap_secs);
+                let due = self.last_commit_meal.is_none_or(|t| self.clock - t >= self.cfg.commit_meal_gap_secs);
                 if self.hunger < MAX_HEARTS && due {
                     self.hunger += 1;
                     self.last_commit_meal = Some(self.clock);

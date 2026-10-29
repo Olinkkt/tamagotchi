@@ -45,14 +45,14 @@ fn read_battery_low() -> bool {
         let is_battery = fs::read_to_string(p.join("type")).map(|t| t.trim() == "Battery").unwrap_or(false);
         let capacity = fs::read_to_string(p.join("capacity")).ok().and_then(|s| s.trim().parse::<u8>().ok());
         let status = fs::read_to_string(p.join("status")).unwrap_or_default();
-        is_battery && capacity.map_or(false, |c| battery_low(c, &status))
+        is_battery && capacity.is_some_and(|c| battery_low(c, &status))
     })
 }
 
 pub fn read() -> Strain {
     let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
-    let busy_cpu = fs::read_to_string("/proc/loadavg").ok().and_then(|s| parse_load1(&s)).map_or(false, |l| cpu_busy(l, cores));
-    let low_ram = fs::read_to_string("/proc/meminfo").ok().and_then(|s| ram_used_percent(&s)).map_or(false, |u| u >= RAM_HIGH_PERCENT);
+    let busy_cpu = fs::read_to_string("/proc/loadavg").ok().and_then(|s| parse_load1(&s)).is_some_and(|l| cpu_busy(l, cores));
+    let low_ram = fs::read_to_string("/proc/meminfo").ok().and_then(|s| ram_used_percent(&s)).is_some_and(|u| u >= RAM_HIGH_PERCENT);
     Strain { busy_cpu, low_ram, low_battery: read_battery_low() }
 }
 
