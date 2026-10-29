@@ -9,6 +9,8 @@ use std::time::{Duration, Instant};
 use crate::config::Config;
 use crate::pet::{Pet, Stage, MAX_HEARTS};
 use crate::save;
+use crate::sprites;
+use ratatui::{style::Color, text::Span};
 
 /// Load the real save, caught up to the present, without writing anything back.
 /// The simulation is deterministic, so the game reaches the same state when it next opens.
@@ -318,6 +320,129 @@ pub fn run(args: &[String]) -> Option<i32> {
         "hook" => hook(args.get(2).map(String::as_str)),
         _ => act(cmd),
     })
+}
+
+/// `--gallery`: print every character once, following the `animate_parts` setting
+/// (the ears, wings, tail etc. only appear when it is on).
+fn gallery() {
+    let cases: [(Stage, &str); 10] = [
+        (Stage::Egg, "Egg"),
+        (Stage::Baby, "Babytchi"),
+        (Stage::Child, "Marutchi"),
+        (Stage::Teen, "Tonmarutchi"),
+        (Stage::Teen, "Hashitamatchi"),
+        (Stage::Adult, "Mametchi"),
+        (Stage::Adult, "Kuchipatchi"),
+        (Stage::Adult, "Tarakotchi"),
+        (Stage::Adult, "Ichigotchi"),
+        (Stage::Adult, "Nyorotchi"),
+    ];
+    let (cfg, _) = Config::load();
+    println!("Animated parts (ears, wings, tuft, leaves, tail): {}  (change with `tama --animate on|off`)\n", if cfg.animate_parts { "on" } else { "off" });
+    let mut pets: Vec<Pet> = cases
+        .iter()
+        .map(|(stage, name)| {
+            let mut p = Pet::new(1);
+            p.stage = *stage;
+            p.species = name.to_string();
+            p.happy = 4;
+            p.hunger = 4;
+            p
+        })
+        .collect();
+    let mut dead = Pet::new(1);
+    dead.stage = Stage::Dead;
+    dead.species = "Departed".into();
+    pets.push(dead);
+    let ansi = |spans: &[Span]| -> String {
+        let mut out = String::new();
+        for s in spans {
+            if let Some(Color::Rgb(r, g, b)) = s.style.fg {
+                out.push_str(&format!("\x1b[38;2;{r};{g};{b}m"));
+            }
+            if let Some(Color::Rgb(r, g, b)) = s.style.bg {
+                out.push_str(&format!("\x1b[48;2;{r};{g};{b}m"));
+            }
+            out.push_str(&s.content);
+            out.push_str("\x1b[0m");
+        }
+        out
+    };
+    for p in &mut pets {
+        p.set_env(cfg.clone(), 0);
+        println!("-- {} --", p.species);
+        for line in sprites::render_still(p, 0, None, 32, 10) {
+            println!("{}", ansi(&line.spans));
+        }
+    }
+}
+
+/// GitHub repo (`owner/name`) that `tama --update` installs from.
+/// Not set up yet; until it is, `--update` rebuilds from the local source folder instead.
+const REPO: Option<&str> = None;
+
+/// `--update`: reinstall the newest version with cargo.
+fn update() -> i32 {
+    let mut cmd = std::process::Command::new("cargo");
+    cmd.args(["install", "--force"]);
+    match REPO {
+        Some(repo) => {
+            cmd.args(["--git", &format!("https://github.com/{repo}")]);
+        }
+        None => {
+            let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+            if !src.join("Cargo.toml").exists() {
+                eprintln!("Source folder {} no longer exists, and no GitHub repo is configured yet.", src.display());
+                return 1;
+            }
+            println!("Rebuilding from {}", src.display());
+            cmd.arg("--path").arg(src);
+        }
+    }
+    match cmd.status() {
+        Ok(s) if s.success() => 0,
+        Ok(s) => s.code().unwrap_or(1),
+        Err(e) => {
+            eprintln!("Could not run cargo ({e}). Is Rust installed and on your PATH?");
+            1
+        }
+    }
+}
+
+/// Handle a `--flag` that prints something and exits. Returns the exit code when handled.
+pub fn flags(args: &[String]) -> Option<i32> {
+    if args.iter().any(|a| a == "--update") {
+        return Some(update());
+    }
+    if let Some(i) = args.iter().position(|a| a == "--animate") {
+        match args.get(i + 1).map(String::as_str) {
+            Some(v @ ("on" | "off")) => match Config::set_animate_parts(v == "on") {
+                Ok(()) => println!("Animated parts (ears, wings, tuft, leaves, tail) are now {v}. Restart tama to see it."),
+                Err(e) => {
+                    eprintln!("Could not change the setting: {e}");
+                    return Some(1);
+                }
+            },
+            _ => {
+                let state = if Config::load().0.animate_parts { "on" } else { "off" };
+                println!("Animated parts (ears, wings, tuft, leaves, tail) are {state}. Use `tama --animate on` or `tama --animate off`.");
+            }
+        }
+        return Some(0);
+    }
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        println!("tama {}", env!("CARGO_PKG_VERSION"));
+        return Some(0);
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        println!("tama - a terminal tamagotchi\n\n  tama            play\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|clean|medicine|scold|light   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  print all character sprites");
+        return Some(0);
+    }
+    if args.iter().any(|a| a == "--gallery") {
+        gallery();
+        return Some(0);
+    }
+    None
 }
 
 #[cfg(test)]
