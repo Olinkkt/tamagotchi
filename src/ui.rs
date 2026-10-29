@@ -197,7 +197,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         v
     };
     let body: Vec<Line> = match &app.mode {
-        Mode::Game(g) => centered(g.lines()),
+        Mode::Game(g) => g.lines(inner.width as usize, inner.height as usize),
         Mode::Chooser => {
             let mut v = vec![
                 Line::from(Span::styled("PICK A GAME", Style::new().fg(ACCENT).add_modifier(Modifier::BOLD))),

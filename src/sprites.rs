@@ -12,10 +12,10 @@ const H: usize = 20;
 const CX: f32 = 15.5;
 const MID: i32 = 15;
 
-type C = (u8, u8, u8);
+pub type C = (u8, u8, u8);
 
-const INK: C = (35, 25, 45);
-const WHITE: C = (245, 245, 255);
+pub const INK: C = (35, 25, 45);
+pub const WHITE: C = (245, 245, 255);
 const SHADOW: C = (1, 2, 3);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -42,7 +42,7 @@ impl Fx {
 }
 
 #[derive(Clone, Copy, PartialEq)]
-enum Mood {
+pub enum Mood {
     Happy,
     Neutral,
     Sad,
@@ -51,41 +51,47 @@ enum Mood {
     Dead,
 }
 
-fn mix(a: C, b: C, t: f32) -> C {
+pub fn mix(a: C, b: C, t: f32) -> C {
     let m = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t).round() as u8;
     (m(a.0, b.0), m(a.1, b.1), m(a.2, b.2))
 }
 
-fn darken(a: C, t: f32) -> C {
+pub fn darken(a: C, t: f32) -> C {
     mix(a, (0, 0, 0), t)
 }
 
-struct Canvas {
+pub struct Canvas {
+    pub w: usize,
+    pub h: usize,
     px: Vec<Option<C>>,
 }
 
 impl Canvas {
     fn new() -> Self {
-        Canvas { px: vec![None; W * H] }
+        Canvas::sized(W, H)
     }
 
-    fn set(&mut self, x: i32, y: i32, c: C) {
-        if x >= 0 && y >= 0 && (x as usize) < W && (y as usize) < H {
-            self.px[y as usize * W + x as usize] = Some(c);
+    pub fn sized(w: usize, h: usize) -> Self {
+        Canvas { w, h, px: vec![None; w * h] }
+    }
+
+    pub fn set(&mut self, x: i32, y: i32, c: C) {
+        if x >= 0 && y >= 0 && (x as usize) < self.w && (y as usize) < self.h {
+            self.px[y as usize * self.w + x as usize] = Some(c);
         }
     }
 
-    fn get(&self, x: i32, y: i32) -> Option<C> {
-        if x >= 0 && y >= 0 && (x as usize) < W && (y as usize) < H {
-            self.px[y as usize * W + x as usize]
+    pub fn get(&self, x: i32, y: i32) -> Option<C> {
+        if x >= 0 && y >= 0 && (x as usize) < self.w && (y as usize) < self.h {
+            self.px[y as usize * self.w + x as usize]
         } else {
             None
         }
     }
 
-    fn ellipse(&mut self, cx: f32, cy: f32, rx: f32, ry: f32, c: C) {
-        for y in 0..H {
-            for x in 0..W {
+    pub fn ellipse(&mut self, cx: f32, cy: f32, rx: f32, ry: f32, c: C) {
+        for y in 0..self.h {
+            for x in 0..self.w {
                 let dx = (x as f32 + 0.5 - cx) / rx;
                 let dy = (y as f32 + 0.5 - cy) / ry;
                 if dx * dx + dy * dy <= 1.0 {
@@ -95,7 +101,7 @@ impl Canvas {
         }
     }
 
-    fn rect(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, c: C) {
+    pub fn rect(&mut self, x0: i32, y0: i32, x1: i32, y1: i32, c: C) {
         for y in y0..=y1 {
             for x in x0..=x1 {
                 self.set(x, y, c);
@@ -103,7 +109,7 @@ impl Canvas {
         }
     }
 
-    fn pixels(&mut self, pts: &[(i32, i32)], c: C) {
+    pub fn pixels(&mut self, pts: &[(i32, i32)], c: C) {
         for &(x, y) in pts {
             self.set(x, y, c);
         }
@@ -112,8 +118,8 @@ impl Canvas {
     /// Put a dark edge around every filled shape.
     fn outline(&mut self, c: C) {
         let mut edge = Vec::new();
-        for y in 0..H as i32 {
-            for x in 0..W as i32 {
+        for y in 0..self.h as i32 {
+            for x in 0..self.w as i32 {
                 if self.get(x, y).is_none()
                     && [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|(dx, dy)| self.get(x + dx, y + dy).is_some())
                 {
@@ -124,9 +130,9 @@ impl Canvas {
         self.pixels(&edge, c);
     }
 
-    fn blit(&mut self, src: &Canvas, dx: i32, dy: i32, flat: Option<C>) {
-        for y in 0..H as i32 {
-            for x in 0..W as i32 {
+    pub fn blit(&mut self, src: &Canvas, dx: i32, dy: i32, flat: Option<C>) {
+        for y in 0..src.h as i32 {
+            for x in 0..src.w as i32 {
                 if let Some(c) = src.get(x, y) {
                     self.set(x + dx, y + dy, flat.unwrap_or(c));
                 }
@@ -148,7 +154,7 @@ struct Body {
     outline: C,
 }
 
-fn heart(c: &mut Canvas, x: i32, y: i32, col: C) {
+pub fn heart(c: &mut Canvas, x: i32, y: i32, col: C) {
     c.pixels(&[(1, 0), (3, 0)].map(|(a, b)| (x + a, y + b)), col);
     c.rect(x, y + 1, x + 4, y + 1, col);
     c.rect(x + 1, y + 2, x + 3, y + 2, col);
@@ -578,6 +584,58 @@ fn render_scene(p: &Pet, t: u32, fx: Option<(Fx, f32)>, w: usize, h: usize, body
     }
 
     compose(&scene, w, h, p.asleep, t)
+}
+
+/// The pet at half size (16x10), for the mini-games. Faces and outlines win over the body
+/// colour when a 2x2 block is shrunk to one pixel, so the pet stays recognisable.
+pub fn mini_pet(p: &Pet, t: u32, mood: Mood) -> Canvas {
+    let mut body = draw_body(p, 1.0, t);
+    if let Some(face) = &body.face {
+        draw_face(&mut body.canvas, face, mood, t % 9 == 8, false, None);
+    }
+    let mut out = Canvas::sized(W / 2, H / 2);
+    for y in 0..(H / 2) as i32 {
+        for x in 0..(W / 2) as i32 {
+            let block: Vec<C> = [(0, 0), (1, 0), (0, 1), (1, 1)].iter().filter_map(|(dx, dy)| body.canvas.get(x * 2 + dx, y * 2 + dy)).collect();
+            let pick = if block.contains(&INK) {
+                Some(INK)
+            } else if block.len() < 4 && block.contains(&body.outline) {
+                Some(body.outline)
+            } else {
+                block.iter().copied().find(|&c| c != body.outline).or(block.first().copied())
+            };
+            if let Some(c) = pick {
+                out.set(x, y, c);
+            }
+        }
+    }
+    out
+}
+
+/// The pet's main body colour, for things drawn in its likeness.
+pub fn body_colour(p: &Pet) -> C {
+    draw_body(p, 1.0, 0).body
+}
+
+/// Turn a canvas into terminal rows, two pixels per cell, scaled up by a whole number when
+/// the `w` x `h` cell area has room, centred, with `outside` filling the rest.
+pub fn to_lines(c: &Canvas, w: usize, h: usize, outside: C) -> Vec<Line<'static>> {
+    let ph = h * 2;
+    let s = (w / c.w.max(1)).min(ph / c.h.max(1)).clamp(1, 3);
+    let ox = w.saturating_sub(c.w * s) / 2;
+    let oy = ph.saturating_sub(c.h * s) / 2;
+    let pix = |x: usize, y: usize| -> C {
+        if x >= ox && y >= oy {
+            if let Some(p) = c.get(((x - ox) / s) as i32, ((y - oy) / s) as i32) {
+                return p;
+            }
+        }
+        outside
+    };
+    let rgb = |p: C| Color::Rgb(p.0, p.1, p.2);
+    (0..h)
+        .map(|row| Line::from((0..w).map(|x| Span::styled("▀", Style::new().fg(rgb(pix(x, row * 2))).bg(rgb(pix(x, row * 2 + 1))))).collect::<Vec<_>>()))
+        .collect()
 }
 
 fn wall(y: usize, ph: usize, night: bool) -> C {

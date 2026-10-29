@@ -680,9 +680,8 @@ mod tests {
         let g = games::Game::new(2, &mut app.pet);
         app.mode = Mode::Game(g);
         let screen = render(&app, 64, 22).join("\n");
-        assert!(screen.contains("█"), "pong lost its paddle at 64x22:\n{screen}");
-        let bottom_wall = "─".repeat(28);
-        assert!(screen.contains(&bottom_wall), "pong lost its bottom edge at 64x22:\n{screen}");
+        assert!(screen.contains("PONG"), "pong lost its heading at 64x22:\n{screen}");
+        assert!(screen.matches('▀').count() >= 32 * 9, "pong court is not fully drawn at 64x22:\n{screen}");
     }
 
     #[test]
