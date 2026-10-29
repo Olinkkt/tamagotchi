@@ -782,6 +782,64 @@ mod tests {
         assert_eq!(p.stage, Stage::Baby);
     }
 
+    #[test]
+    fn teens_split_on_mistakes() {
+        assert_eq!(Pet::species_of(Stage::Teen, 0, 0), "Tonmarutchi");
+        assert_eq!(Pet::species_of(Stage::Teen, 2, 0), "Tonmarutchi");
+        assert_eq!(Pet::species_of(Stage::Teen, 3, 100), "Hashitamatchi");
+    }
+
+    #[test]
+    fn adults_depend_on_mistakes_and_discipline() {
+        assert_eq!(Pet::species_of(Stage::Adult, 0, 75), "Mametchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 1, 100), "Mametchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 0, 74), "Kuchipatchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 2, 100), "Kuchipatchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 3, 100), "Tarakotchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 4, 0), "Tarakotchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 5, 100), "Ichigotchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 6, 0), "Ichigotchi");
+        assert_eq!(Pet::species_of(Stage::Adult, 7, 100), "Nyorotchi");
+    }
+
+    #[test]
+    fn grow_waits_for_the_stage_time_then_resets_the_clock() {
+        let mut p = Pet::new(1);
+        p.stage = Stage::Baby;
+        p.stage_age = p.cfg.baby_secs - 1;
+        p.grow();
+        assert_eq!(p.stage, Stage::Baby);
+        p.stage_age = p.cfg.baby_secs;
+        p.grow();
+        assert_eq!(p.stage, Stage::Child);
+        assert_eq!(p.species, "Marutchi");
+        assert_eq!(p.stage_age, 0);
+    }
+
+    #[test]
+    fn grow_picks_the_adult_from_the_care_record() {
+        let mut p = Pet::new(1);
+        p.stage = Stage::Teen;
+        p.mistakes = 4;
+        p.discipline = 100;
+        p.stage_age = p.cfg.teen_secs;
+        p.grow();
+        assert_eq!(p.stage, Stage::Adult);
+        assert_eq!(p.species, "Tarakotchi");
+    }
+
+    #[test]
+    fn the_preview_names_the_current_track_and_the_next_one_down() {
+        let mut p = Pet::new(1);
+        p.stage = Stage::Teen;
+        p.species = "Tonmarutchi".into();
+        p.mistakes = 0;
+        p.discipline = 80;
+        let text = p.evolution_preview().join("\n");
+        assert!(text.contains("On track: Mametchi"), "{text}");
+        assert!(text.contains("2 more mistakes -> Kuchipatchi"), "{text}");
+    }
+
     fn awake_adult() -> Pet {
         let mut p = Pet::new(11);
         p.dev_set_hour(7);
