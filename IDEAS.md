@@ -20,9 +20,9 @@ Possible next steps, not a roadmap. Roughly in order of payoff within each group
 ## Infrastructure
 
 - [ ] **Download-based updater**: GitHub Actions releases, or an AUR package.
-- [ ] **Save migration**: add a `version` field to saves before a MAJOR change needs it.
+- [x] **Save migration**: saves carry a `version` field (old saves read as 0). Add real migration code when a MAJOR change needs it.
 - [ ] **Sound**: terminal bell or a notification sound when the pet needs you.
-- [ ] **Tests**: cover evolution rules and the profile/shop code.
+- [x] **Tests**: evolution rules, profile and shop code are covered.
 
 ## Polish
 

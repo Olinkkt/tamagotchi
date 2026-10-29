@@ -11,8 +11,14 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+/// Bump when the save format changes in a way old code cannot read.
+const SAVE_VERSION: u32 = 1;
+
 #[derive(Serialize, Deserialize)]
 struct SaveFile {
+    /// Format version; saves from before this field existed read as 0.
+    #[serde(default)]
+    version: u32,
     saved_at: u64,
     pet: Pet,
 }
@@ -66,7 +72,7 @@ fn save_path() -> PathBuf {
 /// can never leave a half-written save behind.
 pub fn save(pet: &Pet) -> io::Result<()> {
     fs::create_dir_all(dir())?;
-    let json = serde_json::to_string_pretty(&SaveFile { saved_at: now(), pet: pet.clone() })?;
+    let json = serde_json::to_string_pretty(&SaveFile { version: SAVE_VERSION, saved_at: now(), pet: pet.clone() })?;
     let path = save_path();
     let tmp = path.with_extension("json.tmp");
     fs::write(&tmp, json)?;
@@ -257,6 +263,18 @@ pub(crate) fn with_temp_dir<R>(f: impl FnOnce() -> R) -> R {
 mod tests {
     use super::*;
     use crate::pet::Stage;
+
+    #[test]
+    fn a_save_without_a_version_field_still_loads() {
+        with_temp_dir(|| {
+            save(&Pet::new(1)).unwrap();
+            let mut v: serde_json::Value = serde_json::from_str(&fs::read_to_string(save_path()).unwrap()).unwrap();
+            assert_eq!(v["version"], SAVE_VERSION);
+            v.as_object_mut().unwrap().remove("version");
+            fs::write(save_path(), v.to_string()).unwrap();
+            assert!(matches!(load(), Loaded::Pet(..)), "saves from before versioning must load");
+        });
+    }
 
     #[test]
     fn save_round_trips_and_leaves_no_temp_file() {
