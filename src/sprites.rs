@@ -617,16 +617,18 @@ pub fn body_colour(p: &Pet) -> C {
     draw_body(p, 1.0, 0).body
 }
 
-/// Turn a canvas into terminal rows, two pixels per cell, scaled up by a whole number when
-/// the `w` x `h` cell area has room, centred, with `outside` filling the rest.
+/// Turn a canvas into terminal rows, two pixels per cell, scaled up as far as the `w` x `h`
+/// cell area allows (keeping its shape), centred, with `outside` filling the rest.
 pub fn to_lines(c: &Canvas, w: usize, h: usize, outside: C) -> Vec<Line<'static>> {
     let ph = h * 2;
-    let s = (w / c.w.max(1)).min(ph / c.h.max(1)).clamp(1, 3);
-    let ox = w.saturating_sub(c.w * s) / 2;
-    let oy = ph.saturating_sub(c.h * s) / 2;
+    let s = (w as f32 / c.w.max(1) as f32).min(ph as f32 / c.h.max(1) as f32).max(1.0);
+    let (sw, sh) = ((c.w as f32 * s) as usize, (c.h as f32 * s) as usize);
+    let ox = w.saturating_sub(sw) / 2;
+    let oy = ph.saturating_sub(sh) / 2;
     let pix = |x: usize, y: usize| -> C {
-        if x >= ox && y >= oy {
-            if let Some(p) = c.get(((x - ox) / s) as i32, ((y - oy) / s) as i32) {
+        if x >= ox && y >= oy && x < ox + sw && y < oy + sh {
+            let (cx, cy) = (((x - ox) as f32 / s) as i32, ((y - oy) as f32 / s) as i32);
+            if let Some(p) = c.get(cx, cy) {
                 return p;
             }
         }

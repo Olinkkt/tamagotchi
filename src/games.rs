@@ -311,6 +311,8 @@ pub struct Pong {
     ky: i32,
     keeper: C,
     spark: Option<(i32, i32, Instant)>,
+    /// The ball got past the paddle; it rolls off the left edge before the game ends.
+    missed: bool,
     hits: u8,
     last: Instant,
     step_ms: u64,
@@ -331,6 +333,7 @@ impl Pong {
             ky: (by - 2).clamp(1, FH as i32 - 1 - KEEPER),
             keeper: body_colour(pet),
             spark: None,
+            missed: false,
             hits: 0,
             last: Instant::now(),
             step_ms: 80,
@@ -363,13 +366,22 @@ impl Pong {
             ny = self.by + self.dy;
         }
         let mut nx = self.bx + self.dx;
+        if self.missed {
+            self.bx = nx;
+            self.by = ny;
+            return if nx < -2 { Outcome::Done { wins: self.hits, rounds: PONG_GOAL } } else { Outcome::Continue };
+        }
+        let keeper_top = (ny - 2).clamp(1, FH as i32 - 1 - KEEPER);
         if nx >= 26 {
             self.dx = -1;
             nx = 25;
+            // The pet always reaches the ball, so it is shown right behind it when it bounces.
+            self.ky = keeper_top;
             self.spark = Some((27, ny, after_ms(150)));
         }
-        if nx <= 2 {
-            if ny + 1 >= self.py && ny < self.py + PADDLE {
+        if nx <= 2 && self.dx < 0 {
+            // The 2-pixel ball counts as a hit when it touches the paddle, plus one pixel of slack.
+            if ny + 2 >= self.py && ny <= self.py + PADDLE {
                 self.hits += 1;
                 if self.hits >= PONG_GOAL {
                     return Outcome::Done { wins: PONG_GOAL, rounds: PONG_GOAL };
@@ -379,12 +391,11 @@ impl Pong {
                 self.spark = Some((3, ny, after_ms(150)));
                 self.step_ms = (self.step_ms * 92 / 100).max(40);
             } else {
-                return Outcome::Done { wins: self.hits, rounds: PONG_GOAL };
+                self.missed = true;
             }
         }
         // The pet follows the ball, one pixel a step.
-        let target = (ny - 2).clamp(1, FH as i32 - 1 - KEEPER);
-        self.ky += (target - self.ky).signum();
+        self.ky += (keeper_top - self.ky).signum();
         self.bx = nx;
         self.by = ny;
         Outcome::Continue
@@ -489,6 +500,31 @@ mod tests {
             }
         }
         panic!("pong never ended");
+    }
+
+    #[test]
+    fn pong_a_ball_touching_the_paddle_is_returned_and_one_beside_it_rolls_past() {
+        let mut p = pet();
+        let mut g = Pong::new(&mut p);
+        g.py = 6;
+        (g.bx, g.by, g.dx, g.dy) = (3, 4, -1, 1);
+        g.last = Instant::now() - Duration::from_millis(500);
+        g.tick();
+        assert_eq!((g.hits, g.dx), (1, 1), "ball rows 5-6 touch the paddle at 6-10");
+
+        let mut g = Pong::new(&mut p);
+        g.py = 10;
+        (g.bx, g.by, g.dx, g.dy) = (3, 4, -1, -1);
+        g.last = Instant::now() - Duration::from_millis(500);
+        assert!(matches!(g.tick(), Outcome::Continue), "a miss is not over until the ball is off screen");
+        assert!(g.missed);
+        for _ in 0..10 {
+            g.last = Instant::now() - Duration::from_millis(500);
+            if let Outcome::Done { wins: 0, .. } = g.tick() {
+                return;
+            }
+        }
+        panic!("the missed ball never left the court");
     }
 
     #[test]

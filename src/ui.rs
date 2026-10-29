@@ -181,7 +181,9 @@ pub fn draw(f: &mut Frame, app: &App) {
     }
     f.render_widget(Paragraph::new(header).block(panel("tamagotchi")), rows[0]);
 
-    let cols = Layout::horizontal([Constraint::Min(34), Constraint::Length(30)]).split(rows[1]);
+    // A game gets the whole width; the status panel comes back when it ends.
+    let in_game = matches!(app.mode, Mode::Game(_));
+    let cols = Layout::horizontal([Constraint::Min(34), Constraint::Length(if in_game { 0 } else { 30 })]).split(rows[1]);
 
     // Room
     let room_block = Block::default()
@@ -322,7 +324,9 @@ pub fn draw(f: &mut Frame, app: &App) {
             stats.push(Line::from(Span::styled(format!("· {e}"), Style::new().fg(DIM))));
         }
     }
-    f.render_widget(Paragraph::new(stats).wrap(Wrap { trim: true }).block(panel("status")), cols[1]);
+    if !in_game {
+        f.render_widget(Paragraph::new(stats).wrap(Wrap { trim: true }).block(panel("status")), cols[1]);
+    }
 
     // Hint: what to do right now
     let need = p.top_need();
