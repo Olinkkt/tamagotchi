@@ -1,14 +1,16 @@
 # tama
 
-A tamagotchi that lives in your terminal. Feed it, clean up after it, play games with it, and
+A pixel-art tamagotchi in a little window. Feed it, clean up after it, play games with it, and
 keep an eye on it from your status bar. It keeps living while the game is closed.
 
-Pixel-art characters are drawn with half-block characters, so you need a terminal with
-24-bit colour and a window of at least **64x22**.
+The whole scene is drawn at 240x160 pixels and shown at the largest whole-number scale that
+fits the window (960x640, 4x, to start with; resize it freely), so every pixel stays crisp and
+the same size. Text is drawn at full window resolution in a matching pixel font.
 
 ## Install
 
-You need [Rust](https://rustup.rs). From the project folder:
+You need [Rust](https://rustup.rs) (1.86 or newer) and a desktop with OpenGL. From the
+project folder:
 
 ```sh
 cargo install --path .
@@ -20,7 +22,9 @@ This puts `tama` in `~/.cargo/bin`, which must be on your `PATH`. After you chan
 
 ## Playing
 
-Run `tama`. One pet at a time; when it dies you can hatch a new egg with `n`.
+Run `tama` to open the window. One pet at a time; when it dies you can hatch a new egg with `n`.
+Every action is also a button along the bottom of the window: click it, or press its key (shown
+in the button's corner).
 
 | Key | Action |
 |---|---|
@@ -36,8 +40,9 @@ Run `tama`. One pet at a time; when it dies you can hatch a new egg with `n`.
 | `g` | graveyard: the pets you have lost |
 | `q` | quit (the pet keeps living) |
 
-The line under the room always tells you the most urgent thing to do, the matching key lights
-up in the menu, and the pet shows a bubble with an icon for it.
+The line under the room always tells you the most urgent thing to do, the matching button
+bounces in yellow, and the pet shows a bubble with an icon for it. Buttons that would do nothing
+right now are dimmed.
 
 ### Mini-games
 
@@ -49,13 +54,13 @@ the window while you play (the status panel comes back afterwards). When a game 
 screen shows a star per round won, the coins earned and the pet cheering or sulking for three
 seconds (any key skips it).
 
-1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4. Your pet watches and cheers or sulks.
-2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. A direction key keeps the paddle going until you press the other way or space, so it does not rely on your terminal's key repeat.
+1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4 (or the buttons). Your pet watches and cheers or sulks.
+2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle moves while you hold ↑/↓ (or W/S, K/J, or the arrow buttons) and stops when you let go.
 
 ### Coins, shop and awards
 
 Winning a mini-game pays **4 coins**, and a perfect game **10**. Spend them in the shop (`b`,
-then `1` to `4`); nothing is charged if the item would do nothing right now:
+then `1` to `4`, or click an item); nothing is charged if the item would do nothing right now:
 
 | Item | Price | Effect |
 |---|---|---|
@@ -65,7 +70,7 @@ then `1` to `4`); nothing is charged if the item would do nothing right now:
 | Vitamins | 12 | no sickness for 3 hours |
 
 `a` shows ten achievements (for example "Spotless": reach adulthood with no care mistakes) and
-which of the five adult species you have raised. Coins, achievements and the collection belong
+the five adult species, in colour once you have raised one and as a silhouette until then. Coins, achievements and the collection belong
 to you, not to one pet, so they survive a pet dying; they live in `profile.json` next to the save.
 Prices and rewards are first guesses.
 
@@ -107,8 +112,11 @@ in the config (`away_slowdown`, `away_safe`).
 
 ## Commands
 
+Only `tama`, `tama --dev` and `tama --fast` open a window; everything else runs in the terminal
+and loads no graphics, so the status bar and `tama watch` stay light.
+
 ```
-tama                 play
+tama                 play (opens the window)
 tama status          one line for a status bar, e.g. (T_T) Marutchi ♡♡♡♡ ♥♥♥♡ ! feed
 tama status --waybar JSON for waybar: short text, a hover tooltip, and a class
 tama feed|snack|clean|medicine|scold|light
@@ -119,7 +127,7 @@ tama watch           desktop notifications when the pet needs you
 tama watch --test    send one test notification
 tama --animate on|off  show or hide the animated ears, wings, tuft, leaves and tail
 tama --update | --version | --help
-tama --gallery       print every character
+tama --gallery       write tama-gallery.png: every character in every expression (no window)
 tama --dev | --fast  developer mode / 60x speed, both with a separate test save
 ```
 
@@ -221,29 +229,53 @@ invisible=0
 ```sh
 cargo test        # unit tests; file tests run in a temporary folder
 tama --dev        # separate test save; press Tab for the dev panel
+cargo art         # redraw every sprite into assets/ (tools/spritegen)
 ```
 
-The dev panel changes hunger/happy/discipline/weight/mistakes, adds poop, sickness or a naughty
-call, adds coins, grows or kills the pet, skips time and sets the clock, changes the speed, and switches the
-machine reactions (CPU, RAM, battery) on and off.
+The dev panel shows the value behind every dev key. It changes hunger/happy/discipline/weight/
+mistakes, adds poop, sickness or a naughty call, adds coins, steps through every form (`[` `]`,
+including death), cracks the egg, grows or kills the pet, skips time and sets the clock, changes
+the speed, and switches the machine reactions (CPU, RAM, battery) on and off. Clicking a button
+always does the action, even while the panel is open.
 
 Shift+R (then `y`) throws the current pet away and starts a new egg.
+
+### Pixel art
+
+Everything is drawn with the 24 colours in `src/palette.rs`; nothing uses colours outside it.
+`cargo art` builds the sprites: each character is drawn in shapes on a 128x128 canvas,
+rasterised without anti-aliasing, shrunk with nearest-neighbour to 32x32 (baby, child), 40x40
+(teens) or 48x48 (adults), snapped to the palette, shaded from the top left with hue-shifted
+palette ramps, and given a 1px outline. Faces, egg cracks and icons are exact pixel grids
+(`src/faces.rs`, `src/icons.rs`). Ears, wings, the tuft, leaves and tail are separate three-frame
+layers, drawn only with `animate_parts` on. The sheets in `assets/sprites/` are embedded in the
+binary; `assets/preview/` gets an 8x preview of every sprite (not committed).
 
 Source layout:
 
 | File | What it holds |
 |---|---|
-| `main.rs` | app state, key handling and the game loop |
-| `ui.rs` | drawing the screen: header, room, status panel, menu |
-| `pet.rs` | the simulation: needs, growth, evolution, shop items |
-| `sprites.rs` | pixel art: the pet, the room, and the shared pixel canvas the games draw on |
+| `main.rs` | picks a shell command or opens the window |
+| `app.rs` | game state, keys, clicks, the dev panel's keys |
+| `window.rs` | the macroquad window: scaling, input, drawing text at full resolution |
+| `hud.rs` | the screen around the room: header, hint line, button bar |
+| `panel.rs` | the status panel |
+| `scene.rs` | the room: the pet, its moods and reactions, poop, bubbles, effects |
+| `screens.rs` | the cards: game picker, shop, awards, graveyard, reset |
 | `games.rs` | mini-games and the result screen |
+| `frame.rs` | the palette pixel canvas everything is drawn into |
+| `art.rs` | the embedded sprite sheets |
+| `palette.rs`, `faces.rs`, `cast.rs` | colours, face grids, sprite sheet layout (shared with `tools/spritegen`) |
+| `icons.rs`, `font.rs` | small pixel icons and the pixel font |
+| `gallery.rs` | `--gallery` |
+| `pet.rs` | the simulation: needs, growth, evolution, shop items |
 | `profile.rs` | coins, achievements, the adult collection |
-| `cli.rs` | shell commands, `--flags`, status bar, notifications, `--gallery`, `--update` |
+| `cli.rs` | shell commands, `--flags`, status bar, notifications, `--update` |
 | `save.rs` | save files (with a format `version`), profile, graveyard, lock |
 | `sysinfo.rs` | machine load |
 | `config.rs` | settings |
 
-New mini-games should draw on the `sprites::Canvas` like the existing ones, not with text.
+New mini-games should draw a palette `Frame` like the existing ones, with the pet's own
+sprite; scores are pixels too, not text.
 
 Versions follow `MAJOR.MINOR.PATCH`; see `CLAUDE.md` for the rules.
