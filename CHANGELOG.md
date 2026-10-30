@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.4
+
+- Nyorotchi's body is now a round blob like the other adults instead of a tall egg shape. The
+  sprout and tail are unchanged.
+
 ## 1.4.3
 
 - The egg's crack is now one zigzag across its middle that grows outwards from the centre, a bit

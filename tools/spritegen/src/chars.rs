@@ -193,9 +193,9 @@ pub fn ichigotchi(c: &Character) -> Vec<Img> {
 
 pub fn nyorotchi(c: &Character) -> Vec<Img> {
     let mut body = Sketch::new(SRC, SRC);
-    body.ellipse(64.0, 72.0, 33.0, 47.0, Teal);
-    body.line(&[(64.0, 28.0), (60.0, 16.0), (68.0, 10.0)], 8.0, Teal);
-    body.ellipse(64.0, 92.0, 18.0, 24.0, Ice);
+    body.ellipse(64.0, 74.0, 44.0, 42.0, Teal);
+    body.line(&[(64.0, 34.0), (60.0, 20.0), (68.0, 12.0)], 8.0, Teal);
+    body.ellipse(64.0, 90.0, 24.0, 21.0, Ice);
     let mut cells = vec![finish(c, &body)];
     // A tail curling out to the right, swishing about its root.
     cells.extend(frames(c, 9.0, |s, a| {
