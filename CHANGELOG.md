@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.7
+
+- Tama is now public and free to play under its own licence (see `LICENSE`: not open source, no
+  selling or redistributing). The README has a new intro with a picture of every character.
+
 ## 1.12.6
 
 - Shop prices and the coin count now read number first, coin after, with the number right up

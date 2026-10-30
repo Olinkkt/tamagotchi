@@ -1,13 +1,40 @@
-# tama
+<h1 align="center">tama</h1>
 
-A pixel-art tamagotchi in a little window. Feed it, take it to the toilet, play games with it, and
-keep an eye on it from your status bar. It keeps living while the game is closed.
+<p align="center"><b>A pixel-art tamagotchi that lives in a window, in your status bar and in your shell.</b></p>
 
-The scene is drawn in pixels and shown at a whole-number scale, so every pixel stays crisp and
-the same size. The window opens at 960x640 (4x) and can be resized freely or made fullscreen with
-F11: the picture grows with it, with a bigger room, a taller status panel and the button bar on
-the edges, instead of leaving bars. Text is drawn at full window resolution in a matching pixel
-font.
+<p align="center">
+  <img src="docs/gallery.png" alt="Every character and expression" width="560">
+</p>
+
+Hatch an egg, feed it, take it to the toilet, play games with it and raise it into one of five
+adults. It keeps living while the game is closed, so check on it from your status bar, get a
+desktop notification when it needs you, and let your `git commit`s feed it. Free to play, written
+in Rust, drawn in 24 colours.
+
+## Highlights
+
+- **A pet that lives on without you.** Close the game and the pet gets hungry, sleepy and sick at
+  a slower, safe pace. Come back to find out how it went.
+- **Five adults to raise.** How well you care for the pet decides what it grows into. Collect
+  them all in the awards.
+- **Mini-games, coins and a shop.** Memory and Pong, played by keyboard or mouse. Win coins and
+  spend them on treats.
+- **Mouse or keyboard.** Every action is a button and a key, and everything clickable lights up
+  when you hover it.
+- **Lives in your terminal too.** `tama status` for tmux or waybar, `tama feed` from the shell,
+  `tama watch` for notifications, and a zsh hook that rewards your commits.
+- **Crisp pixels.** One pixel size at any window size, a matching pixel font and a fixed palette.
+
+## Quick start
+
+```sh
+git clone https://github.com/Olinkkt/tamagotchi
+cd tamagotchi
+cargo install --path .
+tama
+```
+
+Needs [Rust](https://rustup.rs) 1.86+ and a desktop with OpenGL. More below.
 
 ## Install
 
@@ -301,3 +328,9 @@ New mini-games should draw a palette `Frame` like the existing ones, with the pe
 sprite; scores are pixels too, not text.
 
 Versions follow `MAJOR.MINOR.PATCH`; see `CLAUDE.md` for the rules.
+
+## Licence
+
+Tama is free to play, but it is not open source. You may play it, build it from this source for
+your own use and share the link to this repository. You may not sell it, redistribute modified
+copies or use its art and code in other projects. See [LICENSE](LICENSE) for the full terms.

@@ -709,7 +709,7 @@ mod tests {
     #[test]
     fn the_egg_bursts_then_the_baby_pops_out_and_the_shell_lands() {
         let p = pet(Stage::Baby);
-        let at = |t: f32| room(&Moment { pet: &p, fx: None, ms: 0, shell: Some(t), sub_ms: 0 }, W, H);
+        let at = |t: f32| room(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: Some(t), sub_ms: 0 }, W, H);
         // The baby's pink body, above the rug.
         let pink = |f: &Frame| (66..88).flat_map(|y| (60..100).map(move |x| (x, y))).filter(|&(x, y)| f.get(x, y) == Some(Pal::Pink)).count();
         assert!(pink(&at(0.2)) > 100, "the baby is out");
