@@ -55,16 +55,6 @@ impl Quirk {
             Quirk::Mischievous => "mischievous",
         }
     }
-
-    pub fn description(self) -> &'static str {
-        match self {
-            Quirk::Easygoing => "no strong habits",
-            Quirk::Greedy => "gets hungry faster",
-            Quirk::Playful => "gets bored faster, loves games",
-            Quirk::Hardy => "rarely gets sick",
-            Quirk::Mischievous => "acts up more often",
-        }
-    }
 }
 
 /// Something that can be bought in the shop.

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.9.1
+
+- Internal cleanup after the status panel change; nothing looks different.
+
 ## 1.9.0
 
 - The status panel is less crowded: the "recent" log and the trait hint are gone, and growth is
