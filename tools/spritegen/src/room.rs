@@ -14,13 +14,13 @@ use crate::cast::{ROOM_MASTER, ROOM_STAGE};
 
 pub const W: usize = ROOM_STAGE.0;
 pub const H: usize = ROOM_STAGE.1;
-const MW: usize = ROOM_MASTER.0;
-const MH: usize = ROOM_MASTER.1;
+pub(crate) const MW: usize = ROOM_MASTER.0;
+pub(crate) const MH: usize = ROOM_MASTER.1;
 /// Where the stage's top-left corner is in the master.
-const SX: i32 = ((MW - W) / 2) as i32;
-const SY: i32 = (MH - H) as i32;
+pub(crate) const SX: i32 = ((MW - W) / 2) as i32;
+pub(crate) const SY: i32 = (MH - H) as i32;
 const FLOOR: f32 = 84.0;
-const K: f32 = 4.0;
+pub(crate) const K: f32 = 4.0;
 /// Stage coordinates covered by the master.
 const XS: std::ops::Range<i32> = -SX..(W as i32 + SX);
 
@@ -45,7 +45,7 @@ fn flat(s: &Sketch) -> Img {
 }
 
 /// Furniture gets a soft dark outline rather than the characters' ink, so the pet stands out.
-fn lined(s: &Sketch) -> Img {
+pub(crate) fn lined(s: &Sketch) -> Img {
     layer(&s.to_img(), MW, MH, &Finish { shade: false, outline: Some(Night) })
 }
 

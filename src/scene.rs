@@ -1,4 +1,4 @@
-//! The room and everything in it: the pet, its moods and reactions, poop, sleep, speech bubbles
+//! The room and everything in it: the pet, its moods and reactions, sleep, speech bubbles
 //! and the one-shot effects after an action. Drawn in room pixels (160x116).
 
 use crate::app::{App, Mode};
@@ -10,6 +10,7 @@ use crate::frame::Frame;
 use crate::icons;
 use crate::palette::Pal;
 use crate::pet::{Pet, Stage};
+use crate::toilet;
 
 /// A one-shot animation after an action: what happened, picked by `App::react`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -18,7 +19,6 @@ pub enum Fx {
     Snack,
     Hearts,
     Heal,
-    Clean,
     Scold,
     Evolve,
 }
@@ -29,7 +29,6 @@ impl Fx {
             Fx::Eat | Fx::Snack => 1.8,
             Fx::Hearts => 1.6,
             Fx::Heal => 1.4,
-            Fx::Clean => 1.0,
             Fx::Scold => 1.2,
             Fx::Evolve => 2.6,
         }
@@ -40,8 +39,6 @@ impl Fx {
 /// carries the wall and floor on around it, with everything kept to the bottom centre.
 pub const W: i32 = 160;
 pub const H: i32 = 116;
-/// Where up to three poops sit, left to right, relative to the middle of the room.
-const POOP_X: [i32; 3] = [-64, -46, 48];
 /// Stars in the night window that twinkle (the room sprite has them all lit).
 const TWINKLE: [(i32, i32); 3] = [(21, 19), (36, 18), (50, 41)];
 
@@ -257,6 +254,11 @@ fn cracks_at(n: usize) -> Vec<(i32, i32, Pal)> {
     faces::pixels(&faces::EGG_CRACKS[n - 1]).map(|(dx, dy, c)| (x + dx, y + dy, c)).collect()
 }
 
+/// The pet as it sits in the washroom booth.
+pub fn seated(app: &App) -> Sprite {
+    pet_sprite(&Moment::of(app), &character(&app.pet))
+}
+
 /// The pet with a given face (an egg shows its cracks instead), for the games and the gallery.
 pub fn posed(p: &Pet, e: Expr) -> Sprite {
     let c = character(p);
@@ -283,18 +285,6 @@ fn place(m: &Moment, c: &Character, s: Size) -> Place {
     let body = art::body(c);
     let y = s.floor() - body.bottom() + dy;
     Place { x: s.centre() - c.size as i32 / 2 + dx, y, size: c.size as i32, head: y + body.top() }
-}
-
-fn draw_poop(f: &mut Frame, m: &Moment, s: Size) {
-    let poop = art::body(&cast::POOP);
-    for (i, &off) in POOP_X.iter().take(m.pet.poops.min(3) as usize).enumerate() {
-        let (x, y) = (s.centre() + off, s.floor() + 2 - poop.bottom());
-        f.sprite(poop, x, y);
-        // Two specks of stink, hopping about above it.
-        let hop = ((m.beat() + i as u64) % 2) as i32;
-        f.set(x + 4 + hop, y - 3, Pal::Lime);
-        f.set(x + 10 - hop, y - 5, Pal::Lime);
-    }
 }
 
 /// 0 at both ends and 1 in the middle: the height of a jump or a throw as it goes from 0 to 1.
@@ -423,13 +413,6 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
                 }
             }
         }
-        Fx::Clean => {
-            let x = (t * (s.w + 24) as f32) as i32 - 16;
-            f.grid(icons::CLEAN, x, s.floor() - 10);
-            for i in 0..3 {
-                f.grid(icons::SPARKLE, x - 8 - i * 9, s.floor() - 14 + (i % 2) * 6);
-            }
-        }
         Fx::Scold if (t * 10.0) as i32 % 2 == 0 => f.grid(icons::ANGER, px + 2, py - 2),
         Fx::Evolve => {
             for (i, (x, y)) in [(-30, 0), (26, -4), (-36, 20), (32, 18), (-4, -14), (-22, 34), (20, 34)].into_iter().enumerate() {
@@ -489,7 +472,6 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
             }
         }
     }
-    draw_poop(&mut f, m, s);
     if let Some(t) = m.shell {
         draw_shell(&mut f, t, s);
     }
@@ -527,6 +509,9 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
 
 /// The room area for the modes that show the room. Menus and lists dim it behind their text.
 pub fn area(app: &App, w: i32, h: i32) -> Frame {
+    if let Mode::Toilet(visit) = &app.mode {
+        return toilet::area(app, visit, w, h);
+    }
     let mut f = room(&Moment::of(app), w, h);
     if !matches!(app.mode, Mode::Normal) {
         f.tint(0, 0, w, h, Pal::dark);
@@ -554,10 +539,10 @@ mod tests {
 
     #[test]
     fn every_stage_and_effect_draws_without_panicking() {
-        let fxs = [None, Some(Fx::Eat), Some(Fx::Snack), Some(Fx::Hearts), Some(Fx::Heal), Some(Fx::Clean), Some(Fx::Scold), Some(Fx::Evolve)];
+        let fxs = [None, Some(Fx::Eat), Some(Fx::Snack), Some(Fx::Hearts), Some(Fx::Heal), Some(Fx::Scold), Some(Fx::Evolve)];
         for stage in [Stage::Egg, Stage::Baby, Stage::Child, Stage::Teen, Stage::Adult, Stage::Dead] {
             let mut p = pet(stage);
-            p.poops = 3;
+            p.urge = Some(0);
             p.disc_call = Some(0);
             for fx in fxs {
                 for t in [0.0, 0.4, 0.95] {
@@ -786,10 +771,10 @@ mod tests {
     }
 
     #[test]
-    fn poop_and_a_need_bubble_change_the_room() {
+    fn a_need_bubble_changes_the_room() {
         let clean = pet(Stage::Baby);
         let mut dirty = pet(Stage::Baby);
-        dirty.poops = 1;
+        dirty.urge = Some(0);
         assert_ne!(look(&clean, 0), look(&dirty, 0));
         let mut hungry = pet(Stage::Baby);
         hungry.hunger = 0;

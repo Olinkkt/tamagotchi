@@ -3,10 +3,11 @@
 
 use std::time::{Duration, Instant};
 
+use crate::cast;
 use crate::config::Config;
 use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
-use crate::{fmt_age, games, save, scene, sysinfo, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
+use crate::{fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
 
 /// A key press, in the terms the game cares about. Each frontend translates its own events.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -29,6 +30,8 @@ pub enum Mode {
     Graveyard(Vec<String>),
     Shop,
     Awards,
+    /// The pet in a washroom booth; nothing can be done until it comes out.
+    Toilet(toilet::Visit),
 }
 
 pub struct App {
@@ -58,7 +61,7 @@ pub struct App {
     pub quit: bool,
 }
 
-type Snapshot = (u8, u8, u8, bool, u8, bool);
+type Snapshot = (u8, u8, u8, bool, bool);
 
 /// Every form the pet can take, in the order the dev panel steps through them.
 pub const FORMS: [(Stage, &str); 11] = [
@@ -103,12 +106,9 @@ impl App {
     pub fn new() -> Self {
         let args: Vec<String> = std::env::args().collect();
         let has = |f: &str| args.iter().any(|a| a == f);
-        let mut speed = std::env::var("TAMA_SPEED").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
-        if has("--fast") {
-            speed = 60.0;
-        }
+        let speed = std::env::var("TAMA_SPEED").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
         let dev = has("--dev");
-        if has("--fast") || dev {
+        if dev {
             save::use_test_slot();
         }
         if save::claim_game().is_err() {
@@ -233,7 +233,7 @@ impl App {
 
     fn snapshot(&self) -> Snapshot {
         let p = &self.pet;
-        (p.hunger, p.happy, p.doses, p.sick, p.poops, p.disc_call.is_some())
+        (p.hunger, p.happy, p.doses, p.sick, p.disc_call.is_some())
     }
 
     /// Pick an animation by comparing pet state before and after an action.
@@ -245,9 +245,7 @@ impl App {
             Some(scene::Fx::Hearts)
         } else if after.2 < before.2 || (before.3 && !after.3) {
             Some(scene::Fx::Heal)
-        } else if after.4 < before.4 {
-            Some(scene::Fx::Clean)
-        } else if (before.5 && !after.5) || after.1 < before.1 {
+        } else if (before.4 && !after.4) || after.1 < before.1 {
             Some(scene::Fx::Scold)
         } else {
             None
@@ -316,6 +314,9 @@ impl App {
             self.last_stage = self.pet.stage;
         }
         if matches!(self.mode, Mode::Game(_) | Mode::Chooser) && (self.pet.asleep || !self.pet.alive()) {
+            self.mode = Mode::Normal;
+        }
+        if matches!(&self.mode, Mode::Toilet(v) if v.done()) {
             self.mode = Mode::Normal;
         }
         self.tick_game();
@@ -426,6 +427,7 @@ impl App {
                 self.mode = Mode::Normal;
                 return;
             }
+            Mode::Toilet(_) => return,
             Mode::Normal => {}
         }
         if self.confirm_reset {
@@ -479,7 +481,14 @@ impl App {
                 return;
             }
             Key::Char('m') => self.pet.medicine(),
-            Key::Char('c') => self.pet.clean(),
+            Key::Char('t') => {
+                let goes = self.pet.needs_toilet();
+                let msg = self.pet.toilet();
+                if goes {
+                    self.mode = Mode::Toilet(toilet::Visit::new(self.pet.rand(cast::BOOTHS as u64) as usize));
+                }
+                msg
+            }
             Key::Char('d') => self.pet.scold(),
             Key::Char('l') => self.pet.toggle_light(),
             Key::Char('n') if !self.pet.alive() => {
@@ -534,8 +543,8 @@ impl App {
                 format!("mistakes = {}", p.mistakes)
             }
             'p' => {
-                p.poops = (p.poops + 1).min(3);
-                format!("poops = {}", p.poops)
+                p.dev_urge();
+                "needs the toilet".into()
             }
             's' => {
                 p.dev_sick();

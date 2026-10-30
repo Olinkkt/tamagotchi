@@ -109,7 +109,7 @@ fn draw_dev_panel(v: &Viewport, app: &App) {
         format!("w/W  weight {}", p.weight),
         format!("m/M  mistakes {}", p.mistakes),
         format!("o    +10 coins ({})", app.profile.coins),
-        format!("p    poop ({}/3)", p.poops),
+        "p    needs the toilet".into(),
         "s sick  n naughty  g grow".into(),
         "k    kill the pet".into(),
         "e    crack the egg".into(),

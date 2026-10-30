@@ -109,7 +109,7 @@ fn label(text: impl Into<String>, x: f32, y: f32, colour: Pal, align: Align) -> 
     Label { text: text.into(), x, y, colour, align }
 }
 
-const ACTIONS: [char; 11] = ['f', 's', 'p', 'l', 'm', 'c', 'd', 'b', 'a', 'g', 'q'];
+const ACTIONS: [char; 11] = ['f', 's', 'p', 'l', 'm', 't', 'd', 'b', 'a', 'g', 'q'];
 const DEAD_ACTIONS: [char; 4] = ['n', 'a', 'g', 'q'];
 
 /// Whether an action would do anything right now (the rest are drawn dimmed).
@@ -119,7 +119,7 @@ fn useful(app: &App, key: char) -> bool {
         'f' => p.hunger < MAX_HEARTS,
         's' => p.happy < MAX_HEARTS,
         'm' => p.sick,
-        'c' => p.poops > 0,
+        't' => p.needs_toilet(),
         'd' => p.disc_call.is_some(),
         'l' => p.asleep,
         _ => true,
@@ -143,7 +143,7 @@ fn key_name(c: char) -> &'static str {
         'p' => "p",
         'l' => "l",
         'm' => "m",
-        'c' => "c",
+        't' => "t",
         'd' => "d",
         'b' => "b",
         'a' => "a",
@@ -178,6 +178,7 @@ pub fn buttons(app: &App, lay: Layout) -> Vec<Button> {
         Mode::Game(Game::Memory(_)) => vec![text_button('1'), text_button('2'), text_button('3'), text_button('4'), BACK],
         Mode::Game(Game::Pong(_)) => vec![(Key::Up, Some(icons::UP), "w", Look::Normal), (Key::Down, Some(icons::DOWN), "s", Look::Normal), BACK],
         Mode::Finish(_) | Mode::Awards | Mode::Graveyard(_) => vec![BACK],
+        Mode::Toilet(_) => Vec::new(),
     }, lay)
 }
 
@@ -239,7 +240,7 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
     }
     f.boxed(panel_x, 0, PANEL_W, hint_y, Pal::Night, Pal::Dusk);
     f.rect(panel_x + 1, 11, PANEL_W - 2, 1, Pal::Dusk);
-    if matches!(app.mode, Mode::Normal) {
+    if matches!(app.mode, Mode::Normal | Mode::Toilet(_)) {
         panel::draw(&mut f, app, lay);
     }
     screens::draw(&mut f, app, lay);
@@ -267,6 +268,7 @@ fn hint(app: &App) -> Option<(String, Pal)> {
     match &app.mode {
         Mode::Game(g) => return Some((g.hint().into(), Pal::Yellow)),
         Mode::Finish(_) => return Some(("ANY KEY TO GO ON".into(), Pal::Mist)),
+        Mode::Toilet(_) => return Some(("THE DOOR IS SHUT...".into(), Pal::Mist)),
         Mode::Normal if app.confirming_reset() => return Some(("PRESS Y TO START OVER".into(), Pal::Red)),
         Mode::Normal => {}
         _ => return screens::hint(app),
@@ -284,7 +286,7 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
     let mut out = Vec::new();
     let (panel_x, hint_y) = (lay.panel_x(), lay.hint_y());
     // Games and cards cover the header and the panel.
-    let in_game = !matches!(app.mode, Mode::Normal);
+    let in_game = !matches!(app.mode, Mode::Normal | Mode::Toilet(_));
     let mut head = format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age));
     if app.dev {
         head.push_str(" · DEV");
@@ -332,7 +334,7 @@ mod tests {
         let app = app_with(Stage::Adult, |_| {});
         let bar = buttons(&app, Layout::MIN);
         let keys: String = bar.iter().filter_map(|b| if let Key::Char(c) = b.key { Some(c) } else { None }).collect();
-        assert_eq!(keys, "fsplmcdbagq");
+        assert_eq!(keys, "fsplmtdbagq");
         assert!(bar.iter().all(|b| b.x >= 0 && b.x + BUTTON <= 240 && b.y + BUTTON <= 160), "buttons stay on screen");
         let feed = bar[0];
         assert_eq!(button_at(&app, Layout::MIN, feed.x as f32 + 8.0, feed.y as f32 + 8.0), Some(Key::Char('f')));
@@ -393,7 +395,7 @@ mod tests {
             |p| p.sick = true,
             |p| p.hunger = 0,
             |p| p.disc_call = Some(0),
-            |p| p.poops = 1,
+            |p| p.urge = Some(0),
             |p| p.weight = 99,
         ];
         for tweak in states {

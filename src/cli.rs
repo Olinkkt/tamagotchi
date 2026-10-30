@@ -1,5 +1,5 @@
 //! Commands that work without opening the game: `tama status` for a status bar,
-//! `tama feed|snack|clean|medicine|scold|light` to care for the pet from the shell, and
+//! `tama feed|snack|toilet|medicine|scold|light` to care for the pet from the shell, and
 //! `tama watch` to get desktop notifications while the game is closed.
 
 use std::process::Command;
@@ -61,7 +61,7 @@ fn action_word(key: char) -> &'static str {
         'f' => "feed",
         'm' => "medicine",
         'd' => "scold",
-        'c' => "clean",
+        't' => "toilet",
         'p' => "play",
         'l' => "light off",
         _ => "new egg",
@@ -165,7 +165,7 @@ fn act(cmd: &str) -> i32 {
     let msg = match cmd {
         "feed" => pet.feed_meal(),
         "snack" => pet.feed_snack(),
-        "clean" => pet.clean(),
+        "toilet" => pet.toilet(),
         "medicine" => pet.medicine(),
         "scold" => pet.scold(),
         _ => pet.toggle_light(),
@@ -305,10 +305,10 @@ fn event(kind: Option<&str>) -> i32 {
 /// Run a subcommand if `args[1]` is one. Returns the exit code when handled.
 pub fn run(args: &[String]) -> Option<i32> {
     let cmd = args.get(1)?.as_str();
-    if !matches!(cmd, "status" | "feed" | "snack" | "clean" | "medicine" | "scold" | "light" | "watch" | "event" | "hook") {
+    if !matches!(cmd, "status" | "feed" | "snack" | "toilet" | "medicine" | "scold" | "light" | "watch" | "event" | "hook") {
         return None;
     }
-    if args.iter().any(|a| a == "--dev" || a == "--fast") {
+    if args.iter().any(|a| a == "--dev") {
         save::use_test_slot();
     }
     Some(match cmd {
@@ -396,7 +396,7 @@ pub fn flags(args: &[String]) -> Option<i32> {
         return Some(0);
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a pixel-art tamagotchi\n\n  tama            play (opens the window)\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|clean|medicine|scold|light   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --fast     60x speed (separate test save)\n  tama --gallery  write tama-gallery.png with every character and expression");
+        println!("tama - a pixel-art tamagotchi\n\n  tama            play (opens the window)\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|toilet|medicine|scold|light   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --gallery  write tama-gallery.png with every character and expression");
         return Some(0);
     }
     if args.iter().any(|a| a == "--gallery") {

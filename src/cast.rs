@@ -67,15 +67,14 @@ pub const TARAKOTCHI: Character = Character { name: "tarakotchi", size: 48, face
 pub const ICHIGOTCHI: Character = Character { name: "ichigotchi", size: 48, face: large_face(48, 19), parts: &[part("leaves", true)] };
 pub const NYOROTCHI: Character = Character { name: "nyorotchi", size: 48, face: large_face(48, 18), parts: &[part("tail", false)] };
 
-pub const POOP: Character = Character { name: "poop", size: 16, face: None, parts: &[] };
 pub const GRAVE: Character = Character { name: "grave", size: 32, face: None, parts: &[] };
 pub const GHOST: Character = Character { name: "ghost", size: 24, face: None, parts: &[] };
 
 /// What an egg leaves behind: the bowl is the body, the cap is its one part frame.
 pub const SHELL: Character = Character { name: "shell", size: 24, face: None, parts: &[Part { name: "cap", frames: 1, front: false }] };
 
-pub const ALL: [Character; 14] =
-    [EGG, BABY, CHILD, TONMARUTCHI, HASHITAMATCHI, MAMETCHI, KUCHIPATCHI, TARAKOTCHI, ICHIGOTCHI, NYOROTCHI, POOP, GRAVE, GHOST, SHELL];
+pub const ALL: [Character; 13] =
+    [EGG, BABY, CHILD, TONMARUTCHI, HASHITAMATCHI, MAMETCHI, KUCHIPATCHI, TARAKOTCHI, ICHIGOTCHI, NYOROTCHI, GRAVE, GHOST, SHELL];
 
 /// The sprite set for a species, if it has one.
 pub fn for_species(species: &str) -> Option<Character> {
@@ -93,3 +92,18 @@ pub const ROOM_STAGE: (usize, usize) = (160, 116);
 pub const EGG_CRACK_AT: (i32, i32) = (7, 4);
 /// Where the ghost's face goes.
 pub const GHOST_FACE_AT: (i32, i32) = (9, 8);
+
+/// The washroom is one wide master image of booths side by side, as wide and tall as the room's.
+/// The door and the front of the toilet bowl are separate sprites the game draws over the booth,
+/// so the pet can sit behind the bowl and the door can swing shut in front of it.
+pub const BOOTHS: usize = 5;
+/// The middle of the first booth, and the distance from one booth's middle to the next.
+pub const BOOTH_X: i32 = 140;
+pub const BOOTH_PITCH: i32 = 66;
+/// The floor line of the washroom master.
+pub const WASHROOM_FLOOR: i32 = 212;
+pub const DOOR: (usize, usize) = (60, 66);
+/// Where the top of the door and the top of the bowl sit in the master.
+pub const DOOR_TOP: i32 = 142;
+pub const TOILET: (usize, usize) = (40, 20);
+pub const TOILET_TOP: i32 = 196;

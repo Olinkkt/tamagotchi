@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.7.0
+
+- The pet now needs the toilet a minute or two after a meal, and rarely out of nowhere, instead of
+  pooping at random. The Clean button becomes Toilet (`t`): press it and the view moves to a
+  washroom with five booths. The pet sits in one, the door swings shut for about five seconds, and
+  it opens again.
+- Ignoring the call for 10 minutes ends in an accident: Happy -1, a care mistake and a chance of
+  sickness. Poop piles and `tama clean` are gone (`tama toilet` replaces it), and a pile saved by
+  an older version turns into a pending toilet call. Saves stay compatible.
+- Removed `tama --fast` and `cargo fast`; `--dev` has the speed keys. The `poop_*` config options
+  became `urge_*` (see the README).
+
 ## 1.6.0
 
 - Snacks get their own animation: a wrapped candy is tossed in, lands in the pet's mouth, gets

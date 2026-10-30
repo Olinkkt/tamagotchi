@@ -132,7 +132,12 @@ pub struct Pet {
     pub happy: u8,
     pub discipline: u8,
     pub weight: u8,
-    pub poops: u8,
+    /// Seconds the pet has needed the toilet; `None` while it doesn't.
+    #[serde(default)]
+    pub urge: Option<u64>,
+    /// Old saves counted piles on the floor; `set_env` folds them into `urge`.
+    #[serde(default, skip_serializing)]
+    poops: u8,
     pub sick: bool,
     pub doses: u8,
     pub asleep: bool,
@@ -167,9 +172,9 @@ pub struct Pet {
     pub load: crate::sysinfo::Strain,
     hunger_t: u64,
     happy_t: u64,
-    poop_t: u64,
-    poop_next: u64,
-    dirty_t: u64,
+    /// Seconds until the meal just eaten makes the pet need the toilet.
+    #[serde(default)]
+    meal_urge: Option<u64>,
     hunger_zero: u64,
     happy_zero: u64,
     sick_t: u64,
@@ -190,6 +195,7 @@ impl Pet {
             happy: 3,
             discipline: 50,
             weight: 5,
+            urge: None,
             poops: 0,
             sick: false,
             doses: 0,
@@ -210,9 +216,7 @@ impl Pet {
             load: crate::sysinfo::Strain::default(),
             hunger_t: 0,
             happy_t: 0,
-            poop_t: 0,
-            poop_next: 1200,
-            dirty_t: 0,
+            meal_urge: None,
             hunger_zero: 0,
             happy_zero: 0,
             sick_t: 0,
@@ -239,6 +243,9 @@ impl Pet {
     pub fn set_env(&mut self, cfg: Config, tz_offset: i64) {
         self.cfg = cfg;
         self.tz_offset = tz_offset;
+        if std::mem::take(&mut self.poops) > 0 {
+            self.urge.get_or_insert(0);
+        }
     }
 
     // ---- developer helpers (used by --dev mode) ----
@@ -330,8 +337,8 @@ impl Pet {
             Some(('f', "Starving! Feed it a meal"))
         } else if self.disc_call.is_some() {
             Some(('d', "Naughty - scold it"))
-        } else if self.poops > 0 {
-            Some(('c', "Clean up the poop"))
+        } else if self.urge.is_some() {
+            Some(('t', "Needs the toilet"))
         } else if self.happy == 0 {
             Some(('p', "Lonely - play a game with it"))
         } else if self.hunger <= 1 {
@@ -388,7 +395,7 @@ impl Pet {
             return;
         }
         self.decay();
-        self.poop();
+        self.toilet_urge();
         self.sickness();
         self.discipline_call();
         if self.stage == Stage::Adult && self.stage_age >= self.cfg.adult_lifespan_secs {
@@ -412,7 +419,7 @@ impl Pet {
         self.away && self.cfg.away_safe
     }
 
-    /// While away, the slow timers (decay, poop) only advance on every `away_slowdown`-th tick.
+    /// While away, the slow timers (decay, toilet) only advance on every `away_slowdown`-th tick.
     fn skip_slow_tick(&self) -> bool {
         self.away && self.age % self.cfg.away_slowdown.max(1) != 0
     }
@@ -553,29 +560,49 @@ impl Pet {
         }
     }
 
-    fn poop(&mut self) {
+    /// The urge comes a little after a meal, or rarely out of nowhere. Left too long, the pet
+    /// has an accident (never while away with the protection on).
+    fn toilet_urge(&mut self) {
         if self.skip_slow_tick() {
             return;
         }
-        self.poop_t += 1;
-        if self.poop_t >= self.poop_next {
-            self.poop_t = 0;
-            self.poop_next = self.cfg.poop_min_secs + self.rand(self.cfg.poop_extra_secs.max(1));
-            if self.poops < 3 {
-                self.poops += 1;
-                self.events.push(format!("{} pooped.", self.species));
+        if let Some(left) = self.meal_urge {
+            self.meal_urge = (left > 1).then_some(left - 1);
+            if self.meal_urge.is_none() {
+                self.feel_urge();
             }
+        } else if self.urge.is_none() && self.rand(self.cfg.urge_odds.max(1)) == 0 {
+            self.feel_urge();
         }
-        if self.poops > 0 {
-            self.dirty_t += 1;
-            if self.dirty_t >= 1200 {
-                self.dirty_t = 0;
-                if self.rand(3) == 0 && !self.safe_away() && self.age >= self.immune_until {
-                    self.get_sick();
-                }
-            }
-        } else {
-            self.dirty_t = 0;
+        let Some(waited) = self.urge else { return };
+        if self.safe_away() {
+            return;
+        }
+        if waited + 1 < self.cfg.urge_patience_secs {
+            self.urge = Some(waited + 1);
+            return;
+        }
+        self.urge = None;
+        self.happy = self.happy.saturating_sub(1);
+        self.events.push(format!("{} couldn't hold it. Happy -1.", self.species));
+        self.mistake("missed a toilet call");
+        if self.age >= self.immune_until && self.rand(3) == 0 {
+            self.get_sick();
+        }
+    }
+
+    fn feel_urge(&mut self) {
+        if self.urge.is_none() {
+            self.urge = Some(0);
+            self.events.push(format!("{} needs the toilet!", self.species));
+        }
+    }
+
+    /// A meal was eaten: the toilet call follows in a minute or two.
+    fn ate_meal(&mut self) {
+        if self.meal_urge.is_none() && self.urge.is_none() {
+            let wait = self.cfg.urge_after_meal_secs + self.rand(self.cfg.urge_after_meal_extra_secs.max(1));
+            self.meal_urge = Some(wait.max(1));
         }
     }
 
@@ -650,6 +677,7 @@ impl Pet {
         }
         self.hunger += 1;
         self.weight = self.weight.saturating_add(1).min(99);
+        self.ate_meal();
         if self.quirk == Quirk::Greedy { "Gobbles it up! Hunger +1.".into() } else { "Nom nom! Hunger +1.".into() }
     }
 
@@ -699,6 +727,7 @@ impl Pet {
             Item::FancyMeal => {
                 self.hunger = (self.hunger + 2).min(MAX_HEARTS);
                 self.weight = self.weight.saturating_add(1).min(99);
+                self.ate_meal();
                 Ok("A fancy meal! Hunger +2.".into())
             }
             Item::Toy => {
@@ -709,6 +738,7 @@ impl Pet {
             Item::Salad => {
                 self.hunger += 1;
                 self.weight = self.weight.saturating_sub(2).max(1);
+                self.ate_meal();
                 Ok("A light salad. Hunger +1, a little lighter.".into())
             }
             Item::Vitamins => {
@@ -735,16 +765,24 @@ impl Pet {
         }
     }
 
-    pub fn clean(&mut self) -> String {
-        if self.stage == Stage::Egg || !self.alive() {
-            return self.blocked().unwrap_or("").into();
+    /// Awake, hatched and in need of the toilet: the game shows the washroom for it.
+    pub fn needs_toilet(&self) -> bool {
+        self.alive() && self.stage != Stage::Egg && !self.asleep && self.urge.is_some()
+    }
+
+    pub fn toilet(&mut self) -> String {
+        if let Some(m) = self.blocked() {
+            return m.into();
         }
-        if self.poops == 0 {
-            return "Nothing to clean.".into();
+        if self.urge.take().is_none() {
+            return "Doesn't need the toilet.".into();
         }
-        self.poops = 0;
-        self.dirty_t = 0;
-        "Squeaky clean.".into()
+        "Ahh, much better.".into()
+    }
+
+    /// Dev panel: the pet needs the toilet right now.
+    pub fn dev_urge(&mut self) {
+        self.feel_urge();
     }
 
     pub fn scold(&mut self) -> String {
@@ -1004,7 +1042,7 @@ mod tests {
         p.happy = 4;
         p.sick = false;
         p.disc_call = None;
-        p.poops = 0;
+        p.urge = None;
         assert_eq!(p.top_need().map(|n| n.0), Some('p'));
         p.weight = 5;
         assert!(!p.overweight());
@@ -1060,6 +1098,74 @@ mod tests {
         assert!(p.mistakes > 0);
     }
 
+    fn grown(seed: u64) -> Pet {
+        let mut p = Pet::new(seed);
+        p.stage = Stage::Child;
+        p.species = "Marutchi".into();
+        p.dev_set_hour(12);
+        p.hunger = 1;
+        (p.cfg.urge_odds, p.cfg.naughty_odds, p.cfg.sick_odds) = (u64::MAX, u64::MAX, u64::MAX);
+        p
+    }
+
+    #[test]
+    fn a_meal_brings_the_urge_a_little_later_and_the_toilet_clears_it() {
+        let mut p = grown(5);
+        p.feed_meal();
+        assert!(p.urge.is_none());
+        for _ in 0..p.cfg.urge_after_meal_secs + p.cfg.urge_after_meal_extra_secs {
+            p.tick();
+        }
+        assert!(p.urge.is_some() && p.needs_toilet());
+        assert_eq!(p.top_need().map(|n| n.0), Some('t'));
+        assert_eq!(p.toilet(), "Ahh, much better.");
+        assert_eq!(p.toilet(), "Doesn't need the toilet.");
+    }
+
+    #[test]
+    fn a_snack_does_not_bring_the_urge() {
+        let mut p = grown(5);
+        p.happy = 1;
+        p.feed_snack();
+        for _ in 0..1000 {
+            p.tick();
+        }
+        assert!(p.urge.is_none());
+    }
+
+    #[test]
+    fn an_ignored_urge_ends_in_an_accident_but_never_while_away() {
+        let mut p = grown(6);
+        p.hunger = 4;
+        p.happy = 3;
+        p.urge = Some(0);
+        p.away = true;
+        for _ in 0..p.cfg.urge_patience_secs * 2 {
+            p.tick();
+        }
+        assert!(p.urge.is_some() && p.mistakes == 0, "safe while away");
+        p.away = false;
+        for _ in 0..p.cfg.urge_patience_secs {
+            p.tick();
+        }
+        assert!(p.urge.is_none());
+        assert_eq!(p.mistakes, 1);
+        assert!(p.happy < 3);
+    }
+
+    #[test]
+    fn a_pile_from_an_old_save_becomes_a_pending_urge() {
+        let mut p = Pet::new(2);
+        let mut json: serde_json::Value = serde_json::to_value(&p).unwrap();
+        json["poops"] = 2.into();
+        let mut old: Pet = serde_json::from_value(json).unwrap();
+        old.set_env(Config::default(), 0);
+        assert_eq!(old.urge, Some(0));
+        assert!(serde_json::to_value(&old).unwrap().get("poops").is_none());
+        p.set_env(Config::default(), 0);
+        assert_eq!(p.urge, None);
+    }
+
     #[test]
     fn care_keeps_it_alive_to_adulthood() {
         let mut p = Pet::new(9);
@@ -1069,7 +1175,7 @@ mod tests {
             if t % 60 == 0 {
                 if p.hunger < 3 { p.feed_meal(); }
                 if p.happy < 3 { p.feed_snack(); }
-                p.clean();
+                p.toilet();
                 p.medicine();
                 p.medicine();
                 p.scold();

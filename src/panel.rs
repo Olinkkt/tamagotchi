@@ -59,7 +59,7 @@ fn chips(p: &Pet) -> Vec<(&'static str, Pal)> {
         (p.asleep, "sleeping", Pal::Sky),
         (p.sick, "sick - give medicine", Pal::Lime),
         (p.disc_call.is_some(), "naughty - scold it", Pal::Red),
-        (p.poops > 0, "needs cleaning", Pal::Yellow),
+        (p.urge.is_some(), "needs the toilet - press T", Pal::Yellow),
         (p.overweight(), "overweight - play games", Pal::Yellow),
         (p.load.busy_cpu, "sweating - the CPU is busy", Pal::Ice),
         (p.load.low_ram, "dizzy - memory is nearly full", Pal::Violet),
@@ -168,7 +168,7 @@ mod tests {
         let ratio = 2.0 / 3.0;
         let mut app = app_with(Stage::Teen, |p| {
             p.sick = true;
-            p.poops = 2;
+            p.urge = Some(0);
             p.disc_call = Some(0);
             p.weight = 99;
             p.load = Strain { busy_cpu: true, low_ram: true, low_battery: true };

@@ -78,19 +78,19 @@ pub const MEDICINE: Grid = &[
     "............",
 ];
 
-pub const CLEAN: Grid = &[
-    ".....kk.....",
-    "....knnk....",
-    "....knnk....",
-    "....knnk....",
-    "....knnk....",
-    "...kkkkkk...",
-    "..kyyyyyyk..",
-    "..kyoyyoyk..",
-    ".kyyoyyoyyk.",
-    ".kyoyyoyyok.",
-    "kyyoyyoyyoyk",
+pub const TOILET: Grid = &[
+    "..kkkkkkkk..",
+    "..kwwwwwwk..",
+    "..kwwwwhwk..",
+    "..kiiiiiik..",
     "kkkkkkkkkkkk",
+    "kwwwwwwwwwwk",
+    "khiiiiiiiihk",
+    ".kwwwwwwwwk.",
+    "..kwwwwwwk..",
+    "...kwwwwk...",
+    "...kiiiik...",
+    "..kkkkkkkk..",
 ];
 
 pub const SCOLD: Grid = &[
@@ -238,7 +238,7 @@ pub fn for_key(key: char) -> Option<Grid> {
         'p' => PLAY,
         'l' => LIGHT,
         'm' => MEDICINE,
-        'c' => CLEAN,
+        't' => TOILET,
         'd' => SCOLD,
         'b' => SHOP,
         'a' => AWARDS,
@@ -320,14 +320,14 @@ mod tests {
 
     #[test]
     fn icons_are_rectangular_and_use_palette_letters() {
-        let keys = "fsplmcdbagqn".chars().map(|k| for_key(k).unwrap());
+        let keys = "fsplmtdbagqn".chars().map(|k| for_key(k).unwrap());
         for g in keys.chain([CAKE, SALAD, VITAMINS, CHECK, UP, DOWN, STAR, HEART_FULL, HEART_EMPTY, COIN, Z, SWEAT, BATTERY, HEART, SPARKLE, ANGER, APPLE, APPLE_BITTEN, APPLE_CORE, CANDY, CANDY_UNWRAPPED, CANDY_LICKED]) {
             for row in g {
                 assert_eq!(row.len(), g[0].len(), "{g:?}");
                 assert!(row.chars().all(|c| c == '.' || colour(c).is_some()), "{row}");
             }
         }
-        for k in "fsplmcdbagqn".chars() {
+        for k in "fsplmtdbagqn".chars() {
             let g = for_key(k).unwrap();
             assert_eq!((g.len(), g[0].len()), (12, 12), "button icons are 12x12: {k}");
         }

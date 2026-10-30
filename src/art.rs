@@ -121,6 +121,9 @@ pub enum Light {
 struct Art {
     sheets: Vec<(&'static str, Vec<Sprite>)>,
     rooms: [Sprite; 3],
+    washroom: Sprite,
+    door: Sprite,
+    toilet: Sprite,
 }
 
 fn sheet_bytes(name: &str) -> &'static [u8] {
@@ -135,7 +138,6 @@ fn sheet_bytes(name: &str) -> &'static [u8] {
         "tarakotchi" => include_bytes!("../assets/sprites/tarakotchi.png"),
         "ichigotchi" => include_bytes!("../assets/sprites/ichigotchi.png"),
         "nyorotchi" => include_bytes!("../assets/sprites/nyorotchi.png"),
-        "poop" => include_bytes!("../assets/sprites/poop.png"),
         "grave" => include_bytes!("../assets/sprites/grave.png"),
         "ghost" => include_bytes!("../assets/sprites/ghost.png"),
         "shell" => include_bytes!("../assets/sprites/shell.png"),
@@ -158,6 +160,9 @@ fn art() -> &'static Art {
             Sprite::decode(include_bytes!("../assets/sprites/room_lamp.png")),
             Sprite::decode(include_bytes!("../assets/sprites/room_dark.png")),
         ],
+        washroom: Sprite::decode(include_bytes!("../assets/sprites/washroom.png")),
+        door: Sprite::decode(include_bytes!("../assets/sprites/door.png")),
+        toilet: Sprite::decode(include_bytes!("../assets/sprites/toilet.png")),
     })
 }
 
@@ -172,6 +177,18 @@ pub fn body(c: &Character) -> &'static Sprite {
 
 pub fn room(light: Light) -> &'static Sprite {
     &art().rooms[light as usize]
+}
+
+pub fn washroom() -> &'static Sprite {
+    &art().washroom
+}
+
+pub fn door() -> &'static Sprite {
+    &art().door
+}
+
+pub fn toilet() -> &'static Sprite {
+    &art().toilet
 }
 
 #[cfg(test)]

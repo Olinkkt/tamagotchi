@@ -13,9 +13,13 @@ pub struct Config {
     pub hunger_secs_adult: u64,
     /// Happiness decays this many times slower than hunger.
     pub happy_decay_factor: f64,
-    /// A new poop appears every `poop_min_secs` + random(0..`poop_extra_secs`).
-    pub poop_min_secs: u64,
-    pub poop_extra_secs: u64,
+    /// After a meal the pet needs the toilet in `urge_after_meal_secs` + random(0..`..extra_secs`).
+    pub urge_after_meal_secs: u64,
+    pub urge_after_meal_extra_secs: u64,
+    /// Out of nowhere it needs the toilet with chance 1 in N per awake second.
+    pub urge_odds: u64,
+    /// An urge ignored this long ends in an accident.
+    pub urge_patience_secs: u64,
     /// Chance of random sickness is 1 in N per awake second.
     pub sick_odds: u64,
     /// Chance of a naughty call is 1 in N per awake second.
@@ -53,8 +57,10 @@ impl Default for Config {
             hunger_secs_teen: 600,
             hunger_secs_adult: 720,
             happy_decay_factor: 1.25,
-            poop_min_secs: 900,
-            poop_extra_secs: 900,
+            urge_after_meal_secs: 60,
+            urge_after_meal_extra_secs: 120,
+            urge_odds: 7200,
+            urge_patience_secs: 600,
             sick_odds: 20_000,
             naughty_odds: 1800,
             overweight_sick_factor: 3,

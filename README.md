@@ -1,6 +1,6 @@
 # tama
 
-A pixel-art tamagotchi in a little window. Feed it, clean up after it, play games with it, and
+A pixel-art tamagotchi in a little window. Feed it, take it to the toilet, play games with it, and
 keep an eye on it from your status bar. It keeps living while the game is closed.
 
 The scene is drawn in pixels and shown at a whole-number scale, so every pixel stays crisp and
@@ -35,7 +35,7 @@ in the button's corner). F11 toggles fullscreen.
 | `p` | play: pick a mini-game (see below) |
 | `l` | light on/off (only matters while it sleeps) |
 | `m` | medicine (a sick pet needs two doses) |
-| `c` | clean up poop |
+| `t` | take it to the toilet (when it needs to go) |
 | `d` | scold, but only when it is being naughty |
 | `b` | shop (see below) |
 | `a` | awards: achievements and the adults you have raised |
@@ -58,6 +58,15 @@ seconds (any key skips it).
 
 1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4 (or the buttons). Your pet watches and cheers or sulks.
 2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle moves while you hold ↑/↓ (or W/S, K/J, or the arrow buttons) and stops when you let go.
+
+### The toilet
+
+A minute or two after a meal (and rarely out of nowhere) the pet needs the toilet: a bubble appears
+and the **Clean** button becomes **Toilet** (`t`). Press it and the view moves to a washroom with
+five booths. The pet sits in a random one, the door swings shut, and about five seconds later it
+opens and you are back in the room. Snacks do not cause it. If you ignore the call for 10 minutes,
+the pet has an accident: Happy -1, a care mistake and a chance of sickness. While the game is
+closed the call waits for you and never ends in an accident. `tama toilet` does it from the shell.
 
 ### Coins, shop and awards
 
@@ -121,14 +130,14 @@ in the config (`away_slowdown`, `away_safe`).
 
 ## Commands
 
-Only `tama`, `tama --dev` and `tama --fast` open a window; everything else runs in the terminal
+Only `tama` and `tama --dev` open a window; everything else runs in the terminal
 and loads no graphics, so the status bar and `tama watch` stay light.
 
 ```
 tama                 play (opens the window)
 tama status          one line for a status bar, e.g. (T_T) Marutchi ♡♡♡♡ ♥♥♥♡ ! feed
 tama status --waybar JSON for waybar: short text, a hover tooltip, and a class
-tama feed|snack|clean|medicine|scold|light
+tama feed|snack|toilet|medicine|scold|light
                      care for the pet without opening the game (refused while it is open)
 tama hook zsh        print a shell snippet so commits feed the pet and failed commands upset it
 tama event commit|fail  tell the pet about a shell event (the hook calls this)
@@ -137,7 +146,7 @@ tama watch --test    send one test notification
 tama --animate on|off  show or hide the animated ears, wings, tuft, leaves and tail
 tama --update | --version | --help
 tama --gallery       write tama-gallery.png: every character in every expression (no window)
-tama --dev | --fast  developer mode / 60x speed, both with a separate test save
+tama --dev           developer mode (speed keys, separate test save)
 ```
 
 ## Settings
@@ -150,7 +159,9 @@ usual config folder.
 |---|---|
 | `hunger_secs_baby` / `_child` / `_teen` / `_adult` | seconds per lost hunger heart |
 | `happy_decay_factor` | happiness falls this many times slower than hunger |
-| `poop_min_secs`, `poop_extra_secs` | poop every min + random(extra) seconds |
+| `urge_after_meal_secs`, `urge_after_meal_extra_secs` | the toilet call comes this many seconds after a meal + random(extra) |
+| `urge_odds` | chance of a toilet call out of nowhere: 1 in N per awake second |
+| `urge_patience_secs` | an ignored toilet call ends in an accident after this long |
 | `sick_odds`, `naughty_odds` | 1 in N per awake second |
 | `overweight_sick_factor` | sickness is this many times likelier when heavy |
 | `mistake_after_secs` | how long a need may wait before it counts as a mistake |
@@ -242,7 +253,7 @@ cargo art         # redraw every sprite into assets/ (tools/spritegen)
 ```
 
 The dev panel shows the value behind every dev key. It changes hunger/happy/discipline/weight/
-mistakes, adds poop, sickness or a naughty call, adds coins, steps through every form (← →,
+mistakes, makes it need the toilet, sickness or a naughty call, adds coins, steps through every form (← →,
 or `[` `]`, including death), cracks the egg, grows or kills the pet, skips time and sets the clock, changes
 the speed (x1, 2, 5, 10, 60, 600 with `f`, and `1` for straight back to x1), and switches the machine reactions (CPU, RAM, battery) on and off. Clicking a button
 always does the action, even while the panel is open.
@@ -269,7 +280,8 @@ Source layout:
 | `window.rs` | the macroquad window: scaling, input, drawing text at full resolution |
 | `hud.rs` | the screen around the room: header, hint line, button bar |
 | `panel.rs` | the status panel |
-| `scene.rs` | the room: the pet, its moods and reactions, poop, bubbles, effects |
+| `scene.rs` | the room: the pet, its moods and reactions, bubbles, effects |
+| `toilet.rs` | the washroom visit: booths, the door and the timing |
 | `screens.rs` | the cards: game picker, shop, awards, graveyard, reset |
 | `games.rs` | mini-games and the result screen |
 | `frame.rs` | the palette pixel canvas everything is drawn into |

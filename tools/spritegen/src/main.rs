@@ -17,6 +17,7 @@ mod img;
 mod process;
 mod room;
 mod sketch;
+mod washroom;
 
 use std::path::{Path, PathBuf};
 
@@ -162,5 +163,12 @@ fn main() {
         scene.blit(&baby, 80 - 16, 101 - 30);
         img::save_preview(&scene, &preview.join(format!("scene_{name}.png")), 4);
     }
+    let wash = washroom::washroom();
+    img::save(&wash, &sprites.join("washroom.png"));
+    img::save_preview(&wash, &preview.join("washroom.png"), 2);
+    img::save(&washroom::door(), &sprites.join("door.png"));
+    img::save(&washroom::toilet(), &sprites.join("toilet.png"));
+    img::save_preview(&washroom::door(), &preview.join("door.png"), PREVIEW_SCALE);
+    img::save_preview(&washroom::toilet(), &preview.join("toilet.png"), PREVIEW_SCALE);
     println!("sprites in {}, previews in {}", sprites.display(), preview.display());
 }
