@@ -334,7 +334,7 @@ pub fn hover_rect(app: &App, lay: Layout, x: f32, y: f32) -> Option<(i32, i32, i
         return Some(moved(ESC));
     }
     match app.mode {
-        Mode::Shop => (0..4).find(|&i| in_rect((CARD.0, shop_row_y(i), CARD.2, SHOP_ROW - 3), x, y)).map(|i| moved((CARD.0 + 2, shop_row_y(i), CARD.2 - 4, SHOP_ROW - 3))),
+        Mode::Shop => (0..4).find(|&i| in_rect((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3), x, y)).map(|i| moved((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3))),
         Mode::Chooser => (0..2).find(|&i| in_rect((game_card_x(i), GAME_CARD.1, GAME_CARD.2, 70), x, y)).map(|i| moved((game_card_x(i), GAME_CARD.1, GAME_CARD.2, 70))),
         _ => None,
     }

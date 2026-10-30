@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.12.2
+
+- The shop's hover outline now sits exactly on the row instead of spilling past its edges.
+
 ## 1.12.1
 
 - Things you can click now get a white outline when the pointer is over them: shop rows, the two
