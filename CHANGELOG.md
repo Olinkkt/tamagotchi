@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.15.3
+
+- In Shells the pet stays under the same cup between rounds instead of jumping to a random one.
+
 ## 1.15.2
 
 - In Shells the pet's feet no longer poke out while its cup hops over another one or bobs

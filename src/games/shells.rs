@@ -54,12 +54,13 @@ impl Shells {
             look: Box::new(pet.clone()),
             born: Instant::now(),
         };
+        // The pet keeps its cup from round to round, so it never jumps between them.
+        g.hides = pet.rand(3) as usize;
         g.start_round(pet);
         g
     }
 
     fn start_round(&mut self, pet: &mut Pet) {
-        self.hides = pet.rand(3) as usize;
         let count = 3 + 2 * self.round as usize;
         self.swap_ms = [420, 320, 240][self.round as usize - 1];
         self.swaps = (0..count)
@@ -252,5 +253,15 @@ mod tests {
             let out = g.tick(&mut p);
             assert!(matches!(out, Outcome::Done { .. }) == (round == ROUNDS));
         }
+    }
+
+    #[test]
+    fn the_pet_stays_under_the_same_cup_when_the_next_round_starts() {
+        let mut p = pet();
+        let mut g = Shells::new(&mut p);
+        let cup = g.hides;
+        g.phase = Phase::Reveal(0, Instant::now());
+        g.tick(&mut p);
+        assert_eq!((g.round, g.hides), (2, cup));
     }
 }
