@@ -97,7 +97,13 @@ impl Game {
     pub fn hint(&self) -> &'static str {
         match self {
             Game::Memory(m) if matches!(m.phase, MPhase::Input(_)) => "YOUR TURN: CLICK THE PADS OR PRESS 1-4 IN THE SAME ORDER",
-            Game::Memory(_) => "WATCH THE PATTERN",
+            Game::Memory(m) => match m.miss {
+                Some((_, 1, _)) => "WRONG - IT WAS PAD 1",
+                Some((_, 2, _)) => "WRONG - IT WAS PAD 2",
+                Some((_, 3, _)) => "WRONG - IT WAS PAD 3",
+                Some(_) => "WRONG - IT WAS PAD 4",
+                None => "WATCH THE PATTERN",
+            },
             Game::Pong(_) => "HOLD W/S OR THE MOUSE TO MOVE - RETURN IT 5 TIMES",
         }
     }
@@ -160,6 +166,8 @@ pub struct Memory {
     results: Vec<bool>,
     /// A pad you just pressed glows briefly.
     flash: Option<(u8, Instant)>,
+    /// After a wrong press: the pad pressed, the pad it should have been, and when.
+    miss: Option<(u8, u8, Instant)>,
     look: Box<Pet>,
     born: Instant,
 }
@@ -173,6 +181,7 @@ impl Memory {
             phase: MPhase::Pause(after_ms(0)),
             results: Vec::new(),
             flash: None,
+            miss: None,
             look: Box::new(pet.clone()),
             born: Instant::now(),
         };
@@ -182,6 +191,7 @@ impl Memory {
 
     fn start_round(&mut self, pet: &mut Pet) {
         let len = self.round as usize + 2;
+        self.miss = None;
         self.seq = (0..len).map(|_| pet.rand(4) as u8 + 1).collect();
         self.phase = MPhase::Show { idx: 0, lit: false, until: after_ms(600) };
     }
@@ -203,6 +213,7 @@ impl Memory {
             }
         } else {
             self.results.push(false);
+            self.miss = Some((pressed, self.seq[pos], Instant::now()));
             self.phase = MPhase::Pause(after_ms(1500));
         }
         Outcome::Continue
@@ -233,6 +244,9 @@ impl Memory {
     }
 
     fn lit(&self) -> Option<u8> {
+        if let (MPhase::Pause(_), Some((_, right, _))) = (&self.phase, self.miss) {
+            return Some(right);
+        }
         match self.phase {
             MPhase::Show { idx, lit: true, .. } => Some(self.seq[idx]),
             _ => self.flash.filter(|(_, until)| Instant::now() < *until).map(|f| f.0),
@@ -247,9 +261,9 @@ impl Memory {
         })
     }
 
-    fn draw_pad(f: &mut Frame, n: u8, on: bool) {
+    fn draw_pad(f: &mut Frame, n: u8, on: bool, dx: i32, wrong: bool) {
         let base = PADS[n as usize - 1];
-        let x = 20 + (n as i32 - 1) * (PAD_W + PAD_GAP);
+        let x = 20 + (n as i32 - 1) * (PAD_W + PAD_GAP) + dx;
         if on {
             // A glow just outside the lit pad.
             f.rect(x - 3, PAD_Y - 3, PAD_W + 6, PAD_H + 6, base.highlight());
@@ -264,6 +278,10 @@ impl Memory {
         let digit = ((b'0' + n) as char).to_string();
         let w = font::width(&digit) * 2;
         f.text(&digit, x + (PAD_W - w) / 2, PAD_Y + 10, 2, if on { Pal::Ink } else { base });
+        if wrong {
+            f.outline(x - 2, PAD_Y - 2, PAD_W + 4, PAD_H + 4, Pal::White);
+            f.outline(x - 3, PAD_Y - 3, PAD_W + 6, PAD_H + 6, Pal::Ink);
+        }
     }
 
     fn draw(&self) -> Frame {
@@ -279,8 +297,14 @@ impl Memory {
         let bob = if matches!(self.phase, MPhase::Input(_)) { (t % 2) as i32 } else { 0 };
         draw_pet(&mut f, &self.look, mood, GW / 2, PAD_Y - 4 - bob);
         let lit = self.lit();
+        // A miss shakes the pads for a moment and rings the one you pressed.
+        let shake = match self.miss {
+            Some((_, _, at)) if at.elapsed().as_millis() < 300 => [-2, 2][(at.elapsed().as_millis() / 50 % 2) as usize],
+            _ => 0,
+        };
+        let wrong = self.miss.map(|m| m.0);
         for n in 1..=4u8 {
-            Memory::draw_pad(&mut f, n, lit == Some(n));
+            Memory::draw_pad(&mut f, n, lit == Some(n), shake, wrong == Some(n));
         }
         // Rounds, top left: green for a win, red for a miss, white for the one being played.
         for r in 0..MEMORY_ROUNDS as usize {
@@ -578,6 +602,9 @@ mod tests {
         m.key(Key::Char((b'0' + wrong) as char));
         assert_eq!(m.results, [false]);
         assert_eq!(m.wins, 0);
+        let (pressed, right, _) = m.miss.expect("a miss is remembered");
+        assert_eq!((pressed, right), (wrong, m.seq[0]));
+        assert_eq!(m.lit(), Some(right), "the right pad lights up after a miss");
     }
 
     #[test]

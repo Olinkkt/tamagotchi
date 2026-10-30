@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.9
+
+- A wrong answer in Memory now shows: the pads shake, the pad you pressed gets a white ring, the pad
+  you should have pressed lights up, and the hint line says which one it was.
+
 ## 1.12.8
 
 - Changing scenes (the washroom and back) now uses a quick pixel dissolve instead of the slow
