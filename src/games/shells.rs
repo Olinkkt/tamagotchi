@@ -176,7 +176,7 @@ impl Shells {
             // A cup you have not picked yet bobs a little when it is your turn.
             let wait = if matches!(self.phase, Phase::Pick) { (t % 2) as i32 } else { 0 };
             let lift = if self.lifted(cup) { LIFT } else { 0 };
-            draw_cup(&mut f, x, CUP_TOP + hop - lift - wait, cup);
+            draw_cup(&mut f, x, CUP_TOP + hop - lift - wait);
         }
         draw_rounds(&mut f, &self.results, self.round);
         f
@@ -184,8 +184,9 @@ impl Shells {
 }
 
 /// An upside-down cup, `x` is its middle and `y` its top.
-pub fn draw_cup(f: &mut Frame, x: i32, y: i32, shade: usize) {
-    let (body, light, dark) = [(Pal::Orange, Pal::Yellow, Pal::Rust), (Pal::Pink, Pal::Blush, Pal::Violet), (Pal::Sky, Pal::Ice, Pal::Teal)][shade % 3];
+pub fn draw_cup(f: &mut Frame, x: i32, y: i32) {
+    // Every cup looks the same, so the only way to follow the pet is to watch the cups.
+    let (body, light, dark) = (Pal::Orange, Pal::Yellow, Pal::Rust);
     for r in 0..CUP_H {
         let w = CUP_TOP_W + (CUP_FOOT_W - CUP_TOP_W) * r / (CUP_H - 1);
         f.rect(x - w / 2 - 1, y + r, w + 2, 1, Pal::Ink);

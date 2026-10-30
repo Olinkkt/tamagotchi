@@ -231,7 +231,7 @@ fn draw_chooser(f: &mut Frame) {
                 for n in 0..3 {
                     let cx = x + w / 6 + n * w / 3;
                     let top = if n == 1 { y + 22 } else { y + 30 };
-                    f.boxed(cx - 5, top, 10, 14, [Pal::Orange, Pal::Pink, Pal::Sky][n as usize], Pal::Ink);
+                    f.boxed(cx - 5, top, 10, 14, Pal::Orange, Pal::Ink);
                 }
             }
             3 => {

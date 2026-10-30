@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.15.1
+
+- In Shells all three cups are now the same colour, so you have to follow the pet instead of a colour.
+
 ## 1.15.0
 
 - A fifth mini-game, Rock Paper Scissors: pick a hand (keys 1 to 3, R/P/S, or click), watch both
