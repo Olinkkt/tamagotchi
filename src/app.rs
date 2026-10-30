@@ -763,12 +763,12 @@ pub(crate) mod tests {
     #[test]
     fn buying_charges_the_coins_and_uses_the_item() {
         let mut app = app_with(Stage::Adult, |p| p.hunger = 1);
-        app.profile.coins = 10;
+        app.profile.coins = 20;
         app.buy(pet::Item::FancyMeal);
-        assert_eq!((app.profile.coins, app.pet.hunger), (2, 3));
+        assert_eq!((app.profile.coins, app.pet.hunger), (5, 3));
         app.speech = None;
         app.buy(pet::Item::Vitamins);
-        assert_eq!(app.profile.coins, 2, "12 coins is more than it has");
+        assert_eq!(app.profile.coins, 5, "25 coins is more than it has");
         assert!(app.speech().is_none(), "no coins is not the pet talking");
     }
 
@@ -885,7 +885,7 @@ pub(crate) mod tests {
             assert!(matches!(app.mode, Mode::Shop));
             app.profile.coins = 20;
             app.on_key(Key::Char('1'));
-            assert_eq!((app.profile.coins, app.pet.hunger), (12, 3));
+            assert_eq!((app.profile.coins, app.pet.hunger), (5, 3));
             assert!(matches!(app.mode, Mode::Normal), "closes so the pet can be seen enjoying it");
             assert!(app.fx.is_some());
             app.on_key(Key::Char('b'));

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.21.3
+
+- Shop items cost more: fancy meal 15, toy 10, salad 8, vitamins 25. A perfect game now buys about
+  one item instead of two, so coins are worth choosing how to spend.
+
 ## 1.21.2
 
 - The README now shows a real screenshot of the game window.

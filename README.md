@@ -113,10 +113,10 @@ then `1` to `4`, or click an item; the shop closes so you can watch your pet enj
 
 | Item | Price | Effect |
 |---|---|---|
-| Fancy meal | 8 | +2 hunger, a bit heavy |
-| Toy | 6 | +2 happy, burns weight |
-| Salad | 5 | +1 hunger, lighter |
-| Vitamins | 12 | no sickness for 3 hours |
+| Fancy meal | 15 | +2 hunger, a bit heavy |
+| Toy | 10 | +2 happy, burns weight |
+| Salad | 8 | +1 hunger, lighter |
+| Vitamins | 25 | no sickness for 3 hours |
 
 `a` shows ten achievements (for example "Spotless": reach adulthood with no care mistakes) and
 the five adult species, in colour once you have raised one and as a silhouette until then. Coins, achievements and the collection belong

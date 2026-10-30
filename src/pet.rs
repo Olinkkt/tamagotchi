@@ -83,10 +83,10 @@ impl Item {
 
     pub fn price(self) -> u32 {
         match self {
-            Item::FancyMeal => 8,
-            Item::Toy => 6,
-            Item::Salad => 5,
-            Item::Vitamins => 12,
+            Item::FancyMeal => 15,
+            Item::Toy => 10,
+            Item::Salad => 8,
+            Item::Vitamins => 25,
         }
     }
 

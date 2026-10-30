@@ -417,7 +417,7 @@ mod tests {
         app.profile.coins = 7;
         app.mode = Mode::Shop;
         let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
-        for want in ["SHOP", "7", "Fancy meal", "Vitamins", "12"] {
+        for want in ["SHOP", "7", "Fancy meal", "Vitamins", "25"] {
             assert!(text.iter().any(|t| t == want), "shop is missing {want}: {text:?}");
         }
         assert_eq!(click(&app, Layout::MIN, 100.0, shop_row_y(2) as f32 + 5.0 + Layout::MIN.centred_card().1 as f32), Some(Key::Char('3')));
