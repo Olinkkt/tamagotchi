@@ -27,6 +27,10 @@ fn label(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
     Label { text: text.into(), x, y, colour, align: Align::Left }
 }
 
+fn right(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
+    Label { text: text.into(), x, y, colour, align: Align::Right }
+}
+
 fn centred(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
     Label { text: text.into(), x, y, colour, align: Align::Centre }
 }
@@ -60,7 +64,7 @@ fn shop_row_y(i: usize) -> i32 {
 }
 
 fn draw_shop(f: &mut Frame, app: &App) {
-    f.grid(icons::COIN, ESC.0 - 26, ESC.1 + 3);
+    f.grid(icons::COIN, ESC.0 - 10, ESC.1 + 3);
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i);
         let can = app.profile.coins >= item.price();
@@ -72,14 +76,14 @@ fn draw_shop(f: &mut Frame, app: &App) {
             icon.tint(0, 0, 12, 12, |p| if p == Pal::Ink { p } else { p.dark() });
         }
         f.frame(&icon, CARD.0 + 22, y + 4);
-        f.grid(icons::COIN, CARD.0 + CARD.2 - 34, y + 7);
+        f.grid(icons::COIN, CARD.0 + CARD.2 - 14, y + 7);
     }
 }
 
 fn shop_labels(app: &App) -> Vec<Label> {
     let mut v = vec![
         label("SHOP", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
-        label(app.profile.coins.to_string(), (ESC.0 - 17) as f32, ESC.1 as f32 + 6.5, Pal::Yellow),
+        right(app.profile.coins.to_string(), (ESC.0 - 12) as f32, ESC.1 as f32 + 6.5, Pal::Yellow),
     ];
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i) as f32;
@@ -88,7 +92,7 @@ fn shop_labels(app: &App) -> Vec<Label> {
         v.push(centred((i + 1).to_string(), CARD.0 as f32 + 12.5, y + 10.5, Pal::White));
         v.push(label(item.name(), CARD.0 as f32 + 40.0, y + 6.5, name));
         v.push(label(item.blurb(), CARD.0 as f32 + 40.0, y + 14.5, blurb));
-        v.push(label(item.price().to_string(), (CARD.0 + CARD.2 - 25) as f32, y + 10.5, price));
+        v.push(right(item.price().to_string(), (CARD.0 + CARD.2 - 16) as f32, y + 10.5, price));
     }
     v
 }
@@ -256,7 +260,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         _ => Vec::new(),
     };
     if showing(app) {
-        v.push(centred("esc", ESC.0 as f32 + ESC.2 as f32 / 2.0 + 0.25, ESC.1 as f32 + ESC.3 as f32 / 2.0 - 0.25, Pal::White));
+        v.push(centred("esc", ESC.0 as f32 + ESC.2 as f32 / 2.0, ESC.1 as f32 + ESC.3 as f32 / 2.0 - 0.5, Pal::White));
     }
     let (ox, oy) = lay.centred_card();
     for l in &mut v {
@@ -373,6 +377,7 @@ fn fits(l: &Label, ratio: f32) -> bool {
     let (left, right) = match l.align {
         Align::Left => (l.x, l.x + w),
         Align::Centre => (l.x - w / 2.0, l.x + w / 2.0),
+        Align::Right => (l.x - w, l.x),
     };
     left >= CARD.0 as f32 && right <= (CARD.0 + CARD.2) as f32
 }

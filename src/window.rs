@@ -84,7 +84,13 @@ fn keys_pressed() -> Vec<Key> {
 fn draw_label(v: &Viewport, l: &Label) {
     let px = v.text_px();
     let w = font::width(&l.text) as f32 * px;
-    let x = v.x + l.x * v.scale - if l.align == Align::Centre { (w / 2.0).round() } else { 0.0 };
+    let x = v.x + l.x * v.scale
+        - match l.align {
+            Align::Left => 0.0,
+            // Centre on the ink, which stops a little short of the advance width.
+            Align::Centre => (font::pixels(&l.text).iter().map(|p| p.0 + 1).max().unwrap_or(0) as f32 * px / 2.0).round(),
+            Align::Right => w.round(),
+        };
     // `y` is the middle of the capitals, which are 7 font pixels tall.
     let y = (v.y + l.y * v.scale - 3.5 * px).round();
     let c = colour(l.colour);

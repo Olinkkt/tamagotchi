@@ -93,6 +93,7 @@ pub struct Button {
 pub enum Align {
     Left,
     Centre,
+    Right,
 }
 
 /// Text to draw on top of the scene. Positions are in scene pixels; `y` is the middle of the line.
@@ -316,7 +317,7 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
     out.extend(screens::labels(app, lay));
     if matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) {
         let (x, y, w, h) = screens::game_esc(lay);
-        out.push(label("esc", x as f32 + w as f32 / 2.0 + 0.25, y as f32 + h as f32 / 2.0 - 0.25, Pal::White, Align::Centre));
+        out.push(label("esc", x as f32 + w as f32 / 2.0, y as f32 + h as f32 / 2.0 - 0.5, Pal::White, Align::Centre));
     }
     if app.confirming_reset() {
         out.extend(screens::reset_labels(lay));

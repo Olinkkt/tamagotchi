@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.6
+
+- Shop prices and the coin count now read number first, coin after, with the number right up
+  against the coin. The "esc" text sits in the middle of its button, also in the games.
+
 ## 1.12.5
 
 - The shop's coin count sits left of the "esc" button, number beside the coin and level with it.
