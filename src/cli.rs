@@ -349,8 +349,9 @@ fn install_desktop() -> i32 {
     let icon = data.join("icons/hicolor/256x256/apps/tama.png");
     let entry = data.join("applications/tama.desktop");
     let text = format!(
-        "[Desktop Entry]\nType=Application\nName=tama\nComment=A pixel-art tamagotchi\nExec={}\nIcon=tama\nCategories=Game;\nStartupWMClass=tama\nTerminal=false\n",
-        exe.display()
+        "[Desktop Entry]\nType=Application\nName=tama\nComment=A pixel-art tamagotchi\nExec={}\nIcon={}\nCategories=Game;\nStartupWMClass=tama\nTerminal=false\n",
+        exe.display(),
+        icon.display()
     );
     let write = |path: &std::path::Path, bytes: &[u8]| -> std::io::Result<()> {
         std::fs::create_dir_all(path.parent().unwrap_or(path))?;

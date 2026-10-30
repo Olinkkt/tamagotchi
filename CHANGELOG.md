@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.20.1
+
+- The app-menu entry from `tama --install-desktop` now points straight at its icon file, so launchers
+  that ignore your icon folder still show it. Run `tama --install-desktop` again to refresh the entry.
 ## 1.20.0
 
 - When you start tama it checks for a newer version. If there is one, the hint line says
