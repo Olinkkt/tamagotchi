@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.21.1
+
+- Fixes the GitHub release build, so the one-line install has a download to fetch.
 ## 1.21.0
 
 - New players on 64-bit Linux can install with one command (see the README): it downloads the game,
