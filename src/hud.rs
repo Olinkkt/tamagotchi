@@ -11,6 +11,7 @@ use crate::palette::Pal;
 use crate::pet::{Stage, MAX_HEARTS};
 use crate::panel;
 use crate::scene;
+use crate::update;
 use crate::screens;
 
 /// Top of the room, under the header strip.
@@ -281,6 +282,7 @@ fn hint(app: &App) -> Option<(String, Pal)> {
     }
     match p.top_need() {
         Some((k, text)) => Some((format!("→ PRESS {}: {}", k.to_ascii_uppercase(), text.to_uppercase()), Pal::Yellow)),
+        None if app.update.is_some() => Some((format!("UPDATE {} READY - PRESS U", update::show(app.update.unwrap().version)), Pal::Green)),
         None if p.stage == Stage::Egg => Some(("IT'S AN EGG - GIVE IT A MOMENT TO HATCH.".into(), Pal::Mist)),
         None => None,
     }

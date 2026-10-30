@@ -40,7 +40,7 @@ pub(crate) fn dir_override() -> Option<PathBuf> {
     DATA_DIR.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
-fn dir() -> PathBuf {
+pub(crate) fn dir() -> PathBuf {
     if let Some(d) = dir_override() {
         return d;
     }

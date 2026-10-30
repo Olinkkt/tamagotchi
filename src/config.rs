@@ -28,6 +28,8 @@ pub struct Config {
     pub overweight_sick_factor: u64,
     /// Show (and wiggle) the ears, wings, tuft, leaves and tail. When off those parts are not drawn at all.
     pub animate_parts: bool,
+    /// Look for a newer version when the game starts (asks github.com; nothing is installed unasked).
+    pub check_updates: bool,
     /// While the game is closed the pet's needs fall this many times slower (1 = no change).
     pub away_slowdown: u64,
     /// While the game is closed the pet is looked after loosely: hunger and happiness never drop
@@ -65,6 +67,7 @@ impl Default for Config {
             naughty_odds: 1800,
             overweight_sick_factor: 3,
             animate_parts: false,
+            check_updates: true,
             away_slowdown: 3,
             away_safe: true,
             commit_meal_gap_secs: 600,

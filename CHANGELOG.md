@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.20.0
+
+- When you start tama it checks for a newer version. If there is one, the hint line says
+  "UPDATE X.Y.Z READY - PRESS U"; U closes the game, installs it and opens it again.
+- Updates come from your source folder while it is ahead, otherwise from GitHub. Nothing installs
+  unless you press U. New config option `check_updates` (default true) turns the check off.
 ## 1.19.0
 
 - New `tama --install-desktop` adds tama to your Linux app menu with its own icon, so you can start

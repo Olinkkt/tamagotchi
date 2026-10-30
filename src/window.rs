@@ -202,6 +202,9 @@ async fn main_loop(mut app: App) {
         next_frame().await;
     }
     app.shutdown();
+    if app.run_update {
+        crate::update::install_and_relaunch();
+    }
 }
 
 #[cfg(test)]

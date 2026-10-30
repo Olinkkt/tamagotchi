@@ -9,7 +9,7 @@ use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
 use crate::speech;
 use crate::wipe::{Next, Wipe};
-use crate::{fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
+use crate::{update, fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
 
 /// A key press, in the terms the game cares about. Each frontend translates its own events.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -67,6 +67,11 @@ pub struct App {
     pub dev: bool,
     pub dev_open: bool,
     pub quit: bool,
+    /// A newer version found at start-up; `U` installs it and starts the game again.
+    pub update: Option<update::Found>,
+    update_rx: Option<std::sync::mpsc::Receiver<Option<update::Found>>>,
+    /// Set by `U`: once the game has closed, install the update and start again.
+    pub run_update: bool,
 }
 
 type Snapshot = (u8, u8, u8, bool, bool);
@@ -170,6 +175,13 @@ impl App {
         app.drain_events();
         app.last_stage = app.pet.stage;
         save::heartbeat();
+        if app.cfg.check_updates && !dev && speed == 1.0 {
+            let (tx, rx) = std::sync::mpsc::channel();
+            std::thread::spawn(move || {
+                let _ = tx.send(update::check());
+            });
+            app.update_rx = Some(rx);
+        }
         app
     }
 
@@ -201,6 +213,9 @@ impl App {
             dev,
             dev_open: false,
             quit: false,
+            update: None,
+            update_rx: None,
+            run_update: false,
         }
     }
 
@@ -338,6 +353,15 @@ impl App {
         while self.tick_acc >= 1.0 {
             self.tick_acc -= 1.0;
             self.pet.tick();
+        }
+        if let Some(rx) = &self.update_rx {
+            if let Ok(found) = rx.try_recv() {
+                self.update_rx = None;
+                if let Some(f) = found {
+                    self.log.push(format!("Update {} is ready. Press U to install it.", update::show(f.version)));
+                    self.update = Some(f);
+                }
+            }
         }
         if self.last_event_check.elapsed() >= Duration::from_secs(2) {
             self.last_event_check = Instant::now();
@@ -582,6 +606,11 @@ impl App {
                 "A new egg appears!".into()
             }
             Key::Char('q') | Key::Esc => {
+                self.quit = true;
+                return;
+            }
+            Key::Char('U') if self.update.is_some() => {
+                self.run_update = true;
                 self.quit = true;
                 return;
             }

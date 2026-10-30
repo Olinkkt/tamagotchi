@@ -335,37 +335,9 @@ fn gallery() -> i32 {
     }
 }
 
-/// GitHub repo (`owner/name`) that `tama --update` installs from.
-/// Not set up yet; until it is, `--update` rebuilds from the local source folder instead.
-const REPO: Option<&str> = None;
-
-/// `--update`: reinstall the newest version with cargo.
+/// `--update`: reinstall the newest version with cargo (see `update.rs` for where it comes from).
 fn update() -> i32 {
-    let mut cmd = std::process::Command::new("cargo");
-    // --locked builds with the versions in Cargo.lock, which are known to work.
-    cmd.args(["install", "--force", "--locked"]);
-    match REPO {
-        Some(repo) => {
-            cmd.args(["--git", &format!("https://github.com/{repo}")]);
-        }
-        None => {
-            let src = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-            if !src.join("Cargo.toml").exists() {
-                eprintln!("Source folder {} no longer exists, and no GitHub repo is configured yet.", src.display());
-                return 1;
-            }
-            println!("Rebuilding from {}", src.display());
-            cmd.arg("--path").arg(src);
-        }
-    }
-    match cmd.status() {
-        Ok(s) if s.success() => 0,
-        Ok(s) => s.code().unwrap_or(1),
-        Err(e) => {
-            eprintln!("Could not run cargo ({e}). Is Rust installed and on your PATH?");
-            1
-        }
-    }
+    crate::update::install()
 }
 
 /// `--install-desktop`: add tama to the Linux app menu (a launcher entry and its icon).

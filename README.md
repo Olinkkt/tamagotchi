@@ -46,8 +46,10 @@ cargo install --path .
 ```
 
 This puts `tama` in `~/.cargo/bin`, which must be on your `PATH`. After you change the code,
-`tama --update` rebuilds from the same source folder and replaces the installed copy.
-(There is no download-based updater yet.)
+`tama --update` installs the newest version: from the source folder if it is ahead, otherwise
+from GitHub (needs Rust). At start-up the game checks for one too and shows "UPDATE X.Y.Z READY -
+PRESS U"; U closes the game, installs it and opens it again (progress is in `update.log` in the data
+folder). Nothing installs unless you press U.
 
 On Linux, run `tama --install-desktop` once to add tama to your app menu with an icon, so you can
 start it without a terminal. Run it again after moving the `tama` binary.
@@ -201,6 +203,7 @@ usual config folder.
 | `sleep_start_hour`, `sleep_end_hour` | sleeping hours, 24h clock |
 | `away_slowdown`, `away_safe` | see "While the game is closed" |
 | `commit_meal_gap_secs`, `fails_per_sad_heart` | see "Shell hook" |
+| `check_updates` | look for a newer version at start-up (asks github.com) |
 | `animate_parts` | show and wiggle the ears, wings, tuft, leaves and tail |
 
 The balance numbers are first guesses and not play-tested over many days.
@@ -324,6 +327,7 @@ Source layout:
 | `pet.rs` | the simulation: needs, growth, evolution, shop items |
 | `profile.rs` | coins, achievements, the adult collection |
 | `cli.rs` | shell commands, `--flags`, status bar, notifications, `--update` |
+| `update.rs` | finds the newest version (local folder or GitHub) and installs it |
 | `save.rs` | save files (with a format `version`), profile, graveyard, lock |
 | `sysinfo.rs` | machine load |
 | `config.rs` | settings |
