@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.16.0
+
+- Slots is gone from the game picker. Shells and Rock Paper Scissors stay, and Rock Paper Scissors is
+  now game 4 (key 4).
+
 ## 1.15.3
 
 - In Shells the pet stays under the same cup between rounds instead of jumping to a random one.
