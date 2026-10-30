@@ -387,7 +387,7 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
             let (ex, ey) = match c.face {
                 Some(spot) => {
                     let g = faces::grid(spot.style, Expr::Eating);
-                    (px + spot.x + g[0].len() as i32 / 2 - 3, at.y + spot.y + g.len() as i32 - 5)
+                    (px + spot.x + g[0].len() as i32 / 2 - 3, at.y + spot.y + g.len() as i32 - 2)
                 }
                 None => (px + size - 2, at.y + size - 8),
             };

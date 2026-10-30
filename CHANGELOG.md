@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+
+- The food sits a little lower, so you can see the top of the mouth chewing above it.
+
 ## 1.5.2
 
 - The pet stops bobbing while it eats, so the food stays put in its mouth.
