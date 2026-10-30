@@ -238,6 +238,14 @@ impl App {
                 self.profile.coins -= item.price();
                 self.say(&msg);
                 self.react(before);
+                // Close the shop so the pet can be seen enjoying it.
+                self.mode = Mode::Normal;
+                self.trigger(match item {
+                    pet::Item::FancyMeal => scene::Fx::Meal,
+                    pet::Item::Toy => scene::Fx::Toy,
+                    pet::Item::Salad => scene::Fx::Salad,
+                    pet::Item::Vitamins => scene::Fx::Pill,
+                });
             }
             Err(msg) => self.say(&msg),
         }
@@ -849,7 +857,9 @@ pub(crate) mod tests {
             app.profile.coins = 20;
             app.on_key(Key::Char('1'));
             assert_eq!((app.profile.coins, app.pet.hunger), (12, 3));
-            assert!(matches!(app.mode, Mode::Shop), "stays open for another purchase");
+            assert!(matches!(app.mode, Mode::Normal), "closes so the pet can be seen enjoying it");
+            assert!(app.fx.is_some());
+            app.on_key(Key::Char('b'));
             app.on_key(Key::Esc);
             assert!(matches!(app.mode, Mode::Normal));
             app.on_key(Key::Char('a'));

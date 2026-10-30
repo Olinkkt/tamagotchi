@@ -18,6 +18,11 @@ use crate::toilet;
 pub enum Fx {
     Eat,
     Snack,
+    /// Bought in the shop: a cake, a salad, a pill (all eaten) and a ball to play with.
+    Meal,
+    Salad,
+    Pill,
+    Toy,
     Hearts,
     Heal,
     Scold,
@@ -25,9 +30,15 @@ pub enum Fx {
 }
 
 impl Fx {
+    /// Whether the pet stands still and eats it.
+    fn eaten(self) -> bool {
+        matches!(self, Fx::Eat | Fx::Snack | Fx::Meal | Fx::Salad | Fx::Pill)
+    }
+
     pub fn duration_secs(self) -> f32 {
         match self {
-            Fx::Eat | Fx::Snack => 1.8,
+            Fx::Eat | Fx::Snack | Fx::Meal | Fx::Salad | Fx::Pill => 1.8,
+            Fx::Toy => 2.2,
             Fx::Hearts => 1.6,
             Fx::Heal => 1.4,
             Fx::Scold => 1.2,
@@ -152,14 +163,14 @@ pub fn light(p: &Pet) -> Light {
 /// The face to show, following the same rules as the old terminal pet.
 pub fn expression(m: &Moment) -> Expr {
     let p = m.pet;
-    let eating = m.fx_is(Fx::Eat).or(m.fx_is(Fx::Snack)).is_some_and(|f| (0.3..0.9).contains(&f) && ((f * 8.0) as i32) % 2 == 0);
+    let eating = m.fx.is_some_and(|(fx, f)| fx.eaten() && (0.3..0.9).contains(&f) && ((f * 8.0) as i32) % 2 == 0);
     let base = if p.asleep || (p.load.low_battery && calm(p)) {
         Expr::Sleeping
     } else if p.sick {
         Expr::Sick
     } else if m.fx_is(Fx::Scold).is_some() || p.hunger == 0 || p.happy == 0 {
         Expr::Sad
-    } else if m.fx_is(Fx::Hearts).is_some() || p.happy >= 3 {
+    } else if m.fx_is(Fx::Hearts).or(m.fx_is(Fx::Toy)).is_some() || p.happy >= 3 {
         Expr::Happy
     } else {
         Expr::Idle
@@ -201,7 +212,7 @@ fn motion(m: &Moment) -> (i32, i32) {
         }
         _ if m.pet.asleep => (0, -(beat / 3 % 2)),
         // Stands still while it eats, so the food stays in its mouth.
-        _ if m.fx_is(Fx::Eat).or(m.fx_is(Fx::Snack)).is_some() => (0, 0),
+        _ if m.fx.is_some_and(|(fx, _)| fx.eaten()) => (0, 0),
         _ => (0, -(beat % 2)),
     }
 }
@@ -372,7 +383,7 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
                 f.grid(icons::HEART, cx - 18 + i * 13, py - 4 - (t * 22.0) as i32 + (i % 2) * 4);
             }
         }
-        Fx::Eat | Fx::Snack if t < 0.9 => {
+        Fx::Eat | Fx::Snack | Fx::Meal | Fx::Salad | Fx::Pill if t < 0.9 => {
             // Tossed in from the top right, lands in the pet's mouth, then eaten in two bites (or licked, for candy).
             let (ex, ey) = match c.face {
                 Some(spot) => {
@@ -386,14 +397,24 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
             let hop = if t > 0.25 { let v = ((t - 0.25) / 0.08).min(1.0); (2.0 * 4.0 * v * (1.0 - v)) as i32 } else { 0 };
             let x = sx + ((ex - sx) as f32 * u) as i32;
             let y = sy + ((ey - sy) as f32 * u) as i32 - (24.0 * 4.0 * u * (1.0 - u)) as i32 - hop;
-            let [whole, bitten, last] = if fx == Fx::Snack {
-                [icons::CANDY, icons::CANDY_UNWRAPPED, icons::CANDY_LICKED]
-            } else {
-                [icons::APPLE, icons::APPLE_BITTEN, icons::APPLE_CORE]
+            let [whole, bitten, last] = match fx {
+                Fx::Snack => [Some(icons::CANDY), Some(icons::CANDY_UNWRAPPED), Some(icons::CANDY_LICKED)],
+                Fx::Meal => [Some(icons::CAKE), None, None],
+                Fx::Salad => [Some(icons::SALAD), None, None],
+                Fx::Pill => [Some(icons::VITAMINS), None, None],
+                _ => [Some(icons::APPLE), Some(icons::APPLE_BITTEN), Some(icons::APPLE_CORE)],
             };
             let icon = if t < 0.5 { whole } else if t < 0.7 { bitten } else { last };
-            let crumb = if fx == Fx::Snack { "v" } else { "n" };
-            f.grid(icon, x, y);
+            let crumb = match fx {
+                Fx::Snack => "v",
+                Fx::Meal => "p",
+                Fx::Salad => "g",
+                Fx::Pill => "w",
+                _ => "n",
+            };
+            if let Some(icon) = icon {
+                f.grid(icon, x, y);
+            }
             for bite in [0.5, 0.7, 0.88] {
                 if (bite..bite + 0.06).contains(&t) {
                     let k = ((t - bite) * 100.0) as i32;
@@ -403,6 +424,15 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
             }
             if t >= 0.82 {
                 f.grid(icons::SPARKLE, ex, ey - 2);
+            }
+        }
+        Fx::Toy => {
+            // A ball bounces beside the pet.
+            let phase = (t * 2.5).fract();
+            let hop = (16.0 * (1.0 - (2.0 * phase - 1.0).powi(2))) as i32;
+            f.grid(icons::PLAY, (px + size + 1).min(s.w - 13), at.y + size - 12 - hop);
+            for i in 0..2 {
+                f.grid(icons::HEART, cx - 6 + i * 12, py - 4 - (t * 10.0) as i32);
             }
         }
         Fx::Heal => {
@@ -538,7 +568,7 @@ mod tests {
 
     #[test]
     fn every_stage_and_effect_draws_without_panicking() {
-        let fxs = [None, Some(Fx::Eat), Some(Fx::Snack), Some(Fx::Hearts), Some(Fx::Heal), Some(Fx::Scold), Some(Fx::Evolve)];
+        let fxs = [None, Some(Fx::Eat), Some(Fx::Snack), Some(Fx::Meal), Some(Fx::Salad), Some(Fx::Pill), Some(Fx::Toy), Some(Fx::Hearts), Some(Fx::Heal), Some(Fx::Scold), Some(Fx::Evolve)];
         for stage in [Stage::Egg, Stage::Baby, Stage::Child, Stage::Teen, Stage::Adult, Stage::Dead] {
             let mut p = pet(stage);
             p.urge = Some(0);

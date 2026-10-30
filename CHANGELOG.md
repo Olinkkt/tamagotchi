@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.18.0
+
+- Buying now closes the shop, so you see your pet enjoy it: the cake, salad and vitamin pill are
+  tossed to it and eaten, and the toy is a ball that bounces beside it while it smiles.
+- Vitamins used to show nothing at all; now they get their own animation.
+
 ## 1.17.0
 
 - The light is gone: no `l` key, no light button, no `tama light`, and no care mistake for leaving it
