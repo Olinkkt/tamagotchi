@@ -463,7 +463,7 @@ impl App {
             games::Outcome::Done { wins, rounds } => {
                 let before = self.snapshot();
                 let msg = self.pet.finish_game(wins, rounds);
-                let coins = profile::game_reward(wins, rounds);
+                let coins = self.profile.pay_for(profile::game_reward(wins, rounds), save::now());
                 if coins > 0 {
                     self.profile.add_coins(coins);
                     self.profile.games_won += 1;
@@ -789,6 +789,14 @@ pub(crate) mod tests {
         assert!(matches!(app.mode, Mode::Finish(_)), "a finished game shows the result screen");
         app.handle_outcome(games::Outcome::Done { wins: 1, rounds: 5 });
         assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
+    }
+
+    #[test]
+    fn a_second_win_straight_away_pays_half() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.handle_outcome(games::Outcome::Done { wins: 5, rounds: 5 });
+        app.handle_outcome(games::Outcome::Done { wins: 5, rounds: 5 });
+        assert_eq!(app.profile.coins, profile::COINS_PERFECT + profile::COINS_PERFECT / 2);
     }
 
     #[test]

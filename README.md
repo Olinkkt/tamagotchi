@@ -108,7 +108,8 @@ closed the call waits for you and never ends in an accident. `tama toilet` does 
 
 ### Coins, shop and awards
 
-Winning a mini-game pays **4 coins**, and a perfect game **10**. Spend them in the shop (`b`,
+Winning a mini-game pays **4 coins**, and a perfect game **10**. Full pay comes once every 10
+minutes; games won in between pay half. Spend them in the shop (`b`,
 then `1` to `4`, or click an item; the shop closes so you can watch your pet enjoy it); nothing is charged if the item would do nothing right now:
 
 | Item | Price | Effect |

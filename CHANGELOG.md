@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.22.0
+
+- Mini-games pay full coins only once every 10 minutes. Wins in between pay half (2 or 5), so
+  replaying one game over and over no longer buys the whole shop.
+- Your profile remembers the last full payout, so restarting the game does not reset the wait.
+  Old profiles load as before.
+
 ## 1.21.3
 
 - Shop items cost more: fancy meal 15, toy 10, salad 8, vitamins 25. A perfect game now buys about

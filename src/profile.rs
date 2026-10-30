@@ -9,6 +9,8 @@ pub const ADULT_SPECIES: [&str; 5] = ["Mametchi", "Kuchipatchi", "Tarakotchi", "
 /// Coins for finishing a mini-game: nothing for a loss, a few for a win, more for a perfect game.
 pub const COINS_WIN: u32 = 4;
 pub const COINS_PERFECT: u32 = 10;
+/// A win pays in full only if the last full payout was at least this long ago; otherwise half.
+pub const FULL_PAY_GAP_SECS: u64 = 600;
 
 pub fn game_reward(wins: u8, rounds: u8) -> u32 {
     if wins * 2 <= rounds {
@@ -48,12 +50,26 @@ pub struct Profile {
     pub achievements: Vec<String>,
     /// Adult species you have raised.
     pub adults: Vec<String>,
+    /// Unix time of the last game that paid in full.
+    pub last_full_pay: u64,
 }
 
 impl Profile {
     pub fn add_coins(&mut self, n: u32) {
         self.coins += n;
         self.coins_earned += n;
+    }
+
+    /// What a game's reward really is at `now`: full once per `FULL_PAY_GAP_SECS`, half in between.
+    pub fn pay_for(&mut self, reward: u32, now: u64) -> u32 {
+        if reward == 0 {
+            0
+        } else if now.saturating_sub(self.last_full_pay) >= FULL_PAY_GAP_SECS {
+            self.last_full_pay = now;
+            reward
+        } else {
+            reward / 2
+        }
     }
 
     pub fn has(&self, id: &str) -> bool {
@@ -117,6 +133,16 @@ mod tests {
         assert_eq!(game_reward(5, 5), COINS_PERFECT);
         assert_eq!(game_reward(2, 3), COINS_WIN);
         assert_eq!(game_reward(1, 1), COINS_PERFECT);
+    }
+
+    #[test]
+    fn games_pay_in_full_once_per_gap_and_half_in_between() {
+        let mut p = Profile::default();
+        assert_eq!(p.pay_for(10, 1000), 10);
+        assert_eq!(p.pay_for(10, 1100), 5);
+        assert_eq!(p.pay_for(4, 1200), 2);
+        assert_eq!(p.pay_for(0, 1300), 0);
+        assert_eq!(p.pay_for(10, 1000 + FULL_PAY_GAP_SECS), 10);
     }
 
     #[test]
