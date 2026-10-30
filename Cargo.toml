@@ -1,6 +1,6 @@
 [package]
 name = "tamagotchi"
-version = "1.7.3"
+version = "1.8.0"
 edition = "2024"
 rust-version = "1.86"
 

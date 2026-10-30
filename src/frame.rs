@@ -18,7 +18,6 @@ impl Frame {
         Frame { w, h, px: vec![fill; (w * h) as usize] }
     }
 
-    #[cfg(test)]
     pub fn get(&self, x: i32, y: i32) -> Option<Pal> {
         (x >= 0 && y >= 0 && x < self.w && y < self.h).then(|| self.px[(y * self.w + x) as usize])
     }

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.8.0
+
+- The pet now talks in a speech bubble above its head ("Yum.", "Ahh, much better.", "Need toilet!").
+  The bubble fades in, types its words out letter by letter, and fades out again.
+- The strip of text along the foot of the room is gone, and with it the stat and coin lines that
+  appeared there ("Hunger +1", "+3 coins", achievements). Those will get their own place later.
 ## 1.7.3
 
 - The line of news at the foot of the room ("Ahh, much better.") now fades after five seconds

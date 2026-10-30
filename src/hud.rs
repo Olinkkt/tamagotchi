@@ -5,7 +5,6 @@
 
 use crate::app::{App, Key, Mode};
 use crate::fmt_age;
-use crate::font;
 use crate::frame::Frame;
 use crate::games::Game;
 use crate::icons::{self, Grid};
@@ -56,11 +55,6 @@ impl Layout {
 
     pub fn room_h(self) -> i32 {
         self.hint_y() - ROOM_Y
-    }
-
-    /// The message about the last thing that happened sits on a dimmed strip along the room's foot.
-    fn message_y(self) -> i32 {
-        self.hint_y() - 11
     }
 
     /// Where a 240x128 game or card goes so it is centred above the hint line.
@@ -239,9 +233,6 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
         wipe.cover(&mut room, (panel_x / 2, lay.room_h() / 2));
     }
     f.frame(&room, 0, ROOM_Y);
-    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) && !app.wiping() {
-        f.tint(0, lay.message_y(), panel_x, hint_y - lay.message_y(), Pal::dark);
-    }
     f.boxed(panel_x, 0, PANEL_W, hint_y, Pal::Night, Pal::Dusk);
     f.rect(panel_x + 1, 11, PANEL_W - 2, 1, Pal::Dusk);
     if matches!(app.mode, Mode::Normal | Mode::Toilet(_)) {
@@ -302,13 +293,6 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
     if let Some((text, colour)) = hint(app) {
         out.push(label(text, lay.w as f32 / 2.0, hint_y as f32 + 6.0, colour, Align::Centre));
     }
-    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) && !app.wiping() {
-        // One line only: long messages lose their tail rather than spill over the panel.
-        let max = ((panel_x - 8) as f32 / ratio) as i32;
-        let mut text = app.message.clone();
-        while font::width(&text) > max && text.pop().is_some() {}
-        out.push(label(text, panel_x as f32 / 2.0, (lay.message_y() + hint_y) as f32 / 2.0, Pal::White, Align::Centre));
-    }
     if !in_game {
         out.extend(panel::labels(app, ratio, lay));
     }
@@ -331,6 +315,7 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::font;
     use crate::app::tests::app_with;
 
     #[test]

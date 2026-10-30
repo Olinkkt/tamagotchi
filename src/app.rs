@@ -7,6 +7,7 @@ use crate::cast;
 use crate::config::Config;
 use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
+use crate::speech;
 use crate::wipe::{Next, Wipe};
 use crate::{fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
 
@@ -35,15 +36,14 @@ pub enum Mode {
     Toilet(toilet::Visit),
 }
 
-/// How long the line of news at the foot of the room stays up.
-const MESSAGE_SECS: Duration = Duration::from_secs(5);
-
 pub struct App {
     pub pet: Pet,
     pub mode: Mode,
-    pub message: String,
-    /// What `message` said when it was last seen, and since when, so old news can fade.
-    message_seen: (String, Instant),
+    /// What the pet is saying out loud, and since when.
+    speech: Option<(String, Instant)>,
+    /// Said once the room is back in view (after a washroom visit or a game's result card).
+    say_later: Option<String>,
+    was_urgent_toilet: bool,
     pub log: Vec<String>,
     pub cfg: Config,
     pub profile: Profile,
@@ -150,7 +150,8 @@ impl App {
             app.pet.clock = save::now() as i64;
         }
         if ticks > 0 {
-            app.message = format!("Welcome back! You were away {}.", fmt_age(away));
+            app.log.push(format!("Welcome back! You were away {}.", fmt_age(away)));
+            app.say("Missed you!");
         }
         app.pet.load = sysinfo::read();
         app.profile = save::load_profile();
@@ -165,9 +166,10 @@ impl App {
         App {
             pet,
             mode: Mode::Normal,
-            message_seen: (String::new(), Instant::now()),
-            message,
-            log: Vec::new(),
+            speech: None,
+            say_later: None,
+            was_urgent_toilet: false,
+            log: if message.is_empty() { Vec::new() } else { vec![message] },
             cfg,
             profile: Profile::default(),
             tz,
@@ -207,7 +209,7 @@ impl App {
         let before = self.snapshot();
         for e in events.iter().take(MAX_QUEUED_EVENTS) {
             if let Some(m) = self.pet.apply_event(e) {
-                self.message = m.clone();
+                self.say(&m);
                 self.log.push(m);
             }
         }
@@ -217,17 +219,16 @@ impl App {
     /// Buy something from the shop and use it on the pet. Nothing is charged if it would do nothing.
     pub fn buy(&mut self, item: pet::Item) {
         if self.profile.coins < item.price() {
-            self.message = format!("Not enough coins: {} costs {}.", item.name(), item.price());
             return;
         }
         let before = self.snapshot();
         match self.pet.use_item(item) {
             Ok(msg) => {
                 self.profile.coins -= item.price();
-                self.message = format!("{msg} (-{} coins)", item.price());
+                self.say(&msg);
                 self.react(before);
             }
-            Err(msg) => self.message = msg,
+            Err(msg) => self.say(&msg),
         }
     }
 
@@ -289,7 +290,6 @@ impl App {
 
     fn drain_events(&mut self) {
         for e in self.pet.events.drain(..) {
-            self.message = e.clone();
             self.log.push(e);
         }
         if self.log.len() > 50 {
@@ -297,14 +297,19 @@ impl App {
         }
     }
 
-    /// The message line clears itself a few seconds after it last changed (a pending reset prompt stays).
-    fn fade_message(&mut self) {
-        if self.message != self.message_seen.0 {
-            self.message_seen = (self.message.clone(), Instant::now());
-        } else if !self.confirm_reset && self.message_seen.1.elapsed() >= MESSAGE_SECS {
-            self.message.clear();
-            self.message_seen.0.clear();
+    /// The pet says something, if it is awake to say it and the words are its own.
+    pub fn say(&mut self, msg: &str) {
+        if !self.pet.alive() || self.pet.stage == Stage::Egg || self.pet.asleep {
+            return;
         }
+        if let Some(text) = speech::voice(msg) {
+            self.speech = Some((text, Instant::now()));
+        }
+    }
+
+    /// What the pet is saying and how many milliseconds ago it began.
+    pub fn speech(&self) -> Option<(&str, u64)> {
+        self.speech.as_ref().map(|(t, at)| (t.as_str(), at.elapsed().as_millis() as u64))
     }
 
     pub fn update(&mut self) {
@@ -324,7 +329,19 @@ impl App {
             self.pet.load = sysinfo::read();
         }
         self.drain_events();
-        self.fade_message();
+        if self.speech().is_none_or(|(t, age)| age >= speech::total_ms(t)) {
+            self.speech = None;
+        }
+        if self.wipe.is_none() && matches!(self.mode, Mode::Normal) {
+            if let Some(msg) = self.say_later.take() {
+                self.say(&msg);
+            }
+        }
+        let wants = self.pet.needs_toilet();
+        if wants && !self.was_urgent_toilet && matches!(self.mode, Mode::Normal) {
+            self.say("Need toilet!");
+        }
+        self.was_urgent_toilet = wants;
         if self.pet.stage != self.last_stage {
             if self.pet.alive() {
                 self.trigger(scene::Fx::Evolve);
@@ -347,7 +364,6 @@ impl App {
         }
         for a in self.profile.check(&self.pet) {
             let note = format!("Achievement unlocked: {} - {}", a.name, a.how);
-            self.message = note.clone();
             self.log.push(note);
             let _ = save::save_profile(&self.profile);
         }
@@ -366,10 +382,6 @@ impl App {
             save::heartbeat();
             self.last_save = Instant::now();
         }
-    }
-
-    pub fn wiping(&self) -> bool {
-        self.wipe.is_some()
     }
 
     pub fn wipe(&self) -> Option<&Wipe> {
@@ -404,18 +416,17 @@ impl App {
             games::Outcome::Continue => {}
             games::Outcome::Quit => {
                 self.mode = Mode::Normal;
-                self.message = "Game abandoned.".into();
             }
             games::Outcome::Done { wins, rounds } => {
                 let before = self.snapshot();
-                self.message = self.pet.finish_game(wins, rounds);
+                let msg = self.pet.finish_game(wins, rounds);
                 let coins = profile::game_reward(wins, rounds);
                 if coins > 0 {
                     self.profile.add_coins(coins);
                     self.profile.games_won += 1;
-                    self.message.push_str(&format!(" +{coins} coins."));
                 }
                 self.mode = Mode::Finish(games::Finish::new(&self.pet, wins, rounds, coins));
+                self.say_later = Some(msg);
                 self.react(before);
             }
         }
@@ -488,10 +499,7 @@ impl App {
                 self.fx = None;
                 self.shell_at = None;
                 self.last_stage = Stage::Egg;
-                self.message = "Reset! A fresh egg appears.".into();
                 let _ = save::save(&self.pet);
-            } else {
-                self.message = "Reset cancelled.".into();
             }
             return;
         }
@@ -506,14 +514,13 @@ impl App {
         let msg = match code {
             Key::Char('R') => {
                 self.confirm_reset = true;
-                self.message = "Reset your pet? Press y to confirm, any other key to cancel.".into();
                 return;
             }
             Key::Char('f') => self.pet.feed_meal(),
             Key::Char('s') => self.pet.feed_snack(),
             Key::Char('p') => {
                 match self.pet.can_play() {
-                    Some(m) => self.message = m.into(),
+                    Some(m) => self.say(m),
                     None => self.mode = Mode::Chooser,
                 }
                 return;
@@ -536,6 +543,8 @@ impl App {
                 let msg = self.pet.toilet();
                 if goes {
                     self.wipe = Some(Wipe::new(Next::Toilet(self.pet.rand(cast::BOOTHS as u64) as usize)));
+                    self.say_later = Some(msg);
+                    return;
                 }
                 msg
             }
@@ -553,7 +562,7 @@ impl App {
             }
             _ => return,
         };
-        self.message = msg;
+        self.say(&msg);
         self.react(before);
         if code == Key::Char('s') && self.pet.happy > before.1 {
             self.trigger(scene::Fx::Snack);
@@ -672,7 +681,7 @@ impl App {
             }
             _ => return false,
         };
-        self.message = format!("[dev] {note}");
+        self.log.push(format!("[dev] {note}"));
         true
     }
 }
@@ -703,9 +712,10 @@ pub(crate) mod tests {
         app.profile.coins = 10;
         app.buy(pet::Item::FancyMeal);
         assert_eq!((app.profile.coins, app.pet.hunger), (2, 3));
+        app.speech = None;
         app.buy(pet::Item::Vitamins);
         assert_eq!(app.profile.coins, 2, "12 coins is more than it has");
-        assert!(app.message.contains("Not enough coins"), "{}", app.message);
+        assert!(app.speech().is_none(), "no coins is not the pet talking");
     }
 
     #[test]
@@ -714,7 +724,7 @@ pub(crate) mod tests {
         app.profile.coins = 20;
         app.buy(pet::Item::FancyMeal);
         assert_eq!((app.profile.coins, app.pet.hunger), (20, 4));
-        assert!(app.message.contains("Not hungry"), "{}", app.message);
+        assert_eq!(app.speech().map(|(t, _)| t), Some("Not hungry."));
     }
 
     #[test]
@@ -723,7 +733,6 @@ pub(crate) mod tests {
         app.handle_outcome(games::Outcome::Done { wins: 5, rounds: 5 });
         assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
         assert!(matches!(app.mode, Mode::Finish(_)), "a finished game shows the result screen");
-        assert!(app.message.contains("coins"), "{}", app.message);
         app.handle_outcome(games::Outcome::Done { wins: 1, rounds: 5 });
         assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
     }
@@ -838,7 +847,7 @@ pub(crate) mod tests {
         save::with_temp_dir(|| {
             let mut app = app_with(Stage::Adult, |p| p.urge = Some(0));
             app.on_key(Key::Char('t'));
-            assert!(app.wiping() && matches!(app.mode, Mode::Normal), "the wipe starts in the room");
+            assert!(app.wipe.is_some() && matches!(app.mode, Mode::Normal), "the wipe starts in the room");
             app.on_key(Key::Char('f'));
             assert_eq!(app.pet.hunger, 3, "keys do nothing during the wipe");
             app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.9);
@@ -846,7 +855,7 @@ pub(crate) mod tests {
             assert!(matches!(app.mode, Mode::Toilet(_)), "scenes change while the picture is shut");
             app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.9);
             app.update();
-            assert!(!app.wiping() && app.pet.urge.is_none());
+            assert!(!app.wipe.is_some() && app.pet.urge.is_none());
         });
     }
 }
