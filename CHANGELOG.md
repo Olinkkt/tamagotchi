@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.4
+
+- The room's wallpaper now reaches right up to the header line; the dark gap under it is gone.
+
 ## 1.8.3
 
 - The smallest window is now a little wider, so all the action buttons always fit under the room

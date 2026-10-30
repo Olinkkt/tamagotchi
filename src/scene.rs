@@ -465,8 +465,6 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
     let (cw, ch) = (w.min(master.w), h.min(master.h));
     let (sx, sy) = ((master.w - W) / 2 + W / 2 - cw / 2, master.h - ch);
     f.region(master, (sx, sy, cw, ch), (w - cw) / 2, h - ch);
-    // The shadow along the ceiling, wherever the top of the room is cropped to.
-    f.rect(0, 0, w, 3, if light == Light::Dark { Pal::Ink } else { Pal::Night });
     let (dx, dy) = s.shift();
     if light != Light::Day {
         for (i, &(x, y)) in TWINKLE.iter().enumerate() {
