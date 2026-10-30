@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.25.0
+
+- New family tree: press `e` (or click the new button) to see every form from Baby to the five adults,
+  how many care mistakes each one takes, your pet outlined in yellow and the form it is heading for in
+  blue. Adults you have not raised yet stay as silhouettes.
+
 ## 1.24.0
 
 - The pet no longer reacts to your computer: no sweat drops when the CPU is busy, no dizzy eyes when

@@ -62,7 +62,7 @@ start it without a terminal. Run it again after moving the `tama` binary.
 
 Run `tama` to open the window. One pet at a time; when it dies you can hatch a new egg with `n`.
 Every action is also a button along the bottom of the window: click it, or press its key (shown
-in the button's corner). The shop, awards, graveyard, game picker and the games have no bar: click their "esc"
+in the button's corner). The shop, awards, family tree, graveyard, game picker and the games have no bar: click their "esc"
 button (or, on a card, anywhere off it) to close them. F11 toggles fullscreen.
 
 | Key | Action |
@@ -75,6 +75,7 @@ button (or, on a card, anywhere off it) to close them. F11 toggles fullscreen.
 | `d` | scold, but only when it is being naughty |
 | `b` | shop (see below) |
 | `a` | awards: achievements and the adults you have raised |
+| `e` | family tree: every form, what it takes to get there, and where your pet is |
 | `g` | graveyard: the pets you have lost |
 | `q` | quit (the pet keeps living) |
 
@@ -153,7 +154,8 @@ Care mistakes (counted over its whole life) decide what it grows into:
 | Adult: Nyorotchi | 7 or more |
 
 Discipline starts at 50% and rises 25 points each time you scold a real naughty call.
-The status panel shows what it is on track for.
+The status panel shows what it is on track for, and `e` opens the family tree: the same table as a
+picture, with your pet outlined in yellow and the form it is heading for in blue.
 
 Each pet also gets a random trait: *greedy* (hungry faster), *playful* (bored faster, +2
 happiness from a win), *hardy* (rarely sick), *mischievous* (acts up more) or *easygoing*.
@@ -290,7 +292,7 @@ Source layout:
 | `panel.rs` | the status panel |
 | `scene.rs` | the room: the pet, its moods and reactions, bubbles, effects |
 | `toilet.rs` | the washroom visit: booths, the door and the timing |
-| `screens.rs` | the cards: game picker, shop, awards, graveyard, reset |
+| `screens.rs` | the cards: game picker, shop, awards, family tree, graveyard, reset |
 | `games.rs` | mini-games and the result screen |
 | `frame.rs` | the palette pixel canvas everything is drawn into |
 | `art.rs` | the embedded sprite sheets |

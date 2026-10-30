@@ -226,6 +226,7 @@ pub fn for_key(key: char) -> Option<Grid> {
         'd' => SCOLD,
         'b' => SHOP,
         'a' => AWARDS,
+        'e' => EVOLVE,
         'g' => GRAVEYARD,
         'q' => QUIT,
         'n' => NEW_EGG,
@@ -251,6 +252,20 @@ pub const STAR: Grid = &[
 ];
 
 pub const Z: Grid = &["iiiii", "...i.", "..i..", ".i...", "iiiii"];
+pub const EVOLVE: Grid = &[
+    "....kkkk....",
+    "...kyyyyk...",
+    "...kyyyyk...",
+    "....kkkk....",
+    ".....kk.....",
+    "..kkkkkkkk..",
+    "..kk....kk..",
+    ".kkkk..kkkk.",
+    "kgggk..kgggk",
+    "kgggk..kgggk",
+    ".kkk....kkk.",
+    "............",
+];
 pub const HEART: Grid = &[".kk.kk.", "kbpkppk", "kpppppk", ".kpppk.", "..kpk..", "...k..."];
 pub const SPARKLE: Grid = &["..c..", "..c..", "ccwcc", "..c..", "..c.."];
 pub const ANGER: Grid = &["rr.rr", "r...r", ".....", "r...r", "rr.rr"];
@@ -327,14 +342,14 @@ mod tests {
 
     #[test]
     fn icons_are_rectangular_and_use_palette_letters() {
-        let keys = "fspmtdbagqn".chars().map(|k| for_key(k).unwrap());
+        let keys = "fspmtdbaegqn".chars().map(|k| for_key(k).unwrap());
         for g in keys.chain([CAKE, SALAD, VITAMINS, CHECK, STAR, HEART_FULL, HEART_EMPTY, COIN, Z, HEART, SPARKLE, ANGER, APPLE, APPLE_BITTEN, APPLE_CORE, CANDY, CANDY_UNWRAPPED, CANDY_LICKED, CAKE_BITTEN, CAKE_LAST, SALAD_BITTEN, SALAD_LAST, PILL, PILL_BITTEN, PILL_LAST]) {
             for row in g {
                 assert_eq!(row.len(), g[0].len(), "{g:?}");
                 assert!(row.chars().all(|c| c == '.' || colour(c).is_some()), "{row}");
             }
         }
-        for k in "fspmtdbagqn".chars() {
+        for k in "fspmtdbaegqn".chars() {
             let g = for_key(k).unwrap();
             assert_eq!((g.len(), g[0].len()), (12, 12), "button icons are 12x12: {k}");
         }

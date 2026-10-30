@@ -32,6 +32,8 @@ pub enum Mode {
     Graveyard(Vec<String>),
     Shop,
     Awards,
+    /// The family tree: every form and what it takes to get there.
+    Tree,
     /// The pet in a washroom booth; nothing can be done until it comes out.
     Toilet(toilet::Visit),
 }
@@ -502,7 +504,7 @@ impl App {
                 }
                 return;
             }
-            Mode::Awards | Mode::Graveyard(_) => {
+            Mode::Awards | Mode::Tree | Mode::Graveyard(_) => {
                 self.mode = Mode::Normal;
                 return;
             }
@@ -553,6 +555,10 @@ impl App {
             }
             Key::Char('a') => {
                 self.mode = Mode::Awards;
+                return;
+            }
+            Key::Char('e') => {
+                self.mode = Mode::Tree;
                 return;
             }
             Key::Char('m') => self.pet.medicine(),
@@ -860,6 +866,10 @@ pub(crate) mod tests {
             assert!(matches!(app.mode, Mode::Normal));
             app.on_key(Key::Char('a'));
             assert!(matches!(app.mode, Mode::Awards));
+            app.on_key(Key::Char('x'));
+            assert!(matches!(app.mode, Mode::Normal));
+            app.on_key(Key::Char('e'));
+            assert!(matches!(app.mode, Mode::Tree));
             app.on_key(Key::Char('x'));
             assert!(matches!(app.mode, Mode::Normal));
         });

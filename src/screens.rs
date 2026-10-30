@@ -39,7 +39,7 @@ fn centred(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
 
 /// Whether one of the cards is up, hiding the room and the panel.
 pub fn showing(app: &App) -> bool {
-    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Graveyard(_))
+    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Tree | Mode::Graveyard(_))
 }
 
 fn card(f: &mut Frame) {
@@ -99,13 +99,17 @@ fn shop_labels(app: &App) -> Vec<Label> {
     v
 }
 
-/// An adult in the collection: in colour once raised, a dark silhouette until then.
+/// A form in the collection: in colour once raised, a dark silhouette until then.
 fn collection_sprite(species: &str, raised: bool) -> Sprite {
+    form_sprite(species, Stage::Adult, raised)
+}
+
+fn form_sprite(species: &str, stage: Stage, shown: bool) -> Sprite {
     let mut p = Pet::new(1);
-    p.stage = Stage::Adult;
+    p.stage = stage;
     p.species = species.into();
     let s = scene::posed(&p, Expr::Happy);
-    if raised {
+    if shown {
         return s;
     }
     let mut dark = Sprite::empty(s.w);
@@ -147,6 +151,91 @@ fn awards_labels(app: &App) -> Vec<Label> {
     for (i, a) in profile::ACHIEVEMENTS.iter().enumerate() {
         let (x, y) = (CARD.0 + 18 + (i as i32 / 5) * 110, BODY_Y as f32 + 5.5 + (i % 5) as f32 * AWARD_ROW);
         v.push(label(a.name, x as f32, y, if p.has(a.id) { Pal::Green } else { Pal::Mist }));
+    }
+    v
+}
+
+/// One form on the tree: its name, stage, middle (x) and floor (y) in the card, and what it takes.
+struct Node {
+    species: &'static str,
+    stage: Stage,
+    x: i32,
+    floor: i32,
+    needs: &'static str,
+}
+
+const TREE_TOP_FLOOR: i32 = 54;
+const TREE_ADULT_FLOOR: i32 = CARD.1 + CARD.3 - 4;
+const TREE_NEEDS_Y: f32 = 72.0;
+
+fn tree_nodes() -> Vec<Node> {
+    let top = |species, stage, x, needs| Node { species, stage, x, floor: TREE_TOP_FLOOR, needs };
+    let adult = |i: i32, species, needs| Node { species, stage: Stage::Adult, x: 36 + 42 * i, floor: TREE_ADULT_FLOOR, needs };
+    vec![
+        top("Babytchi", Stage::Baby, 36, ""),
+        top("Marutchi", Stage::Child, 80, ""),
+        top("Tonmarutchi", Stage::Teen, 140, "0-2 mistakes"),
+        top("Hashitamatchi", Stage::Teen, 196, "3+ mistakes"),
+        adult(0, "Mametchi", "0-1*"),
+        adult(1, "Kuchipatchi", "0-2"),
+        adult(2, "Tarakotchi", "3-4"),
+        adult(3, "Ichigotchi", "5-6"),
+        adult(4, "Nyorotchi", "7+"),
+    ]
+}
+
+/// Whether the pet is this form right now.
+fn is_now(app: &App, n: &Node) -> bool {
+    app.pet.alive() && app.pet.stage == n.stage && app.pet.species == n.species
+}
+
+fn is_on_track(app: &App, n: &Node) -> bool {
+    app.pet.on_track() == Some(n.species)
+}
+
+fn outline(f: &mut Frame, (x, y, w, h): (i32, i32, i32, i32), colour: Pal) {
+    f.rect(x, y, w, 1, colour);
+    f.rect(x, y + h - 1, w, 1, colour);
+    f.rect(x, y, 1, h, colour);
+    f.rect(x + w - 1, y, 1, h, colour);
+}
+
+/// An arrow pointing right, `w` pixels long, with its middle at (`x`, `y`).
+fn arrow(f: &mut Frame, x: i32, y: i32, w: i32) {
+    f.rect(x, y, w, 1, Pal::Slate);
+    f.rect(x + w - 2, y - 1, 1, 3, Pal::Slate);
+    f.rect(x + w - 3, y - 2, 1, 5, Pal::Slate);
+}
+
+fn draw_tree(f: &mut Frame, app: &App) {
+    arrow(f, 56, TREE_TOP_FLOOR - 14, 14);
+    arrow(f, 98, TREE_TOP_FLOOR - 14, 14);
+    for n in tree_nodes() {
+        let shown = n.stage != Stage::Adult || app.profile.raised(n.species) || is_now(app, &n);
+        let s = form_sprite(n.species, n.stage, shown);
+        let (x, y) = (n.x - s.w / 2, n.floor - s.bottom());
+        f.sprite(&s, x, y);
+        let colour = if is_now(app, &n) { Some(Pal::Yellow) } else if is_on_track(app, &n) { Some(Pal::Sky) } else { None };
+        if let Some(c) = colour {
+            let (l, r) = ((0..s.w).find(|&x| (0..s.h).any(|y| s.get(x, y).is_some())).unwrap_or(0), (0..s.w).rev().find(|&x| (0..s.h).any(|y| s.get(x, y).is_some())).unwrap_or(s.w - 1));
+            outline(f, (x + l - 2, y + s.top() - 2, r - l + 5, s.bottom() - s.top() + 4), c);
+        }
+    }
+}
+
+fn tree_labels(app: &App) -> Vec<Label> {
+    let mut v = vec![label("FAMILY TREE", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink)];
+    v.push(centred("or", 168.0, (TREE_TOP_FLOOR - 14) as f32, Pal::Slate));
+    for n in tree_nodes() {
+        let tint = if is_now(app, &n) { Pal::Yellow } else if is_on_track(app, &n) { Pal::Sky } else { Pal::Mist };
+        if n.stage == Stage::Adult {
+            v.push(centred(n.needs, n.x as f32, TREE_NEEDS_Y, tint));
+        } else {
+            v.push(centred(n.species, n.x as f32, (TREE_TOP_FLOOR + 5) as f32, tint));
+            if !n.needs.is_empty() {
+                v.push(centred(n.needs, n.x as f32, (TREE_TOP_FLOOR + 11) as f32, Pal::Slate));
+            }
+        }
     }
     v
 }
@@ -266,6 +355,7 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
         Mode::Chooser => draw_chooser(&mut local),
         Mode::Shop => draw_shop(&mut local, app),
         Mode::Awards => draw_awards(&mut local, app),
+        Mode::Tree => draw_tree(&mut local, app),
         Mode::Graveyard(entries) => draw_graveyard(&mut local, entries),
         _ => {}
     }
@@ -278,6 +368,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         Mode::Chooser => chooser_labels(),
         Mode::Shop => shop_labels(app),
         Mode::Awards => awards_labels(app),
+        Mode::Tree => tree_labels(app),
         Mode::Graveyard(entries) => graveyard_labels(entries),
         _ => Vec::new(),
     };
@@ -301,6 +392,7 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
             None => ("EVERY AWARD UNLOCKED!".into(), Pal::Yellow),
         },
+        Mode::Tree => ("YELLOW: NOW  BLUE: NEXT  NUMBERS: MISTAKES  *: 75% DISCIPLINE".into(), Pal::Mist),
         Mode::Graveyard(_) => ("ANY KEY TO GO BACK".into(), Pal::Mist),
         _ => return None,
     })
@@ -425,6 +517,24 @@ mod tests {
     }
 
     #[test]
+    fn the_tree_names_every_stage_and_marks_where_the_pet_is() {
+        let mut app = app_with(Stage::Teen, |p| {
+            p.species = "Tonmarutchi".into();
+            p.mistakes = 4;
+        });
+        app.mode = Mode::Tree;
+        let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
+        for want in ["Babytchi", "Marutchi", "Tonmarutchi", "Hashitamatchi", "0-1*", "7+"] {
+            assert!(text.iter().any(|t| t == want), "the tree is missing {want}: {text:?}");
+        }
+        let forms = tree_nodes();
+        let now: Vec<&str> = forms.iter().filter(|n| is_now(&app, n)).map(|n| n.species).collect();
+        assert_eq!(now, ["Tonmarutchi"]);
+        let next: Vec<&str> = forms.iter().filter(|n| is_on_track(&app, n)).map(|n| n.species).collect();
+        assert_eq!(next, ["Tarakotchi"], "four mistakes lead to Tarakotchi");
+    }
+
+    #[test]
     fn the_awards_list_every_achievement_and_the_collection() {
         let mut app = app_with(Stage::Adult, |_| {});
         app.mode = Mode::Awards;
@@ -446,7 +556,7 @@ mod tests {
     fn every_card_fits_at_the_coarsest_text_scale() {
         let mut app = app_with(Stage::Adult, |_| {});
         let graves = vec!["2026-10-29 22:00 | Hashitamatchi | lived 1d 23h 59m | 12 care mistakes | cause: starvation".to_string(); 9];
-        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(graves), Mode::Graveyard(Vec::new())] {
+        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Tree, Mode::Graveyard(graves), Mode::Graveyard(Vec::new())] {
             app.mode = mode;
             for mut l in labels(&app, Layout::MIN) {
                 l.x -= Layout::MIN.centred_card().0 as f32;

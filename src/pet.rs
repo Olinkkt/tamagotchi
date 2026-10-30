@@ -415,6 +415,15 @@ impl Pet {
         self.alive() && self.stage != Stage::Egg && self.weight > healthy_max_weight(self.stage)
     }
 
+    /// The form it will grow into next at the care it has had so far (only teens and adults vary).
+    pub fn on_track(&self) -> Option<&'static str> {
+        if !self.alive() || self.stage == Stage::Egg {
+            return None;
+        }
+        let (_, next) = self.next_stage()?;
+        matches!(next, Stage::Teen | Stage::Adult).then(|| Self::species_of(next, self.mistakes, self.discipline))
+    }
+
     /// Short lines describing what growth is coming and how care changes the outcome.
     pub fn evolution_preview(&self) -> Vec<String> {
         if !self.alive() || self.stage == Stage::Egg {
@@ -791,6 +800,17 @@ mod tests {
         p.grow();
         assert_eq!(p.stage, Stage::Adult);
         assert_eq!(p.species, "Tarakotchi");
+    }
+
+    #[test]
+    fn on_track_names_the_next_form_from_the_care_so_far() {
+        let mut p = Pet::new(1);
+        assert_eq!(p.on_track(), None, "an egg has no track");
+        p.stage = Stage::Teen;
+        p.mistakes = 4;
+        assert_eq!(p.on_track(), Some("Tarakotchi"));
+        p.stage = Stage::Adult;
+        assert_eq!(p.on_track(), None, "an adult has nothing left to grow into");
     }
 
     #[test]

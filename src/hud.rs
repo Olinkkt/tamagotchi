@@ -111,8 +111,8 @@ fn label(text: impl Into<String>, x: f32, y: f32, colour: Pal, align: Align) -> 
     Label { text: text.into(), x, y, colour, align }
 }
 
-const ACTIONS: [char; 10] = ['f', 's', 'p', 'm', 't', 'd', 'b', 'a', 'g', 'q'];
-const DEAD_ACTIONS: [char; 4] = ['n', 'a', 'g', 'q'];
+const ACTIONS: [char; 11] = ['f', 's', 'p', 'm', 't', 'd', 'b', 'a', 'e', 'g', 'q'];
+const DEAD_ACTIONS: [char; 5] = ['n', 'a', 'e', 'g', 'q'];
 
 /// Whether an action would do anything right now (the rest are drawn dimmed).
 fn useful(app: &App, key: char) -> bool {
@@ -147,6 +147,7 @@ fn key_name(c: char) -> &'static str {
         'd' => "d",
         'b' => "b",
         'a' => "a",
+        'e' => "e",
         'g' => "g",
         'q' => "q",
         'n' => "n",
@@ -347,7 +348,7 @@ mod tests {
         let lay = Layout::new(320, 160);
         let bar = buttons(&app, lay);
         let keys: String = bar.iter().filter_map(|b| if let Key::Char(c) = b.key { Some(c) } else { None }).collect();
-        assert_eq!(keys, "fspmtdbagq");
+        assert_eq!(keys, "fspmtdbaegq");
         assert!(bar.iter().all(|b| b.x >= 0 && b.x + BUTTON <= lay.panel_x() && b.y + BUTTON <= 160), "buttons stay on screen");
         let feed = bar[0];
         assert_eq!(button_at(&app, lay, feed.x as f32 + 8.0, feed.y as f32 + 8.0), Some(Key::Char('f')));
@@ -370,7 +371,7 @@ mod tests {
     fn a_dead_pet_offers_a_new_egg() {
         let app = app_with(Stage::Dead, |_| {});
         let keys: Vec<Key> = buttons(&app, Layout::MIN).iter().map(|b| b.key).collect();
-        assert_eq!(keys, [Key::Char('n'), Key::Char('a'), Key::Char('g'), Key::Char('q')]);
+        assert_eq!(keys, [Key::Char('n'), Key::Char('a'), Key::Char('e'), Key::Char('g'), Key::Char('q')]);
     }
 
     #[test]
@@ -386,7 +387,7 @@ mod tests {
         let mut app = app_with(Stage::Adult, |_| {});
         let normal = bar_w(&app, lay);
         assert_eq!(normal, lay.panel_x());
-        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(Vec::new())] {
+        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Tree, Mode::Graveyard(Vec::new())] {
             app.mode = mode;
             assert_eq!(bar_w(&app, lay), lay.w);
             let text: Vec<String> = labels(&app, lay, 0.5).into_iter().map(|l| l.text).collect();
@@ -448,7 +449,7 @@ mod tests {
     #[test]
     fn every_mode_draws() {
         let mut app = app_with(Stage::Adult, |_| {});
-        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(vec!["x".into()])] {
+        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Tree, Mode::Graveyard(vec!["x".into()])] {
             app.mode = mode;
             assert_eq!(frame(&app, Layout::MIN, None).w, 288);
             assert!(!labels(&app, Layout::MIN, 0.5).is_empty());
