@@ -201,12 +201,12 @@ mod tests {
             let v = Viewport::fit(w, h);
             (v.scale, v.layout.w, v.layout.h, v.x, v.y)
         };
-        assert_eq!(at(960.0, 640.0), (4.0, 240, 160, 0.0, 0.0));
-        assert_eq!(at(1000.0, 700.0), (4.0, 250, 175, 0.0, 0.0), "the extra room goes to the screen, not to bars");
+        assert_eq!(at(864.0, 480.0), (3.0, 288, 160, 0.0, 0.0));
+        assert_eq!(at(900.0, 498.0), (3.0, 300, 166, 0.0, 0.0), "the extra room goes to the screen, not to bars");
         assert_eq!(at(1920.0, 1080.0), (6.0, 320, 180, 0.0, 0.0));
         assert_eq!(at(1893.0, 993.0), (6.0, 315, 165, 1.0, 1.0), "less than a scene pixel is left over");
         assert_eq!(at(100.0, 50.0).0, 1.0, "never smaller than 1x");
-        assert_eq!(at(100.0, 50.0).1, 240, "and never a smaller screen than the layout needs");
+        assert_eq!(at(100.0, 50.0).1, 288, "and never a smaller screen than the layout needs");
     }
 
     #[test]
@@ -218,10 +218,10 @@ mod tests {
 
     #[test]
     fn clicks_map_back_to_scene_pixels_and_text_stays_whole_pixels() {
-        let v = Viewport::fit(1003.0, 705.0);
+        let v = Viewport::fit(872.0, 480.0);
         assert_eq!((v.x, v.y), (1.0, 0.0));
         assert_eq!(v.to_scene(1.0, 0.0), (0.0, 0.0));
-        assert_eq!(v.to_scene(41.0, 40.0), (10.0, 10.0));
-        assert_eq!((Viewport::fit(720.0, 480.0).text_px(), v.text_px()), (2.0, 2.0));
+        assert_eq!(v.to_scene(31.0, 30.0), (10.0, 10.0));
+        assert_eq!((Viewport::fit(864.0, 480.0).text_px(), v.text_px()), (2.0, 2.0));
     }
 }

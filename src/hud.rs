@@ -1,5 +1,5 @@
 //! The whole screen around the room: header strip, status panel, hint line and the clickable
-//! icon bar. The screen is at least 240x160 scene pixels and grows with the window; the room
+//! icon bar. The screen is at least 288x160 scene pixels and grows with the window; the room
 //! takes the extra space, and the panel and bar stay glued to the right and bottom edges. Pixel parts are drawn into the frame; text is handed back as `Label`s
 //! for the window to draw sharp, at full resolution.
 
@@ -32,7 +32,7 @@ pub struct Layout {
 
 impl Layout {
     /// The smallest screen the layout is designed for.
-    pub const MIN: Layout = Layout { w: 240, h: 160 };
+    pub const MIN: Layout = Layout { w: 288, h: 160 };
     /// The biggest: the room art stops growing here, and a bigger window gets bars.
     pub const MAX: Layout = Layout { w: PANEL_W + crate::cast::ROOM_MASTER.0 as i32, h: ROOM_Y + FOOT + crate::cast::ROOM_MASTER.1 as i32 };
 
@@ -422,7 +422,7 @@ mod tests {
         let mut app = app_with(Stage::Adult, |_| {});
         for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(vec!["x".into()])] {
             app.mode = mode;
-            assert_eq!(frame(&app, Layout::MIN, None).w, 240);
+            assert_eq!(frame(&app, Layout::MIN, None).w, 288);
             assert!(!labels(&app, Layout::MIN, 0.5).is_empty());
         }
     }

@@ -365,7 +365,8 @@ mod tests {
         let graves = vec!["2026-10-29 22:00 | Hashitamatchi | lived 1d 23h 59m | 12 care mistakes | cause: starvation".to_string(); 9];
         for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(graves), Mode::Graveyard(Vec::new())] {
             app.mode = mode;
-            for l in labels(&app, Layout::MIN) {
+            for mut l in labels(&app, Layout::MIN) {
+                l.x -= Layout::MIN.centred_240x128().0 as f32;
                 assert!(fits(&l, COARSEST), "does not fit: {:?}", l.text);
             }
             let mut f = Frame::new(240, 160, Pal::Ink);
@@ -407,6 +408,6 @@ mod tests {
     fn a_click_on_a_game_card_picks_it() {
         let mut app = app_with(Stage::Adult, |_| {});
         app.mode = Mode::Chooser;
-        assert_eq!(click(&app, Layout::MIN, game_card_x(1) as f32 + 10.0, GAME_CARD.1 as f32 + 10.0), Some(Key::Char('2')));
+        assert_eq!(click(&app, Layout::MIN, (Layout::MIN.centred_240x128().0 + game_card_x(1)) as f32 + 10.0, GAME_CARD.1 as f32 + 10.0), Some(Key::Char('2')));
     }
 }

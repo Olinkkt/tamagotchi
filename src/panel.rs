@@ -175,7 +175,7 @@ mod tests {
         });
         app.log = (0..20).map(|i| format!("Something long happened to the pet, number {i}")).collect();
         for l in labels(&app, ratio, Layout::MIN) {
-            assert!(l.x + font::width(&l.text) as f32 * ratio <= 240.0 - 1.0, "too wide: {}", l.text);
+            assert!(l.x + font::width(&l.text) as f32 * ratio <= 288.0 - 1.0, "too wide: {}", l.text);
             assert!(l.y <= 157.0, "below the panel: {}", l.text);
         }
     }

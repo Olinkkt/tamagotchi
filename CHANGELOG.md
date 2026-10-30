@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.3
+
+- The smallest window is now a little wider, so all the action buttons always fit under the room
+  beside the full-height sidebar.
+
 ## 1.8.2
 
 - The status sidebar now runs the full height of the window, and the action buttons are centred in
