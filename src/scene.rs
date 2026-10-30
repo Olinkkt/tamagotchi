@@ -501,7 +501,7 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
     }
     draw_machine(&mut f, m, &c, at, s);
     if let Some((text, age)) = m.speech {
-        speech::draw(&mut f, text, age, at.x + at.size / 2, at.head);
+        speech::draw(&mut f, text, age, at.x + at.size - 6, at.head);
     } else if let Some((key, _)) = p.top_need() {
         if !p.asleep {
             let x = (at.x + at.size - 6).min(w - 19);

@@ -88,16 +88,17 @@ fn shows(x: i32, y: i32, level: u64) -> bool {
     BAYER[(y & 3) as usize][(x & 3) as usize] < level * 16 / STEPS
 }
 
-/// Draw the bubble centred over `cx`, with its tail ending just above `head`. It is sized for
+/// Draw the bubble up and to the right of the pet, like the one for a need: its left edge at `left`
+/// (pulled in if it would leave the room) and its tail pointing down at `head`. It is sized for
 /// the whole line so it does not jump as the letters arrive.
-pub fn draw(f: &mut Frame, text: &str, age: u64, cx: i32, head: i32) {
+pub fn draw(f: &mut Frame, text: &str, age: u64, left: i32, head: i32) {
     let Some(look) = look(text, age) else { return };
     let lines = font::wrap(text, MAX_TEXT);
     let widest = lines.iter().map(|l| font::width(l)).max().unwrap_or(0);
     let (w, h) = (widest + PAD_X * 2 + 2, lines.len() as i32 * LINE - 1 + PAD_Y * 2 + 2);
-    let x = (cx - w / 2).clamp(1, (f.w - w - 1).max(1));
-    let y = (head - h - 5).max(1);
-    let tx = (cx - 2).clamp(x + 3, x + w - 6);
+    let x = left.min(f.w - w - 1).max(1);
+    let y = (head - h - 2).max(1);
+    let tx = (left + 2).clamp(x + 3, x + w - 6);
     let (bw, bh) = (w, h + 2);
     let behind: Vec<Pal> = (0..bw * bh).map(|i| f.get(x + i % bw, y + i / bw).unwrap_or(Pal::Ink)).collect();
     f.boxed(x, y, w, h, Pal::White, Pal::Ink);
@@ -163,9 +164,9 @@ mod tests {
     fn the_bubble_draws_inside_the_room_at_every_moment() {
         for text in ["Yum.", "Ahh, much better.", "Thanks for the commit!", "Need toilet!"] {
             for age in (0..total_ms(text)).step_by(25) {
-                for cx in [0, 40, 100, 159] {
+                for left in [0, 40, 100, 159] {
                     let mut f = Frame::new(160, 120, Pal::Night);
-                    draw(&mut f, text, age, cx, 40);
+                    draw(&mut f, text, age, left, 40);
                 }
             }
         }

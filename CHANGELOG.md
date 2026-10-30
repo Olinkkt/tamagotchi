@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.8.1
+
+- The speech bubble sits up and to the right of the pet's head, where the need icons appear.
+
 ## 1.8.0
 
 - The pet now talks in a speech bubble above its head ("Yum.", "Ahh, much better.", "Need toilet!").
