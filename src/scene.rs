@@ -203,6 +203,8 @@ fn motion(m: &Moment) -> (i32, i32) {
             (pose.dx, pose.dy)
         }
         _ if m.pet.asleep => (0, -(beat / 3 % 2)),
+        // Stands still while it eats, so the food stays in its mouth.
+        _ if m.fx_is(Fx::Eat).is_some() => (0, 0),
         _ => (0, -(beat % 2)),
     }
 }

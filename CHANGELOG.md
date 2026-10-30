@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2
+
+- The pet stops bobbing while it eats, so the food stays put in its mouth.
+
 ## 1.5.1
 
 - The food now lands in the pet's mouth, whichever form it is, instead of beside it.
