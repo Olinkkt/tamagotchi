@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.2
+
+- Internal: the changelog writing rules now live in `CLAUDE.md`.
+
 ## 1.4.1
 
 - Changelog now covers 0.1 to 0.23 too, rebuilt from the git history.
