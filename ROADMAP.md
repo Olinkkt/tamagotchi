@@ -5,6 +5,10 @@
 tama is a cute pixel-art pet that lives in a window and your status bar. It is about raising
 a pet well and building something that lasts across pets, not about your coding.
 
+**Simple to learn, deep to keep.** A new player should understand the game in a minute: hatch,
+feed, play, grow. New content adds things to discover, never things to learn first. Every new
+feature must work without a tutorial, and the first hour must stay as easy as it is today.
+
 Three goals, in this order:
 
 1. **Long-term goals.** Give a life more reason to matter: breeding or generations, a growing
