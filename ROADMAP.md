@@ -62,6 +62,10 @@ personality replaces the previous form's, so a pet has at most two traits at onc
 - **Hidden counters, reset each stage.** Meals, snacks, games, scolds and shop buys are counted
   during a stage; the biggest one picks the next form. Players learn the paths by playing and by
   reading the family tree, not a wiki.
+- **Only actions that helped count.** A meal counts when the pet was hungry, a snack or a game
+  win when it was missing happy hearts, a scold only on a real naughty call, a shop buy only when
+  the item had an effect. Spamming games gains nothing, and snacks and games compete to refill
+  happiness, which is the choice behind Ichigotchi or Tarakotchi.
 - **Ties** go to the first row. A pet with no habits gets the default form until a neutral
   "Plain" form exists (see Later).
 - **Personality as a visible moment.** Each effect is small and clear, with a line of speech
