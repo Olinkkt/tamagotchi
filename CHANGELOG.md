@@ -25,6 +25,11 @@
 - The shop's coin count moves next to the "SHOP" title, away from the "esc" button. The card's
   "esc" button is back to its old size.
 
+## 1.12.3
+
+- The "esc" button in the corner of every card is centred in its box instead of sitting off to
+  one side.
+
 ## 1.12.2
 
 - The shop's hover outline now sits exactly on the row instead of spilling past its edges.
