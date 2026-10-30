@@ -245,7 +245,7 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
     f.rect(0, ROOM_Y - 1, panel_x, 1, Pal::Dusk);
     let mut room = scene::area(app, panel_x, lay.room_h());
     if let Some(wipe) = app.wipe() {
-        wipe.cover(&mut room, (panel_x / 2, lay.room_h() / 2));
+        wipe.cover(&mut room);
     }
     f.frame(&room, 0, ROOM_Y);
     f.boxed(panel_x, 0, PANEL_W, lay.h, Pal::Night, Pal::Dusk);

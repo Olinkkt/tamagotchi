@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.8
+
+- Changing scenes (the washroom and back) now uses a quick pixel dissolve instead of the slow
+  circle: blocks of ink pop in, the scene changes, and they pop out. It takes 0.6 s instead of 1.6 s.
+
 ## 1.12.7
 
 - Tama is now public and free to play under its own licence (see `LICENSE`: not open source, no

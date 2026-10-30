@@ -58,7 +58,7 @@ pub struct App {
     was_calling: bool,
     pub started: Instant,
     fx: Option<(scene::Fx, Instant)>,
-    /// The iris wipe in progress between two scenes; keys do nothing until it is over.
+    /// The pixel dissolve in progress between two scenes; keys do nothing until it is over.
     pub(crate) wipe: Option<Wipe>,
     /// When the egg hatched, so its shell can lie on the floor for a while.
     shell_at: Option<Instant>,
@@ -868,10 +868,10 @@ pub(crate) mod tests {
             assert!(app.wipe.is_some() && matches!(app.mode, Mode::Normal), "the wipe starts in the room");
             app.on_key(Key::Char('f'));
             assert_eq!(app.pet.hunger, 3, "keys do nothing during the wipe");
-            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.9);
+            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.4);
             app.update();
             assert!(matches!(app.mode, Mode::Toilet(_)), "scenes change while the picture is shut");
-            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.9);
+            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.4);
             app.update();
             assert!(!app.wipe.is_some() && app.pet.urge.is_none());
         });

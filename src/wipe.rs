@@ -1,5 +1,5 @@
-//! The iris wipe between scenes: the picture closes to a black circle around the middle, the game
-//! swaps scenes while it is shut, and the circle opens again in the new scene.
+//! The pixel dissolve between scenes: blocks of ink pop in all over the picture until it is shut,
+//! the game swaps scenes, and the blocks pop out again in the new scene.
 //! It runs on real time, so the game speed does not change it.
 
 use std::time::Instant;
@@ -7,8 +7,10 @@ use std::time::Instant;
 use crate::frame::Frame;
 use crate::palette::Pal;
 
-const CLOSE_SECS: f32 = 0.8;
-const OPEN_SECS: f32 = 0.8;
+const CLOSE_SECS: f32 = 0.3;
+const OPEN_SECS: f32 = 0.3;
+/// Side of one block of ink, in scene pixels.
+const BLOCK: i32 = 8;
 
 /// Where the wipe takes the player.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -25,18 +27,23 @@ pub struct Wipe {
     swapped: bool,
 }
 
-fn smooth(t: f32) -> f32 {
-    let t = t.clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
+/// How much of the picture is inked `secs` into the wipe: 0 open, 1 shut.
+fn shut(secs: f32) -> f32 {
+    if secs < CLOSE_SECS {
+        secs / CLOSE_SECS
+    } else {
+        1.0 - (secs - CLOSE_SECS) / OPEN_SECS
+    }
+    .clamp(0.0, 1.0)
 }
 
-/// The circle's radius `secs` into the wipe, for a picture whose far corner is `max` away.
-fn radius(secs: f32, max: f32) -> f32 {
-    if secs < CLOSE_SECS {
-        max * (1.0 - smooth(secs / CLOSE_SECS))
-    } else {
-        max * smooth((secs - CLOSE_SECS) / OPEN_SECS)
-    }
+/// A fixed, scattered 0..1 rank for one block, so each block always pops in at the same moment.
+fn rank(bx: i32, by: i32) -> f32 {
+    let mut h = (bx as u32).wrapping_mul(0x9E37_79B1) ^ (by as u32).wrapping_mul(0x85EB_CA77);
+    h ^= h >> 15;
+    h = h.wrapping_mul(0x2C1B_3C6D);
+    h ^= h >> 12;
+    (h % 1000) as f32 / 1000.0
 }
 
 impl Wipe {
@@ -59,15 +66,14 @@ impl Wipe {
         self.age() >= CLOSE_SECS + OPEN_SECS
     }
 
-    /// Black out everything outside the circle around `centre`.
-    pub fn cover(&self, f: &mut Frame, (cx, cy): (i32, i32)) {
-        let far = |x: i32, y: i32| (((x - cx).pow(2) + (y - cy).pow(2)) as f32).sqrt();
-        let max = far(0, 0).max(far(f.w, 0)).max(far(0, f.h)).max(far(f.w, f.h));
-        let r2 = radius(self.age(), max).powi(2);
-        for y in 0..f.h {
-            for x in 0..f.w {
-                if (((x - cx).pow(2) + (y - cy).pow(2)) as f32) > r2 {
-                    f.set(x, y, Pal::Ink);
+    /// Ink over the blocks that have popped in so far.
+    pub fn cover(&self, f: &mut Frame) {
+        let amount = shut(self.age());
+        for by in 0..(f.h + BLOCK - 1) / BLOCK {
+            for bx in 0..(f.w + BLOCK - 1) / BLOCK {
+                // `<=` so a fully shut picture has no block left open.
+                if rank(bx, by) <= amount && amount > 0.0 {
+                    f.rect(bx * BLOCK, by * BLOCK, BLOCK, BLOCK, Pal::Ink);
                 }
             }
         }
@@ -79,11 +85,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_circle_closes_to_nothing_then_opens_past_the_corners() {
-        assert!((radius(0.0, 100.0) - 100.0).abs() < 0.01);
-        assert!(radius(CLOSE_SECS, 100.0) < 0.01);
-        assert!(radius(CLOSE_SECS + OPEN_SECS, 100.0) > 99.9);
-        assert!(radius(CLOSE_SECS / 2.0, 100.0) > 30.0 && radius(CLOSE_SECS / 2.0, 100.0) < 70.0);
+    fn the_blocks_fill_in_then_clear_again() {
+        assert_eq!(shut(0.0), 0.0);
+        assert!((shut(CLOSE_SECS) - 1.0).abs() < 0.001);
+        assert_eq!(shut(CLOSE_SECS + OPEN_SECS), 0.0);
+        assert!(shut(CLOSE_SECS / 2.0) > 0.4 && shut(CLOSE_SECS / 2.0) < 0.6);
     }
 
     #[test]
@@ -91,14 +97,14 @@ mod tests {
         let mut wipe = Wipe::new(Next::Room);
         let mut f = Frame::new(40, 30, Pal::White);
         wipe.started -= std::time::Duration::from_secs_f32(CLOSE_SECS);
-        wipe.cover(&mut f, (20, 15));
+        wipe.cover(&mut f);
         assert_eq!(f.get(0, 0), Some(Pal::Ink));
         assert_eq!(f.get(39, 29), Some(Pal::Ink));
         assert!(wipe.swap_now() && !wipe.swap_now(), "the swap fires once");
         let mut open = Frame::new(40, 30, Pal::White);
         wipe.started -= std::time::Duration::from_secs_f32(OPEN_SECS);
         assert!(wipe.done());
-        wipe.cover(&mut open, (20, 15));
+        wipe.cover(&mut open);
         assert_eq!(open.get(0, 0), Some(Pal::White));
     }
 }
