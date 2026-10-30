@@ -30,8 +30,6 @@ mod wipe;
 mod window;
 
 const MAX_CATCHUP_TICKS: u64 = 86_400;
-/// Most shell events applied at once, so a runaway script cannot stall the game.
-const MAX_QUEUED_EVENTS: usize = 200;
 
 pub fn fmt_age(secs: u64) -> String {
     let (d, h, m) = (secs / 86_400, secs / 3600 % 24, secs / 60 % 60);

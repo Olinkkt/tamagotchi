@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.23.0
+
+- The shell hook is gone: git commits no longer feed your pet and failed commands no longer upset
+  it. `tama hook` and `tama event` still exist but do nothing, so an old `eval "$(tama hook zsh)"`
+  line in your `.zshrc` is harmless; you can delete it.
+- The "Fed by git" achievement is removed (nine left). Old saves, profiles and configs load as
+  before; the two hook options in `config.json` are simply ignored.
+
 ## 1.22.1
 
 - The one-line install command in the README now points at the `main` branch, which replaces `master`.

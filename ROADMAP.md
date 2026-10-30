@@ -14,11 +14,11 @@ Three goals, in this order:
 
 ## Dropped
 
-- The shell hook (`tama hook`, `tama event`, commits feeding the pet). It is being removed.
+- The shell hook (`tama hook`, `tama event`, commits feeding the pet). It was removed in 1.23.0.
 
 ## Next, smallest first
 
-1. Remove the shell hook and its config, queue and docs (MAJOR: config options go away).
+1. Done in 1.23.0: the shell hook was removed.
 2. One new mini-game or shop item (MINOR, a few hours).
 3. A second collection layer on top of adult species, for example a record of each pet's life.
 4. Pick the long-term goal: generations or collection depth.

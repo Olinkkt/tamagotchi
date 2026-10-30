@@ -12,7 +12,7 @@ use crate::save;
 
 /// Load the real save, caught up to the present, without writing anything back.
 /// The simulation is deterministic, so the game reaches the same state when it next opens.
-pub fn load_caught_up(consume_events: bool) -> Option<Pet> {
+pub fn load_caught_up() -> Option<Pet> {
     let save::Loaded::Pet(mut pet, away) = save::load() else { return None };
     let (cfg, _) = Config::load();
     pet.set_env(cfg, save::tz_offset());
@@ -26,11 +26,6 @@ pub fn load_caught_up(consume_events: bool) -> Option<Pet> {
     }
     pet.away = false;
     pet.clock = save::now() as i64;
-    // Things that happened in the shell since the last save. Only a caller that saves may use them up.
-    let queued = if consume_events { save::take_events() } else { save::peek_events() };
-    for e in queued.iter().take(crate::MAX_QUEUED_EVENTS) {
-        pet.apply_event(e);
-    }
     pet.events.clear();
     pet.load = crate::sysinfo::read();
     Some(pet)
@@ -135,7 +130,7 @@ fn waybar_json(p: Option<&Pet>) -> String {
 }
 
 fn status(waybar: bool) -> i32 {
-    let pet = load_caught_up(false);
+    let pet = load_caught_up();
     if waybar {
         println!("{}", waybar_json(pet.as_ref()));
         return 0;
@@ -157,7 +152,7 @@ fn act(cmd: &str) -> i32 {
         eprintln!("The game is open - care for the pet there (changes made here would be overwritten).");
         return 1;
     }
-    let Some(mut pet) = load_caught_up(true) else {
+    let Some(mut pet) = load_caught_up() else {
         eprintln!("No saved pet yet. Run `tama` to start one.");
         return 1;
     };
@@ -232,7 +227,7 @@ fn watch(test: bool) -> i32 {
     let mut warned = false;
     loop {
         if !save::game_running() {
-            match load_caught_up(false).and_then(|p| p.top_need().map(|(key, text)| (p.species.clone(), key, text))) {
+            match load_caught_up().and_then(|p| p.top_need().map(|(key, text)| (p.species.clone(), key, text))) {
                 Some((species, key, text)) => {
                     if should_notify(last.map(|(k, at)| (k, at.elapsed())), key) {
                         match notify(&species, text) {
@@ -252,54 +247,6 @@ fn watch(test: bool) -> i32 {
     }
 }
 
-/// The shell snippet for `tama hook zsh`: tells tama about git commits and failed commands.
-const ZSH_HOOK: &str = r#"# tama: let your pet notice git commits (it gets fed) and failed commands (it gets sad).
-# Add this line to ~/.zshrc:   eval "$(tama hook zsh)"
-autoload -Uz add-zsh-hook
-__tama_preexec() { __tama_cmd="$1" }
-__tama_precmd() {
-  local code=$?
-  case "$__tama_cmd" in
-    "") ;;
-    git\ commit*|*"&& git commit"*) [ $code -eq 0 ] && { command tama event commit >/dev/null 2>&1 & } ;;
-    *) [ $code -ne 0 ] && [ $code -ne 130 ] && { command tama event fail >/dev/null 2>&1 & } ;;
-  esac
-  __tama_cmd=""
-}
-add-zsh-hook preexec __tama_preexec
-add-zsh-hook precmd __tama_precmd
-"#;
-
-fn hook(shell: Option<&str>) -> i32 {
-    match shell {
-        Some("zsh") => {
-            print!("{ZSH_HOOK}");
-            0
-        }
-        Some(other) => {
-            eprintln!("No hook for {other} yet; only zsh is supported.");
-            1
-        }
-        None => {
-            eprintln!("Usage: tama hook zsh");
-            1
-        }
-    }
-}
-
-fn event(kind: Option<&str>) -> i32 {
-    match kind {
-        Some(k @ ("commit" | "fail")) => {
-            save::queue_event(k);
-            0
-        }
-        _ => {
-            eprintln!("Usage: tama event commit|fail");
-            1
-        }
-    }
-}
-
 /// Run a subcommand if `args[1]` is one. Returns the exit code when handled.
 pub fn run(args: &[String]) -> Option<i32> {
     let cmd = args.get(1)?.as_str();
@@ -312,8 +259,8 @@ pub fn run(args: &[String]) -> Option<i32> {
     Some(match cmd {
         "status" => status(args.iter().any(|a| a == "--waybar")),
         "watch" => watch(args.iter().any(|a| a == "--test")),
-        "event" => event(args.get(2).map(String::as_str)),
-        "hook" => hook(args.get(2).map(String::as_str)),
+        // The shell hook was removed. Old `eval "$(tama hook zsh)"` lines in a .zshrc stay harmless.
+        "event" | "hook" => 0,
         _ => act(cmd),
     })
 }
@@ -399,7 +346,7 @@ pub fn flags(args: &[String]) -> Option<i32> {
         return Some(0);
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a pixel-art tamagotchi\n\n  tama            play (opens the window)\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|toilet|medicine|scold   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --install-desktop   add tama to your app menu (Linux)\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --gallery  write tama-gallery.png with every character and expression");
+        println!("tama - a pixel-art tamagotchi\n\n  tama            play (opens the window)\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|toilet|medicine|scold   care for the pet without opening the game\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --install-desktop   add tama to your app menu (Linux)\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --gallery  write tama-gallery.png with every character and expression");
         return Some(0);
     }
     if args.iter().any(|a| a == "--gallery") {
@@ -448,7 +395,7 @@ mod tests {
         save::with_temp_dir(|| {
             save::save(&saved_adult(1)).unwrap();
             assert_eq!(act("feed"), 0);
-            let p = load_caught_up(false).unwrap();
+            let p = load_caught_up().unwrap();
             assert!(p.hunger >= 2, "feeding should have been saved, hunger is {}", p.hunger);
         });
     }
@@ -460,7 +407,7 @@ mod tests {
             save::heartbeat();
             assert_eq!(act("feed"), 1);
             save::release();
-            assert_eq!(load_caught_up(false).unwrap().hunger, 1, "nothing should have been changed");
+            assert_eq!(load_caught_up().unwrap().hunger, 1, "nothing should have been changed");
         });
     }
 
@@ -486,29 +433,9 @@ mod tests {
     }
 
     #[test]
-    fn shell_events_are_applied_by_status_but_only_used_up_by_a_care_command() {
-        save::with_temp_dir(|| {
-            save::save(&saved_adult(2)).unwrap();
-            assert_eq!(event(Some("commit")), 0);
-            assert_eq!(load_caught_up(false).unwrap().hunger, 3, "a commit feeds it");
-            assert_eq!(save::peek_events().len(), 1, "status must leave the queue alone");
-            assert_eq!(load_caught_up(false).unwrap().hunger, 3, "...so asking again gives the same answer");
-            assert_eq!(act("snack"), 0);
-            assert!(save::peek_events().is_empty(), "a care command saves, so it uses the events up");
-            assert_eq!(load_caught_up(false).unwrap().hunger, 3, "and the meal was kept");
-        });
-    }
-
-    #[test]
-    fn unknown_events_are_rejected_and_the_hook_snippet_is_printed_for_zsh_only() {
-        save::with_temp_dir(|| {
-            assert_eq!(event(Some("explode")), 1);
-            assert_eq!(event(None), 1);
-            assert!(save::peek_events().is_empty());
-        });
-        assert_eq!(hook(Some("zsh")), 0);
-        assert_eq!(hook(Some("fish")), 1);
-        assert!(ZSH_HOOK.contains("tama event commit") && ZSH_HOOK.contains("tama event fail"));
+    fn the_removed_shell_hook_commands_do_nothing_and_succeed() {
+        assert_eq!(run(&["tama".into(), "hook".into(), "zsh".into()]), Some(0));
+        assert_eq!(run(&["tama".into(), "event".into(), "commit".into()]), Some(0));
     }
 
     #[test]

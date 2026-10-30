@@ -9,7 +9,7 @@ use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
 use crate::speech;
 use crate::wipe::{Next, Wipe};
-use crate::{update, fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
+use crate::{update, fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS};
 
 /// A key press, in the terms the game cares about. Each frontend translates its own events.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -52,7 +52,6 @@ pub struct App {
     tick_acc: f64,
     last: Instant,
     last_save: Instant,
-    last_event_check: Instant,
     last_sys_check: Instant,
     dev_load_override: bool,
     was_calling: bool,
@@ -171,7 +170,6 @@ impl App {
         }
         app.pet.load = sysinfo::read();
         app.profile = save::load_profile();
-        app.apply_queued_events();
         app.drain_events();
         app.last_stage = app.pet.stage;
         save::heartbeat();
@@ -200,7 +198,6 @@ impl App {
             tick_acc: 0.0,
             last: Instant::now(),
             last_save: Instant::now(),
-            last_event_check: Instant::now(),
             last_sys_check: Instant::now(),
             dev_load_override: false,
             was_calling: false,
@@ -224,22 +221,6 @@ impl App {
         let _ = save::save(&self.pet);
         let _ = save::save_profile(&self.profile);
         save::release();
-    }
-
-    /// Apply things that happened in the shell (git commits, failed commands).
-    fn apply_queued_events(&mut self) {
-        let events = save::take_events();
-        if events.is_empty() {
-            return;
-        }
-        let before = self.snapshot();
-        for e in events.iter().take(MAX_QUEUED_EVENTS) {
-            if let Some(m) = self.pet.apply_event(e) {
-                self.say(&m);
-                self.log.push(m);
-            }
-        }
-        self.react(before);
     }
 
     /// Buy something from the shop and use it on the pet. Nothing is charged if it would do nothing.
@@ -362,10 +343,6 @@ impl App {
                     self.update = Some(f);
                 }
             }
-        }
-        if self.last_event_check.elapsed() >= Duration::from_secs(2) {
-            self.last_event_check = Instant::now();
-            self.apply_queued_events();
         }
         if !self.dev_load_override && self.last_sys_check.elapsed() >= Duration::from_secs(5) {
             self.last_sys_check = Instant::now();

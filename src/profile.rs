@@ -28,14 +28,13 @@ pub struct Achievement {
     pub how: &'static str,
 }
 
-pub const ACHIEVEMENTS: [Achievement; 10] = [
+pub const ACHIEVEMENTS: [Achievement; 9] = [
     Achievement { id: "hatched", name: "First steps", how: "hatch an egg" },
     Achievement { id: "grown_up", name: "Grown up", how: "raise a pet to adulthood" },
     Achievement { id: "mametchi", name: "Teacher's pet", how: "raise a Mametchi" },
     Achievement { id: "spotless", name: "Spotless", how: "reach adulthood with no care mistakes" },
     Achievement { id: "survivor", name: "Survivor", how: "keep a pet alive for a whole day" },
     Achievement { id: "old_age", name: "A long life", how: "a pet dies of old age" },
-    Achievement { id: "commit_fed", name: "Fed by git", how: "a git commit feeds your pet" },
     Achievement { id: "gamer", name: "Gamer", how: "win 10 mini-games" },
     Achievement { id: "rich", name: "Piggy bank", how: "earn 100 coins in total" },
     Achievement { id: "collector", name: "Collector", how: "raise all five adult species" },
@@ -89,7 +88,6 @@ impl Profile {
             "spotless" => adult && pet.mistakes == 0,
             "survivor" => pet.age >= 86_400,
             "old_age" => pet.cause_of_death.as_deref() == Some("old age"),
-            "commit_fed" => pet.last_commit_meal.is_some(),
             "gamer" => self.games_won >= 10,
             "rich" => self.coins_earned >= 100,
             "collector" => self.adults.len() >= ADULT_SPECIES.len(),
@@ -190,9 +188,8 @@ mod tests {
         old.stage = Stage::Dead;
         old.cause_of_death = Some("old age".into());
         old.age = 200_000;
-        old.last_commit_meal = Some(1);
         profile.check(&old);
-        for id in ["gamer", "rich", "old_age", "survivor", "commit_fed"] {
+        for id in ["gamer", "rich", "old_age", "survivor"] {
             assert!(profile.has(id), "{id}");
         }
     }
