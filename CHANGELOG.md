@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.3
+
+- The "esc" button on cards sits evenly in the corner, with the same gap above, below and to the
+  right.
+
 ## 1.12.2
 
 - The shop's hover outline now sits exactly on the row instead of spilling past its edges.

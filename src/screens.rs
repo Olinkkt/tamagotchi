@@ -21,7 +21,7 @@ const BODY_Y: i32 = 22;
 const SHOP_ROW: i32 = 24;
 const GAME_CARD: (i32, i32, i32) = (28, 34, 82);
 /// The close button in a card's top-right corner.
-const ESC: (i32, i32, i32, i32) = (CARD.0 + CARD.2 - 19, CARD.1 + 2, 15, 11);
+const ESC: (i32, i32, i32, i32) = (CARD.0 + CARD.2 - 17, CARD.1 + 2, 15, 12);
 
 fn label(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
     Label { text: text.into(), x, y, colour, align: Align::Left }
