@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.18.1
+
+- Shop food is now eaten bite by bite like the apple: the cake, salad and vitamin pill each show
+  whole, bitten and a last scrap instead of vanishing in the pet's mouth.
+
 ## 1.18.0
 
 - Buying now closes the shop, so you see your pet enjoy it: the cake, salad and vitamin pill are

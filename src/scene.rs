@@ -398,11 +398,11 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
             let x = sx + ((ex - sx) as f32 * u) as i32;
             let y = sy + ((ey - sy) as f32 * u) as i32 - (24.0 * 4.0 * u * (1.0 - u)) as i32 - hop;
             let [whole, bitten, last] = match fx {
-                Fx::Snack => [Some(icons::CANDY), Some(icons::CANDY_UNWRAPPED), Some(icons::CANDY_LICKED)],
-                Fx::Meal => [Some(icons::CAKE), None, None],
-                Fx::Salad => [Some(icons::SALAD), None, None],
-                Fx::Pill => [Some(icons::VITAMINS), None, None],
-                _ => [Some(icons::APPLE), Some(icons::APPLE_BITTEN), Some(icons::APPLE_CORE)],
+                Fx::Snack => [icons::CANDY, icons::CANDY_UNWRAPPED, icons::CANDY_LICKED],
+                Fx::Meal => [icons::CAKE, icons::CAKE_BITTEN, icons::CAKE_LAST],
+                Fx::Salad => [icons::SALAD, icons::SALAD_BITTEN, icons::SALAD_LAST],
+                Fx::Pill => [icons::PILL, icons::PILL_BITTEN, icons::PILL_LAST],
+                _ => [icons::APPLE, icons::APPLE_BITTEN, icons::APPLE_CORE],
             };
             let icon = if t < 0.5 { whole } else if t < 0.7 { bitten } else { last };
             let crumb = match fx {
@@ -412,9 +412,7 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
                 Fx::Pill => "w",
                 _ => "n",
             };
-            if let Some(icon) = icon {
-                f.grid(icon, x, y);
-            }
+            f.grid(icon, x, y);
             for bite in [0.5, 0.7, 0.88] {
                 if (bite..bite + 0.06).contains(&t) {
                     let k = ((t - bite) * 100.0) as i32;
