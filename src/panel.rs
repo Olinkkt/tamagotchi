@@ -59,9 +59,6 @@ fn chips(p: &Pet) -> Vec<(&'static str, Pal)> {
         (p.disc_call.is_some(), "naughty - scold it", Pal::Red),
         (p.urge.is_some(), "needs the toilet - press T", Pal::Yellow),
         (p.overweight(), "overweight - play games", Pal::Yellow),
-        (p.load.busy_cpu, "sweating - the CPU is busy", Pal::Ice),
-        (p.load.low_ram, "dizzy - memory is nearly full", Pal::Violet),
-        (p.load.low_battery, "sleepy - the battery is low", Pal::Sky),
         (p.hunger == 0 && !p.asleep, "starving!", Pal::Red),
         (p.happy == 0 && !p.asleep, "lonely", Pal::Red),
     ];
@@ -116,19 +113,9 @@ pub fn labels(app: &App, ratio: f32, lay: Layout) -> Vec<Label> {
 mod tests {
     use super::*;
     use crate::app::tests::app_with;
-    use crate::sysinfo::Strain;
 
     fn panel_text(app: &App, ratio: f32) -> String {
         labels(app, ratio, Layout::MIN).into_iter().map(|l| l.text).collect::<Vec<_>>().join("\n")
-    }
-
-    #[test]
-    fn the_panel_names_what_the_machine_is_doing_to_the_pet() {
-        let app = app_with(Stage::Adult, |p| p.load = Strain { busy_cpu: true, low_ram: true, low_battery: true });
-        let text = panel_text(&app, 0.5);
-        assert!(text.contains("sweating") && text.contains("dizzy") && text.contains("sleepy"), "{text}");
-        let calm = panel_text(&app_with(Stage::Adult, |_| {}), 0.5);
-        assert!(!calm.contains("sweating") && !calm.contains("dizzy"));
     }
 
     #[test]
@@ -150,7 +137,6 @@ mod tests {
             p.urge = Some(0);
             p.disc_call = Some(0);
             p.weight = 99;
-            p.load = Strain { busy_cpu: true, low_ram: true, low_battery: true };
         });
         for l in labels(&app, ratio, Layout::MIN) {
             assert!(l.x + font::width(&l.text) as f32 * ratio <= 288.0 - 1.0, "too wide: {}", l.text);

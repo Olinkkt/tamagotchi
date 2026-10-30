@@ -214,20 +214,6 @@ Saves, the profile, the graveyard and a lock file live in the user data folder (
 on Linux). Saves are written atomically, and an unreadable save is moved aside instead of
 being overwritten.
 
-## Your machine
-
-The pet reacts to how the computer is doing. This is only for show, with no effect on its needs:
-
-| Machine | Pet |
-|---|---|
-| CPU busy (1-minute load average at 80% of your cores or more) | sweat drops |
-| Memory nearly full (85% or more in use) | dizzy, spinning eyes |
-| Battery low (20% or less, and discharging) | sleepy eyes and a battery icon |
-
-The status panel and the status-bar tooltip say what is going on. This reads `/proc` and `/sys`,
-so it works on Linux; on other systems the pet just never notices. The thresholds are my
-guesses. Your own machine can be tried out with the dev panel (`u`, `r`, `b`).
-
 ## Status bar and notifications
 
 None of this is required to play.
@@ -277,7 +263,7 @@ cargo art         # redraw every sprite into assets/ (tools/spritegen)
 The dev panel shows the value behind every dev key. It changes hunger/happy/discipline/weight/
 mistakes, makes it need the toilet, sickness or a naughty call, adds coins, steps through every form (← →,
 or `[` `]`, including death), cracks the egg, grows or kills the pet, skips time and sets the clock, changes
-the speed (x1, 2, 5, 10, 60, 600 with `f`, and `1` for straight back to x1), and switches the machine reactions (CPU, RAM, battery) on and off. Clicking a button
+the speed (x1, 2, 5, 10, 60, 600 with `f`, and `1` for straight back to x1). Clicking a button
 always does the action, even while the panel is open.
 
 Shift+R (then `y`) throws the current pet away and starts a new egg.
@@ -316,7 +302,6 @@ Source layout:
 | `cli.rs` | shell commands, `--flags`, status bar, notifications, `--update` |
 | `update.rs` | finds the newest version (local folder or GitHub release) and installs it |
 | `save.rs` | save files (with a format `version`), profile, graveyard, lock |
-| `sysinfo.rs` | machine load |
 | `config.rs` | settings |
 
 New mini-games should draw a palette `Frame` like the existing ones, with the pet's own

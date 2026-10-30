@@ -9,7 +9,7 @@ use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
 use crate::speech;
 use crate::wipe::{Next, Wipe};
-use crate::{update, fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS};
+use crate::{update, fmt_age, games, save, scene, toilet, MAX_CATCHUP_TICKS};
 
 /// A key press, in the terms the game cares about. Each frontend translates its own events.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -52,8 +52,6 @@ pub struct App {
     tick_acc: f64,
     last: Instant,
     last_save: Instant,
-    last_sys_check: Instant,
-    dev_load_override: bool,
     was_calling: bool,
     pub started: Instant,
     fx: Option<(scene::Fx, Instant)>,
@@ -168,7 +166,6 @@ impl App {
             app.log.push(format!("Welcome back! You were away {}.", fmt_age(away)));
             app.say("Missed you!");
         }
-        app.pet.load = sysinfo::read();
         app.profile = save::load_profile();
         app.drain_events();
         app.last_stage = app.pet.stage;
@@ -198,8 +195,6 @@ impl App {
             tick_acc: 0.0,
             last: Instant::now(),
             last_save: Instant::now(),
-            last_sys_check: Instant::now(),
-            dev_load_override: false,
             was_calling: false,
             started: Instant::now(),
             fx: None,
@@ -343,10 +338,6 @@ impl App {
                     self.update = Some(f);
                 }
             }
-        }
-        if !self.dev_load_override && self.last_sys_check.elapsed() >= Duration::from_secs(5) {
-            self.last_sys_check = Instant::now();
-            self.pet.load = sysinfo::read();
         }
         self.drain_events();
         if self.speech().is_none_or(|(t, age)| age >= speech::total_ms(t)) {
@@ -655,15 +646,6 @@ impl App {
             'o' => {
                 self.profile.add_coins(10);
                 format!("coins = {}", self.profile.coins)
-            }
-            'u' | 'r' | 'b' => {
-                match c {
-                    'u' => p.load.busy_cpu = !p.load.busy_cpu,
-                    'r' => p.load.low_ram = !p.load.low_ram,
-                    _ => p.load.low_battery = !p.load.low_battery,
-                }
-                self.dev_load_override = true;
-                format!("cpu {}  ram {}  battery {} (auto-detect off)", p.load.busy_cpu, p.load.low_ram, p.load.low_battery)
             }
             't' | 'T' => {
                 let secs = if c == 'T' { 8 * 3600 } else { 3600 };

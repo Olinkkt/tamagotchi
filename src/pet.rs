@@ -152,7 +152,6 @@ pub struct Pet {
     pub away: bool,
     /// How busy the machine is right now (set by the game; never saved).
     #[serde(skip)]
-    pub load: crate::sysinfo::Strain,
     hunger_t: u64,
     happy_t: u64,
     /// Seconds until the meal just eaten makes the pet need the toilet.
@@ -192,7 +191,6 @@ impl Pet {
             cfg: Config::default(),
             tz_offset: 0,
             away: false,
-            load: crate::sysinfo::Strain::default(),
             hunger_t: 0,
             happy_t: 0,
             meal_urge: None,

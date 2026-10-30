@@ -23,7 +23,6 @@ mod save;
 mod scene;
 mod screens;
 mod speech;
-mod sysinfo;
 mod toilet;
 mod update;
 mod wipe;

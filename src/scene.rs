@@ -176,7 +176,7 @@ pub fn light(p: &Pet) -> Light {
 pub fn expression(m: &Moment) -> Expr {
     let p = m.pet;
     let eating = m.fx.is_some_and(|(fx, f)| fx.eaten() && (0.3..0.9).contains(&f) && ((f * 8.0) as i32) % 2 == 0);
-    let base = if p.asleep || (p.load.low_battery && calm(p)) {
+    let base = if p.asleep {
         Expr::Sleeping
     } else if p.sick {
         Expr::Sick
@@ -194,11 +194,6 @@ pub fn expression(m: &Moment) -> Expr {
     } else {
         base
     }
-}
-
-/// Awake, alive, hatched and not ill: the only time the machine's state shows on the pet.
-fn calm(p: &Pet) -> bool {
-    p.alive() && p.stage != Stage::Egg && !p.asleep && !p.sick
 }
 
 /// How long the shell lies on the floor after hatching.
@@ -236,9 +231,7 @@ fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
     if p.stage == Stage::Egg {
         return egg_sprite(m, c);
     } else if let Some(spot) = c.face {
-        let dizzy = p.load.low_ram && calm(p) && expression(m) != Expr::Sleeping;
-        let face: Vec<(i32, i32, Pal)> =
-            if dizzy { faces::dizzy(spot.style, m.beat() as usize) } else { faces::pixels(faces::grid(spot.style, expression(m))).collect() };
+        let face: Vec<(i32, i32, Pal)> = faces::pixels(faces::grid(spot.style, expression(m))).collect();
         overlay.extend(face.into_iter().map(|(dx, dy, p)| (spot.x + dx, spot.y + dy, p)));
     }
     assemble(p, c, &overlay, m.beat())
@@ -464,25 +457,6 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
     }
 }
 
-fn draw_machine(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
-    let p = m.pet;
-    if !calm(p) {
-        return;
-    }
-    if p.load.busy_cpu {
-        if let Some(spot) = c.face {
-            // Sweat drops slide down either side of the head.
-            let slide = (m.beat() % 3) as i32;
-            f.grid(icons::SWEAT, at.x + spot.x - 8, at.y + spot.y - 3 + slide);
-            f.grid(icons::SWEAT, at.x + spot.x + 16, at.y + spot.y - 2 + slide);
-        }
-    }
-    if p.load.low_battery {
-        let (dx, dy) = s.shift();
-        f.grid(icons::BATTERY, 70 + dx, 24 + dy);
-    }
-}
-
 fn draw_sleep(f: &mut Frame, m: &Moment, at: Place) {
     for i in 0..2 {
         let phase = ((m.beat() / 2) as i32 + i * 2) % 4;
@@ -540,7 +514,6 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
     if p.asleep {
         draw_sleep(&mut f, m, at);
     }
-    draw_machine(&mut f, m, &c, at, s);
     if let Some((text, age)) = m.speech {
         speech::draw(&mut f, text, age, at.x + at.size - 6, at.head);
     } else if let Some((key, _)) = p.top_need() {
@@ -576,7 +549,6 @@ mod tests {
     }
 
     use super::*;
-    use crate::sysinfo::Strain;
 
     fn pet(stage: Stage) -> Pet {
         let mut p = Pet::new(3);
@@ -772,27 +744,6 @@ mod tests {
         assert!(mid[1].1 < start[1].1.min(rest[1].1) - 10, "the cap flies up through the air: {mid:?}");
         let xs: Vec<i32> = (0..=20).map(|i| shell_pieces(HATCH_CAP * i as f32 / 20.0, s)[1].0).collect();
         assert!(xs.windows(2).all(|w| w[0] <= w[1]), "and never comes back: {xs:?}");
-    }
-
-    #[test]
-    fn the_machine_shows_on_a_calm_pet_only() {
-        let calm = pet(Stage::Baby);
-        for strain in [
-            Strain { busy_cpu: true, ..Strain::default() },
-            Strain { low_ram: true, ..Strain::default() },
-            Strain { low_battery: true, ..Strain::default() },
-        ] {
-            let mut p = pet(Stage::Baby);
-            p.load = strain;
-            assert_ne!(look(&calm, 0), look(&p, 0), "{strain:?} should show");
-            let mut egg = pet(Stage::Egg);
-            let before = look(&egg, 0);
-            egg.load = strain;
-            assert_eq!(before, look(&egg, 0), "an egg ignores {strain:?}");
-        }
-        let mut dizzy = pet(Stage::Baby);
-        dizzy.load.low_ram = true;
-        assert_ne!(look(&dizzy, 0), look(&dizzy, 350), "the dizzy eyes spin");
     }
 
     #[test]

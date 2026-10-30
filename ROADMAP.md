@@ -14,7 +14,8 @@ Three goals, in this order:
 
 ## Dropped
 
-- The shell hook (`tama hook`, `tama event`, commits feeding the pet). It was removed in 1.23.0.
+- The shell hook (`tama hook`, `tama event`, commits feeding the pet). Removed in 1.23.0.
+- The machine reactions (CPU, RAM and battery). Removed in 1.24.0.
 
 ## Next, smallest first
 

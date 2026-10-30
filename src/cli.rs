@@ -27,7 +27,6 @@ pub fn load_caught_up() -> Option<Pet> {
     pet.away = false;
     pet.clock = save::now() as i64;
     pet.events.clear();
-    pet.load = crate::sysinfo::read();
     Some(pet)
 }
 
@@ -98,15 +97,6 @@ fn tooltip(p: &Pet) -> String {
     }
     if let Some((_, text)) = p.top_need() {
         s.push_str(&format!("\n{text}"));
-    }
-    if p.load.busy_cpu {
-        s.push_str("\nThe CPU is busy - it is sweating");
-    }
-    if p.load.low_ram {
-        s.push_str("\nMemory is nearly full - it feels dizzy");
-    }
-    if p.load.low_battery {
-        s.push_str("\nThe battery is low - it is sleepy");
     }
     s
 }
@@ -454,16 +444,6 @@ mod tests {
         assert_eq!(short_text(&p), "(^_^)");
         p.hunger = 0;
         assert_eq!(short_text(&p), "(T_T) !");
-    }
-
-    #[test]
-    fn the_tooltip_mentions_a_stressed_machine() {
-        let mut p = Pet::new(1);
-        p.stage = Stage::Adult;
-        p.species = "Mametchi".into();
-        p.load = crate::sysinfo::Strain { busy_cpu: true, low_ram: true, low_battery: true };
-        let t = tooltip(&p);
-        assert!(t.contains("sweating") && t.contains("dizzy") && t.contains("sleepy"), "{t}");
     }
 
     #[test]

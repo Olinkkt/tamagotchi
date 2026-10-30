@@ -384,26 +384,6 @@ pub const EGG_CRACKS: [[&str; 24]; 6] = [
     ],
 ];
 
-/// Spinning rings in place of the eyes while the machine's memory is nearly full, with the
-/// idle mouth. `phase` moves the gap in each ring.
-pub fn dizzy(style: FaceStyle, phase: usize) -> Vec<(i32, i32, Pal)> {
-    let (eyes, mouth) = match style {
-        FaceStyle::Small => ([(2, 1), (9, 1)], [(5, 4), (6, 4)]),
-        FaceStyle::Large => ([(4, 1), (11, 1)], [(7, 6), (8, 6)]),
-    };
-    let ring = [(-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0)];
-    let mut out: Vec<(i32, i32, Pal)> = mouth.iter().map(|&(x, y)| (x, y, Pal::Ink)).collect();
-    for (side, (cx, cy)) in eyes.into_iter().enumerate() {
-        out.push((cx, cy, Pal::Ink));
-        for (i, (dx, dy)) in ring.iter().enumerate() {
-            if i != (phase + side * 4) % ring.len() {
-                out.push((cx + dx, cy + dy, Pal::Ink));
-            }
-        }
-    }
-    out
-}
-
 /// The ghost of a pet that has passed away.
 pub const GHOST_FACE: [&str; 5] = [
     "kk..kk",

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.24.0
+
+- The pet no longer reacts to your computer: no sweat drops when the CPU is busy, no dizzy eyes when
+  memory is full and no sleepy eyes or battery icon when the battery is low. The status panel and
+  the `tama status` tooltip lose those lines too.
+- The dev panel loses its CPU, RAM and battery switches. Saves, profiles and configs are unaffected.
+
 ## 1.23.0
 
 - The shell hook is gone: git commits no longer feed your pet and failed commands no longer upset

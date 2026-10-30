@@ -106,7 +106,6 @@ fn draw_dev_panel(v: &Viewport, app: &App) {
     let (w, h) = (76.0 * v.scale, (v.layout.h - 15) as f32 * v.scale);
     draw_rectangle(x - 2.0, y - 2.0, w, h, Color::from_rgba(0, 0, 0, 225));
     let p = &app.pet;
-    let on = |b: bool| if b { "ON" } else { "off" };
     let lines = [
         format!("DEV  speed x{}  {:02}:00", app.speed, p.local_hour()),
         format!("<- ->  form: {}", p.species),
@@ -123,8 +122,6 @@ fn draw_dev_panel(v: &Viewport, app: &App) {
         "t/T  skip 1h / 8h".into(),
         ", .  clock -/+ 1h".into(),
         "z/Z  clock 22:00 / 12:00".into(),
-        format!("u cpu {}  r ram {}", on(p.load.busy_cpu), on(p.load.low_ram)),
-        format!("b battery {}", on(p.load.low_battery)),
         "f    speed 1/2/5/10/60/600".into(),
         "1    back to speed x1".into(),
         "tab  close the panel".into(),
