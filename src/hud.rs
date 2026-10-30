@@ -358,11 +358,10 @@ mod tests {
     }
 
     #[test]
-    fn the_header_and_message_are_on_screen() {
+    fn the_header_is_on_screen() {
         let app = app_with(Stage::Baby, |_| {});
         let text: Vec<String> = labels(&app, Layout::MIN, 0.5).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t.starts_with("Babytchi · Baby")), "{text:?}");
-        assert!(text.contains(&"hello".to_string()));
     }
 
     #[test]

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.9.0
+
+- The status panel is less crowded: the "recent" log and the trait hint are gone, and growth is
+  two short lines ("Adult - 1d 23h left", or what the pet is on track for).
+- Weight and mistakes now share one dim line under growth instead of a row each.
+
 ## 1.8.4
 
 - The room's wallpaper now reaches right up to the header line; the dark gap under it is gone.

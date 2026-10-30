@@ -487,7 +487,7 @@ impl Pet {
         }
         let Some((limit, next)) = self.next_stage() else {
             let left = self.cfg.adult_lifespan_secs.saturating_sub(self.stage_age);
-            return vec![format!("Fully grown. About {} left.", crate::fmt_age(left))];
+            return vec![format!("Adult - {} left", crate::fmt_age(left))];
         };
         let mut out = vec![format!("Next: {} in {}", next.label(), crate::fmt_age(limit.saturating_sub(self.stage_age)))];
         if matches!(next, Stage::Teen | Stage::Adult) {

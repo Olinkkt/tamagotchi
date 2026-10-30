@@ -114,7 +114,7 @@ Care mistakes (counted over its whole life) decide what it grows into:
 | Adult: Nyorotchi | 7 or more |
 
 Discipline starts at 50% and rises 25 points each time you scold a real naughty call.
-The status panel's "growth" section shows what it is on track for.
+The status panel shows what it is on track for.
 
 Each pet also gets a random trait: *greedy* (hungry faster), *playful* (bored faster, +2
 happiness from a win), *hardy* (rarely sick), *mischievous* (acts up more) or *easygoing*.

@@ -1,5 +1,5 @@
 //! The status panel to the right of the room: hearts, discipline, the numbers, what is going
-//! on with the pet right now, what it will grow into, and the latest events.
+//! on with the pet right now, and what it will grow into.
 
 use crate::app::App;
 use crate::font;
@@ -20,12 +20,10 @@ const WIDTH: f32 = 72.0;
 const HUNGER_Y: i32 = 18;
 const HAPPY_Y: i32 = 27;
 const DISCIPLINE_Y: i32 = 36;
-const WEIGHT_Y: f32 = 44.0;
-const MISTAKES_Y: f32 = 51.0;
-const COINS_Y: i32 = 58;
-const TRAIT_Y: f32 = 65.0;
+const COINS_Y: i32 = 46;
+const TRAIT_Y: f32 = 54.0;
 /// Free-flowing lines start here and stop this far above the hint line.
-const FLOW_TOP: f32 = 73.0;
+const FLOW_TOP: f32 = 63.0;
 const FLOW_MARGIN: i32 = 3;
 const PITCH: f32 = 7.0;
 
@@ -84,16 +82,6 @@ pub fn labels(app: &App, ratio: f32, lay: Layout) -> Vec<Label> {
         out.push(text("hunger", col, HUNGER_Y as f32, Pal::Mist));
         out.push(text("happy", col, HAPPY_Y as f32, Pal::Mist));
         out.push(text("discipline", col, DISCIPLINE_Y as f32, Pal::Mist));
-        out.push(text("weight", col, WEIGHT_Y, Pal::Mist));
-        let weight = if p.overweight() { format!("{} heavy", p.weight) } else { p.weight.to_string() };
-        out.push(text(&weight, value_x, WEIGHT_Y, if p.overweight() { Pal::Yellow } else { Pal::White }));
-        out.push(text("mistakes", col, MISTAKES_Y, Pal::Mist));
-        let colour = match p.mistakes {
-            0 => Pal::Green,
-            1..=3 => Pal::Yellow,
-            _ => Pal::Red,
-        };
-        out.push(text(&p.mistakes.to_string(), value_x, MISTAKES_Y, colour));
         out.push(text("trait", col, TRAIT_Y, Pal::Mist));
         out.push(text(p.quirk.label(), value_x, TRAIT_Y, Pal::Pink));
     }
@@ -110,23 +98,14 @@ pub fn labels(app: &App, ratio: f32, lay: Layout) -> Vec<Label> {
     for (t, c) in chips(p) {
         add(&format!("• {t}"), c, true);
     }
-    let growth = p.evolution_preview();
-    if !growth.is_empty() {
-        add("growth", Pal::Pink, false);
-        for line in &growth {
-            add(line, Pal::White, false);
-        }
+    // Growth is two lines at most; the rest of the preview lives in `tama status`.
+    for line in p.evolution_preview().iter().take(2) {
+        add(line, Pal::White, false);
     }
     if has_stats(p) {
-        add(p.quirk.description(), Pal::Slate, false);
+        add(&format!("weight {}, mistakes {}", p.weight, p.mistakes), Pal::Slate, false);
     }
     let room = ((flow_bottom - FLOW_TOP) / PITCH) as usize + 1;
-    let left = room.saturating_sub(flow.len());
-    if left >= 2 && !app.log.is_empty() {
-        flow.push(("recent".into(), Pal::Pink));
-        let recent: Vec<String> = app.log.iter().rev().take(4).flat_map(|e| font::wrap(e, max)).collect();
-        flow.extend(recent.into_iter().take(left - 1).map(|l| (l, Pal::Slate)));
-    }
     for (i, (t, c)) in flow.into_iter().take(room).enumerate() {
         out.push(text(&t, col, FLOW_TOP + i as f32 * PITCH, c));
     }
@@ -159,21 +138,20 @@ mod tests {
             p.discipline = 80;
         });
         let text = panel_text(&app, 0.5);
-        assert!(text.contains("growth") && text.contains("Mametchi"), "{text}");
+        assert!(text.contains("On track") && text.contains("Mametchi"), "{text}");
     }
 
     #[test]
     fn every_line_fits_the_panel_at_the_coarsest_text_scale() {
         // At 3x the window, a font pixel covers two thirds of a scene pixel: the widest case.
         let ratio = 2.0 / 3.0;
-        let mut app = app_with(Stage::Teen, |p| {
+        let app = app_with(Stage::Teen, |p| {
             p.sick = true;
             p.urge = Some(0);
             p.disc_call = Some(0);
             p.weight = 99;
             p.load = Strain { busy_cpu: true, low_ram: true, low_battery: true };
         });
-        app.log = (0..20).map(|i| format!("Something long happened to the pet, number {i}")).collect();
         for l in labels(&app, ratio, Layout::MIN) {
             assert!(l.x + font::width(&l.text) as f32 * ratio <= 288.0 - 1.0, "too wide: {}", l.text);
             assert!(l.y <= 157.0, "below the panel: {}", l.text);
