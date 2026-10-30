@@ -53,6 +53,18 @@ pub const W: i32 = 160;
 pub const H: i32 = 116;
 /// Stars in the night window that twinkle (the room sprite has them all lit).
 const TWINKLE: [(i32, i32); 3] = [(21, 19), (36, 18), (50, 41)];
+/// Centre of the wall clock's face.
+const CLOCK: (i32, i32) = (127, 13);
+
+/// The wall clock's hands for the pet's local time, as pixel offsets from its centre.
+fn clock_hands(hour: i64, minute: i64) -> (Vec<(i32, i32)>, Vec<(i32, i32)>) {
+    let hand = |turns: f32, len: i32| -> Vec<(i32, i32)> {
+        let a = turns * std::f32::consts::TAU;
+        (1..=len).map(|i| ((a.sin() * i as f32).round() as i32, (-a.cos() * i as f32).round() as i32)).collect()
+    };
+    let hours = ((hour % 12) * 60 + minute) as f32 / 720.0;
+    (hand(hours, 2), hand(minute as f32 / 60.0, 4))
+}
 
 /// The size of the room being drawn, and what hangs off it.
 #[derive(Clone, Copy)]
@@ -497,6 +509,13 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
             }
         }
     }
+    let secs = (p.clock + p.tz_offset).rem_euclid(86_400);
+    let (hours, minutes) = clock_hands(secs / 3600, secs / 60 % 60);
+    let ink = if light == Light::Day { Pal::Ink } else { Pal::Ink.dark() };
+    for (ox, oy) in hours.into_iter().chain(minutes) {
+        f.set(CLOCK.0 + ox + dx, CLOCK.1 + oy + dy, ink);
+    }
+    f.set(CLOCK.0 + dx, CLOCK.1 + dy, if light == Light::Day { Pal::Red } else { Pal::Red.dark() });
     if let Some(t) = m.shell {
         draw_shell(&mut f, t, s);
     }
@@ -548,6 +567,14 @@ pub fn area(app: &App, w: i32, h: i32) -> Frame {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_wall_clock_hands_follow_the_time() {
+        let (h, m) = clock_hands(3, 0);
+        assert_eq!(h.last(), Some(&(2, 0)), "hour hand points right at three");
+        assert_eq!(m.last(), Some(&(0, -4)), "minute hand points up at the hour");
+        assert_eq!(clock_hands(6, 30).1.last(), Some(&(0, 4)), "and down at half past");
+    }
+
     use super::*;
     use crate::sysinfo::Strain;
 

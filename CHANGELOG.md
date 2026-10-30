@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.18.2
+
+- The clock on the wall now shows the real time, with hour and minute hands that move.
+
 ## 1.18.1
 
 - Shop food is now eaten bite by bite like the apple: the cake, salad and vitamin pill each show

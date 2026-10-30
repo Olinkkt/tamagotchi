@@ -162,9 +162,7 @@ fn clock() -> Img {
     let mut s = canvas();
     s.ellipse(127.0, 13.0, 7.0, 7.0, Tan);
     s.ellipse(127.0, 13.0, 5.0, 5.0, White);
-    s.line(&[(127.0, 13.0), (127.0, 9.5)], 1.0, Ink);
-    s.line(&[(127.0, 13.0), (129.5, 13.0)], 1.0, Ink);
-    s.rect(126.5, 12.5, 1.0, 1.0, Red);
+    // No hands: the game draws them from the real time.
     lined(&s)
 }
 
