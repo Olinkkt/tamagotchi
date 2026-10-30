@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.11.1
+
+- Dev mode runs on its own clock: a new test egg is laid at 07:00 and the day no longer follows
+  your real time. Normal play is unchanged.
+
 ## 1.11.0
 
 - The game picker, shop, awards and graveyard lose the button bar. Each card has a small "esc"

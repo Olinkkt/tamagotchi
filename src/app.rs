@@ -125,17 +125,28 @@ impl App {
         }
         let (cfg, cfg_warning) = Config::load();
         let tz = save::tz_offset();
+        let mut fresh = false;
         let (pet, away, note) = match save::load() {
             save::Loaded::Pet(p, away) => (p, away, "Welcome back!".to_string()),
-            save::Loaded::None => (Pet::new(save::now()), 0, "A new egg! Take good care of it.".to_string()),
-            save::Loaded::Corrupt(path) => (
-                Pet::new(save::now()),
-                0,
-                format!("Your save was unreadable, so it was moved to {} and a new egg started.", path.display()),
-            ),
+            save::Loaded::None => {
+                fresh = true;
+                (Pet::new(save::now()), 0, "A new egg! Take good care of it.".to_string())
+            }
+            save::Loaded::Corrupt(path) => {
+                fresh = true;
+                (
+                    Pet::new(save::now()),
+                    0,
+                    format!("Your save was unreadable, so it was moved to {} and a new egg started.", path.display()),
+                )
+            }
         };
         let mut app = App::from_parts(pet, cfg.clone(), tz, speed, dev, cfg_warning.unwrap_or(note));
         app.pet.set_env(cfg, tz);
+        if dev && fresh {
+            // Dev pets keep their own clock and are laid in the morning.
+            app.pet.dev_set_hour(7);
+        }
         if app.pet.clock == 0 {
             // Save from before the clock existed.
             app.pet.clock = (save::now() - away) as i64;
@@ -146,7 +157,7 @@ impl App {
             app.pet.tick();
         }
         app.pet.away = false;
-        if speed == 1.0 {
+        if speed == 1.0 && !dev {
             app.pet.clock = save::now() as i64;
         }
         if ticks > 0 {
