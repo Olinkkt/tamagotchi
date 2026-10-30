@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.3
+
+- The line of news at the foot of the room ("Ahh, much better.") now fades after five seconds
+  instead of staying up until the next action.
+
 ## 1.7.2
 
 - The iris wipe is slower (about a second and a half in all) and closes on the middle of the

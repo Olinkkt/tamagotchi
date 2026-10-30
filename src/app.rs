@@ -35,10 +35,15 @@ pub enum Mode {
     Toilet(toilet::Visit),
 }
 
+/// How long the line of news at the foot of the room stays up.
+const MESSAGE_SECS: Duration = Duration::from_secs(5);
+
 pub struct App {
     pub pet: Pet,
     pub mode: Mode,
     pub message: String,
+    /// What `message` said when it was last seen, and since when, so old news can fade.
+    message_seen: (String, Instant),
     pub log: Vec<String>,
     pub cfg: Config,
     pub profile: Profile,
@@ -160,6 +165,7 @@ impl App {
         App {
             pet,
             mode: Mode::Normal,
+            message_seen: (String::new(), Instant::now()),
             message,
             log: Vec::new(),
             cfg,
@@ -291,6 +297,16 @@ impl App {
         }
     }
 
+    /// The message line clears itself a few seconds after it last changed (a pending reset prompt stays).
+    fn fade_message(&mut self) {
+        if self.message != self.message_seen.0 {
+            self.message_seen = (self.message.clone(), Instant::now());
+        } else if !self.confirm_reset && self.message_seen.1.elapsed() >= MESSAGE_SECS {
+            self.message.clear();
+            self.message_seen.0.clear();
+        }
+    }
+
     pub fn update(&mut self) {
         let now = Instant::now();
         self.tick_acc += now.duration_since(self.last).as_secs_f64() * self.speed;
@@ -308,6 +324,7 @@ impl App {
             self.pet.load = sysinfo::read();
         }
         self.drain_events();
+        self.fade_message();
         if self.pet.stage != self.last_stage {
             if self.pet.alive() {
                 self.trigger(scene::Fx::Evolve);
