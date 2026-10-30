@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.22.1
+
+- The one-line install command in the README now points at the `main` branch, which replaces `master`.
+
 ## 1.22.0
 
 - Mini-games pay full coins only once every 10 minutes. Wins in between pay half (2 or 5), so

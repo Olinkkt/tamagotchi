@@ -34,7 +34,7 @@ in Rust, drawn in 24 colours.
 On 64-bit Linux, one command downloads the game and adds it to your app menu (no Rust needed):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/Olinkkt/tamagotchi/master/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Olinkkt/tamagotchi/main/install.sh | sh
 ```
 
 Then search for "tama" in your launcher. It needs `curl` and a desktop with OpenGL. To build it
