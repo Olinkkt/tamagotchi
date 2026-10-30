@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.11.0
+
+- The game picker, shop, awards and graveyard lose the button bar. Each card has a small "esc"
+  button in its top-right corner, and clicking anywhere off the card closes it too.
+- Those cards sit lower now that the bar's height is free; the hint line stays under them.
+
 ## 1.10.0
 
 - The game picker, shop, awards and graveyard now take the whole window like the games do: the

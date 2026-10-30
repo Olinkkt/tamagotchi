@@ -19,6 +19,8 @@ pub const ROOM_Y: i32 = 12;
 pub const PANEL_W: i32 = 80;
 /// Height of the hint line plus the button bar under the room.
 const FOOT: i32 = 32;
+/// Height of the hint line under a card.
+const CARD_HINT_H: i32 = 16;
 const BUTTON: i32 = 16;
 const GAP: i32 = 3;
 const KEYCAP: i32 = 7;
@@ -57,7 +59,17 @@ impl Layout {
         self.hint_y() - ROOM_Y
     }
 
-    /// Where a 240x128 game or card goes so it is centred above the hint line.
+    /// Where the one-line hint under a card sits; a card has no button bar.
+    pub fn card_hint_y(self) -> i32 {
+        self.h - CARD_HINT_H
+    }
+
+    /// Where a 240x128 card goes so it is centred above its hint line.
+    pub fn centred_card(self) -> (i32, i32) {
+        ((self.w - 240) / 2, (self.card_hint_y() - 128) / 2)
+    }
+
+    /// Where a 240x128 game goes so it is centred above the hint line.
     pub fn centred_240x128(self) -> (i32, i32) {
         ((self.w - 240) / 2, (self.hint_y() - 128) / 2)
     }
@@ -178,12 +190,10 @@ pub fn buttons(app: &App, lay: Layout) -> Vec<Button> {
     row(match &app.mode {
         Mode::Normal if app.pet.stage == Stage::Dead => DEAD_ACTIONS.iter().map(|&c| action(c)).collect(),
         Mode::Normal => ACTIONS.iter().map(|&c| action(c)).collect(),
-        Mode::Chooser => vec![text_button('1'), text_button('2'), BACK],
-        Mode::Shop => vec![text_button('1'), text_button('2'), text_button('3'), text_button('4'), BACK],
         Mode::Game(Game::Memory(_)) => vec![text_button('1'), text_button('2'), text_button('3'), text_button('4'), BACK],
         Mode::Game(Game::Pong(_)) => vec![(Key::Up, Some(icons::UP), "w", Look::Normal), (Key::Down, Some(icons::DOWN), "s", Look::Normal), BACK],
-        Mode::Finish(_) | Mode::Awards | Mode::Graveyard(_) => vec![BACK],
-        Mode::Toilet(_) => Vec::new(),
+        Mode::Finish(_) => vec![BACK],
+        Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Graveyard(_) | Mode::Toilet(_) => Vec::new(),
     }, lay, bar_w(app, lay))
 }
 
@@ -226,17 +236,21 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
         Mode::Finish(fin) => Some(fin.draw()),
         _ => None,
     };
-    if !has_panel(app) {
+    if screens::showing(app) {
+        let y = lay.card_hint_y();
+        f.frame(&scene::area(app, lay.w, y), 0, 0);
+        screens::draw(&mut f, app, lay);
+        f.rect(0, y, lay.w, CARD_HINT_H, Pal::Ink);
+        f.rect(0, y, lay.w, 1, Pal::Dusk);
+        return f;
+    }
+    if let Some(g) = game {
         f.frame(&scene::area(app, lay.w, hint_y), 0, 0);
-        if let Some(g) = game {
-            let (x, y) = lay.centred_240x128();
-            if (x, y) != (0, 0) {
-                f.boxed(x - 1, y - 1, g.w + 2, g.h + 2, Pal::Ink, Pal::Slate);
-            }
-            f.frame(&g, x, y);
-        } else {
-            screens::draw(&mut f, app, lay);
+        let (x, y) = lay.centred_240x128();
+        if (x, y) != (0, 0) {
+            f.boxed(x - 1, y - 1, g.w + 2, g.h + 2, Pal::Ink, Pal::Slate);
         }
+        f.frame(&g, x, y);
         draw_bar(&mut f, app, lay, hover);
         return f;
     }
@@ -304,7 +318,8 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
         out.push(label("STATUS", panel_x as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
     }
     if let Some((text, colour)) = hint(app) {
-        out.push(label(text, bar_w(app, lay) as f32 / 2.0, hint_y as f32 + 6.0, colour, Align::Centre));
+        let y = if screens::showing(app) { lay.card_hint_y() as f32 + CARD_HINT_H as f32 / 2.0 } else { hint_y as f32 + 6.0 };
+        out.push(label(text, bar_w(app, lay) as f32 / 2.0, y, colour, Align::Centre));
     }
     if !in_game {
         out.extend(panel::labels(app, ratio, lay));

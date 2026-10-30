@@ -26,7 +26,8 @@ This puts `tama` in `~/.cargo/bin`, which must be on your `PATH`. After you chan
 
 Run `tama` to open the window. One pet at a time; when it dies you can hatch a new egg with `n`.
 Every action is also a button along the bottom of the window: click it, or press its key (shown
-in the button's corner). F11 toggles fullscreen.
+in the button's corner). The shop, awards, graveyard and game picker have no bar: click their "esc"
+button or anywhere off the card to close them. F11 toggles fullscreen.
 
 | Key | Action |
 |---|---|

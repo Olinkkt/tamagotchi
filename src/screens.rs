@@ -14,12 +14,14 @@ use crate::pet::{self, Pet, Stage};
 use crate::profile;
 use crate::scene;
 
-/// The card covers the room and the panel, above the hint line.
+/// The card covers the room, above its hint line.
 const CARD: (i32, i32, i32, i32) = (4, 4, 232, 120);
 const TITLE_Y: f32 = 12.0;
 const BODY_Y: i32 = 22;
 const SHOP_ROW: i32 = 24;
 const GAME_CARD: (i32, i32, i32) = (28, 34, 82);
+/// The close button in a card's top-right corner.
+const ESC: (i32, i32, i32, i32) = (CARD.0 + CARD.2 - 19, CARD.1 + 2, 15, 11);
 
 fn label(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
     Label { text: text.into(), x, y, colour, align: Align::Left }
@@ -232,6 +234,8 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
     // The card is laid out as if the screen were the smallest one, then moved to the middle.
     let mut local = Frame::new(240, 128, Pal::Ink);
     card(&mut local);
+    let (x, y, w, h) = ESC;
+    local.boxed(x, y, w, h, Pal::Night, Pal::Slate);
     match &app.mode {
         Mode::Chooser => draw_chooser(&mut local),
         Mode::Shop => draw_shop(&mut local, app),
@@ -239,7 +243,7 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
         Mode::Graveyard(entries) => draw_graveyard(&mut local, entries),
         _ => {}
     }
-    let (ox, oy) = lay.centred_240x128();
+    let (ox, oy) = lay.centred_card();
     f.copy_rect(&local, CARD, ox + CARD.0, oy + CARD.1);
 }
 
@@ -251,7 +255,10 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         Mode::Graveyard(entries) => graveyard_labels(entries),
         _ => Vec::new(),
     };
-    let (ox, oy) = lay.centred_240x128();
+    if showing(app) {
+        v.push(centred("esc", ESC.0 as f32 + ESC.2 as f32 / 2.0, ESC.1 as f32 + ESC.3 as f32 / 2.0, Pal::White));
+    }
+    let (ox, oy) = lay.centred_card();
     for l in &mut v {
         l.x += ox as f32;
         l.y += oy as f32;
@@ -275,8 +282,16 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
 
 /// The key a click on a card presses: a shop row or a game.
 pub fn click(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
-    let (ox, oy) = lay.centred_240x128();
+    let (ox, oy) = lay.centred_card();
     let (x, y) = (x as i32 - ox, y as i32 - oy);
+    let inside = |r: (i32, i32, i32, i32)| (r.0..r.0 + r.2).contains(&x) && (r.1..r.1 + r.3).contains(&y);
+    if !showing(app) {
+        return None;
+    }
+    // The close button, or anywhere off the card, closes it.
+    if inside(ESC) || !inside(CARD) {
+        return Some(Key::Esc);
+    }
     match app.mode {
         Mode::Shop => (0..4).find(|&i| (shop_row_y(i)..shop_row_y(i) + SHOP_ROW - 3).contains(&y) && (CARD.0..CARD.0 + CARD.2).contains(&x)).map(|i| Key::Char((b'1' + i as u8) as char)),
         Mode::Chooser => (0..2).find(|&i| (game_card_x(i)..game_card_x(i) + GAME_CARD.2).contains(&x) && (GAME_CARD.1..GAME_CARD.1 + 70).contains(&y)).map(|i| Key::Char((b'1' + i as u8) as char)),
@@ -337,8 +352,8 @@ mod tests {
         for want in ["SHOP", "7", "Fancy meal", "Vitamins", "12"] {
             assert!(text.iter().any(|t| t == want), "shop is missing {want}: {text:?}");
         }
-        assert_eq!(click(&app, Layout::MIN, 100.0, shop_row_y(2) as f32 + 5.0), Some(Key::Char('3')));
-        assert_eq!(click(&app, Layout::MIN, 100.0, 2.0), None);
+        assert_eq!(click(&app, Layout::MIN, 100.0, shop_row_y(2) as f32 + 5.0 + Layout::MIN.centred_card().1 as f32), Some(Key::Char('3')));
+        assert_eq!(click(&app, Layout::MIN, 100.0, shop_row_y(0) as f32 - 3.0 + Layout::MIN.centred_card().1 as f32), None);
     }
 
     #[test]
@@ -366,7 +381,7 @@ mod tests {
         for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(graves), Mode::Graveyard(Vec::new())] {
             app.mode = mode;
             for mut l in labels(&app, Layout::MIN) {
-                l.x -= Layout::MIN.centred_240x128().0 as f32;
+                l.x -= Layout::MIN.centred_card().0 as f32;
                 assert!(fits(&l, COARSEST), "does not fit: {:?}", l.text);
             }
             let mut f = Frame::new(240, 160, Pal::Ink);
@@ -397,17 +412,30 @@ mod tests {
         let mut app = app_with(Stage::Adult, |_| {});
         app.mode = Mode::Shop;
         let lay = Layout::new(400, 220);
-        let (ox, oy) = lay.centred_240x128();
-        assert_eq!((ox, oy), (80, 30));
+        let (ox, oy) = lay.centred_card();
+        assert_eq!((ox, oy), (80, 38));
         let title = labels(&app, lay).into_iter().find(|l| l.text == "SHOP").unwrap();
-        assert_eq!((title.x, title.y), (CARD.0 as f32 + 6.0 + 80.0, TITLE_Y + 30.0));
-        assert_eq!(click(&app, lay, 180.0, shop_row_y(1) as f32 + 5.0 + 30.0), Some(Key::Char('2')));
+        assert_eq!((title.x, title.y), (CARD.0 as f32 + 6.0 + 80.0, TITLE_Y + 38.0));
+        assert_eq!(click(&app, lay, 180.0, shop_row_y(1) as f32 + 5.0 + 38.0), Some(Key::Char('2')));
+    }
+
+    #[test]
+    fn the_esc_button_and_a_click_off_the_card_close_it() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.mode = Mode::Shop;
+        let lay = Layout::MIN;
+        let (ox, oy) = lay.centred_card();
+        assert_eq!(click(&app, lay, (ox + ESC.0 + 3) as f32, (oy + ESC.1 + 3) as f32), Some(Key::Esc));
+        assert_eq!(click(&app, lay, 1.0, 1.0), Some(Key::Esc));
+        assert_eq!(click(&app, lay, 100.0, shop_row_y(0) as f32 - 3.0 + oy as f32), None);
+        app.mode = Mode::Normal;
+        assert_eq!(click(&app, lay, 1.0, 1.0), None);
     }
 
     #[test]
     fn a_click_on_a_game_card_picks_it() {
         let mut app = app_with(Stage::Adult, |_| {});
         app.mode = Mode::Chooser;
-        assert_eq!(click(&app, Layout::MIN, (Layout::MIN.centred_240x128().0 + game_card_x(1)) as f32 + 10.0, GAME_CARD.1 as f32 + 10.0), Some(Key::Char('2')));
+        assert_eq!(click(&app, Layout::MIN, (Layout::MIN.centred_card().0 + game_card_x(1)) as f32 + 10.0, GAME_CARD.1 as f32 + 10.0 + Layout::MIN.centred_card().1 as f32), Some(Key::Char('2')));
     }
 }
