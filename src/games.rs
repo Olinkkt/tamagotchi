@@ -338,16 +338,16 @@ const COURT_TOP: f32 = 9.0;
 const COURT_BOTTOM: f32 = GH as f32 - 9.0 - BALL;
 const PADDLE_X: f32 = 8.0;
 const PADDLE_W: f32 = 4.0;
-const PADDLE_H: f32 = 24.0;
+const PADDLE_H: f32 = 30.0;
 /// How far past either end of the paddle the ball still counts as touching it.
-const SLACK: f32 = 2.0;
+const SLACK: f32 = 3.0;
 /// The ball bounces off the pet keeper here.
 const KEEPER_X: f32 = GW as f32 - 44.0;
 const PADDLE_SPEED: f32 = 160.0;
-const BALL_SPEED: f32 = 95.0;
+const BALL_SPEED: f32 = 80.0;
 /// Each return makes the ball this much faster, up to `MAX_SPEEDUP` times the start.
-const SPEEDUP: f32 = 1.087;
-const MAX_SPEEDUP: f32 = 2.0;
+const SPEEDUP: f32 = 1.06;
+const MAX_SPEEDUP: f32 = 1.5;
 const STEP: f32 = 1.0 / 120.0;
 
 pub struct Pong {

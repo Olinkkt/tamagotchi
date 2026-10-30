@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.10
+
+- Pong is easier: the paddle is taller, the ball starts slower and speeds up less with each
+  return, and a ball that just clips the paddle's edge still counts.
+
 ## 1.12.9
 
 - A wrong answer in Memory now shows: the pads shake, the pad you pressed gets a white ring, the pad
