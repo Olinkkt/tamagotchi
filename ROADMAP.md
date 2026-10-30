@@ -9,14 +9,39 @@ a pet well and building something that lasts across pets, not about your coding.
 feed, play, grow. New content adds things to discover, never things to learn first. Every new
 feature must work without a tutorial, and the first hour must stay as easy as it is today.
 
+**No fail state for being away.** Closing the game never punishes the player. Coming back
+should feel like a reward.
+
 Three goals, in this order:
 
-1. **Long-term goals.** Give a life more reason to matter: breeding or generations, a growing
-   collection, achievements that carry over between pets.
-2. **More content.** New species and evolutions, rooms, mini-games and shop items.
+1. **Long-term goals.** Give a life more reason to matter: a growing collection, badges that
+   carry over between pets, later generations.
+2. **More content.** New forms, rooms, mini-games and shop items.
 3. **More platforms.** macOS and Windows builds next to Linux.
 
-## Evolution by habit and personality (next)
+## Done
+
+- 1.21 to 1.22: one-line install, in-game updates, shop prices, mini-game payout cooldown.
+- 1.23 to 1.24: the shell hook and the CPU, RAM and battery reactions were removed.
+- 1.25: the family tree screen (`e`).
+
+## Next, in order
+
+Times are my own work time, plus your playtesting.
+
+1. **Evolution by habit (MAJOR 2.0.0, about 1 hour).** Details below. Changes the save format.
+2. **Leaning tint (PATCH, about 15 minutes).** A small tint or accent on the pet that shifts
+   towards the form it is heading for. No meter to read.
+3. **Gifts while away (MINOR, about 30 minutes).** Details below.
+4. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
+   (100, 500, 1000). No fail state.
+5. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
+   seconds a round.
+6. **Room decorations and more shop items (MINOR, about 30 minutes each).** A good coin sink,
+   and learned by seeing it.
+7. **macOS build in the release workflow (MINOR, about 30 minutes).**
+
+## Evolution by habit
 
 Care mistakes no longer pick a form. What you do most during a stage does, and each teen and
 adult form brings its own personality. The birth trait (random) stays for life; a form's
@@ -32,19 +57,51 @@ personality replaces the previous form's, so a pet has at most two traits at onc
 | Adult | Mametchi | teen stage: mostly scolds | Disciplined: acts up half as often |
 | Adult | Nyorotchi | teen stage: mostly shop | Sturdy: gets sick half as often |
 
-Ties go to the first row; no habits gives the default form. The panel shows what the pet is
-leaning towards and the family tree shows each form's habit and personality. Numbers are first
-guesses. More teen forms come later (each needs new sprites).
+- **Hidden counters, reset each stage.** Meals, snacks, games, scolds and shop buys are counted
+  during a stage; the biggest one picks the next form. Players learn the paths by playing and by
+  reading the family tree, not a wiki.
+- **Ties** go to the first row. A pet with no habits gets the default form until a neutral
+  "Plain" form exists (see Later).
+- **Personality as a visible moment.** Each effect is small and clear, with a line of speech
+  when it shows, so it feels earned and not like a hidden percentage.
+- **Showing the lean.** The panel says what the pet is heading for, the family tree shows each
+  form's habit and personality, and the tint (step 2) shows it on the pet itself.
+- **Save impact.** New counters with defaults, so old saves load. Pets already past teen keep
+  their form and get its personality. The mistakes rule goes away for form choice only; mistakes
+  still affect health and the "Spotless" award.
+
+Numbers are first guesses, like the rest of the balance.
+
+## Gifts while away
+
+While the game is closed the pet leaves small gifts, so coming back is a reward and never a
+chore.
+
+- One gift for every 2 hours away, up to 5 waiting. First guess: each gift is 2 to 5 coins or a
+  keepsake.
+- Keepsakes are collectable and appear in a "keepsakes" page next to the awards, shown as
+  silhouettes until found.
+- A short "welcome back" card shows the gifts when the game opens. No gifts are lost or
+  punished if you stay away longer; they just stop piling up at the cap.
+- Works with the existing away rules: the pet is safe and slower while the game is closed.
+
+## Later
+
+- **A neutral "Plain" form** for balanced or empty habits. Needs a sprite.
+- **More teen forms** so the child stage can branch more than two ways (each needs sprites).
+- **Generations:** a new egg inherits a colour or accessory, and the family tree can show
+  grandparents. Bigger than anything above, so only after the collection and badges exist.
+- **Memory of past pets** with milestones, built on the graveyard.
+- **Windows build.**
 
 ## Dropped
 
 - The shell hook (`tama hook`, `tama event`, commits feeding the pet). Removed in 1.23.0.
 - The machine reactions (CPU, RAM and battery). Removed in 1.24.0.
 
-## Next, smallest first
+## Where the ideas come from
 
-1. Done in 1.23.0: the shell hook was removed.
-2. One new mini-game or shop item (MINOR, a few hours).
-3. A second collection layer on top of adult species, for example a record of each pet's life.
-4. Pick the long-term goal: generations or collection depth.
-5. macOS build in the release workflow.
+Research from EDITH (mostly fan wikis, so treat the details as readings, not facts):
+Digimon Ver.1 habit counters, Tamagotchi Uni personalities and care icons, Chao evolution tints,
+the Neko Atsume Catbook and mementos, Pokémon-Amie affection, Tamagotchi m!x generations. It
+could not check Nintendogs, Spiritfarer or classic Connection.
