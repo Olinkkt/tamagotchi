@@ -48,6 +48,21 @@ impl Game {
         }
     }
 
+    /// The key a click at (`x`, `y`) in the game's own picture presses: a Memory pad.
+    pub fn click(&self, x: i32, y: i32) -> Option<Key> {
+        match self {
+            Game::Memory(_) => Memory::pad_at(x, y).map(|n| Key::Char((b'0' + n) as char)),
+            Game::Pong(_) => None,
+        }
+    }
+
+    /// Where the mouse is held down (a row of the game's own picture): Pong's paddle follows it.
+    pub fn aim(&mut self, y: Option<f32>) {
+        if let Game::Pong(g) = self {
+            g.aim = y;
+        }
+    }
+
     /// Which direction keys are held down right now.
     pub fn hold(&mut self, up: bool, down: bool) {
         if let Game::Pong(g) = self {
@@ -73,9 +88,9 @@ impl Game {
     /// What to do, for the line under the game.
     pub fn hint(&self) -> &'static str {
         match self {
-            Game::Memory(m) if matches!(m.phase, MPhase::Input(_)) => "YOUR TURN: PRESS 1-4 IN THE SAME ORDER",
+            Game::Memory(m) if matches!(m.phase, MPhase::Input(_)) => "YOUR TURN: CLICK THE PADS OR PRESS 1-4 IN THE SAME ORDER",
             Game::Memory(_) => "WATCH THE PATTERN",
-            Game::Pong(_) => "HOLD UP/DOWN (W/S) TO MOVE - RETURN IT 5 TIMES",
+            Game::Pong(_) => "HOLD W/S OR THE MOUSE TO MOVE - RETURN IT 5 TIMES",
         }
     }
 }
@@ -216,6 +231,14 @@ impl Memory {
         }
     }
 
+    /// Which pad (1 to 4) covers this point of the picture.
+    fn pad_at(x: i32, y: i32) -> Option<u8> {
+        (1..=4u8).find(|&n| {
+            let left = 20 + (n as i32 - 1) * (PAD_W + PAD_GAP);
+            (left..left + PAD_W).contains(&x) && (PAD_Y..PAD_Y + PAD_H).contains(&y)
+        })
+    }
+
     fn draw_pad(f: &mut Frame, n: u8, on: bool) {
         let base = PADS[n as usize - 1];
         let x = 20 + (n as i32 - 1) * (PAD_W + PAD_GAP);
@@ -300,6 +323,8 @@ pub struct Pong {
     py: f32,
     /// -1 up, 1 down, 0 still: set every frame from the keys held.
     dir: i32,
+    /// A row the mouse holds the paddle towards, when the button is down.
+    aim: Option<f32>,
     /// Top-left corner of the ball, and its velocity in pixels per second.
     bx: f32,
     by: f32,
@@ -326,6 +351,7 @@ impl Pong {
         Pong {
             py: (GH as f32 - PADDLE_H) / 2.0,
             dir: 0,
+            aim: None,
             bx: KEEPER_X - 20.0,
             by,
             vx: -BALL_SPEED,
@@ -358,6 +384,10 @@ impl Pong {
 
     fn step(&mut self, dt: f32) -> Outcome {
         let lowest = COURT_BOTTOM + BALL + 2.0 - PADDLE_H;
+        if let Some(y) = self.aim {
+            let mid = self.py + PADDLE_H / 2.0;
+            self.dir = if y > mid + 2.0 { 1 } else if y < mid - 2.0 { -1 } else { 0 };
+        }
         self.py = (self.py + self.dir as f32 * PADDLE_SPEED * dt).clamp(COURT_TOP - 2.0, lowest);
         if self.trail.first().is_none_or(|&(x, y)| (x - self.bx).abs() + (y - self.by).abs() >= 4.0) {
             self.trail.insert(0, (self.bx, self.by));

@@ -168,11 +168,13 @@ async fn main_loop(mut app: App) {
                 app.press(k);
             }
         }
+        let aim = (is_mouse_button_down(MouseButton::Left) && under_mouse.is_none()).then(|| sy - lay.centred_card().1 as f32);
         // Real key-down state, so the Pong paddle moves exactly while a key or button is held.
         let held = |keys: [KeyCode; 3], button: Key| {
             keys.iter().any(|&k| is_key_down(k)) || (is_mouse_button_down(MouseButton::Left) && under_mouse == Some(button))
         };
         app.hold(held([KeyCode::Up, KeyCode::W, KeyCode::K], Key::Up), held([KeyCode::Down, KeyCode::S, KeyCode::J], Key::Down));
+        app.aim(aim);
         app.update();
 
         image.bytes = hud::frame(&app, lay, hud::button_at(&app, lay, sx, sy)).rgba();

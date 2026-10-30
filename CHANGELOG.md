@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.12.0
+
+- The games lose the button bar too. Click a Memory pad to repeat the pattern, hold the mouse
+  button to make the Pong paddle chase the pointer, and use the "esc" button in the top-right
+  corner to quit. Clicking on a result card carries on.
+
 ## 1.11.1
 
 - Dev mode runs on its own clock: a new test egg is laid at 07:00 and the day no longer follows

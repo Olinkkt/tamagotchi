@@ -280,10 +280,27 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
     })
 }
 
-/// The key a click on a card presses: a shop row or a game.
+/// The close button over a game: the top-right corner of the screen.
+pub fn game_esc(lay: Layout) -> (i32, i32, i32, i32) {
+    (lay.w - 19, 3, 15, 11)
+}
+
+fn in_rect(r: (i32, i32, i32, i32), x: i32, y: i32) -> bool {
+    (r.0..r.0 + r.2).contains(&x) && (r.1..r.1 + r.3).contains(&y)
+}
+
+/// The key a click presses where there is no button bar: on a card a shop row, a game or the
+/// way out; in a game a Memory pad or the way out.
 pub fn click(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
     let (ox, oy) = lay.centred_card();
     let (x, y) = (x as i32 - ox, y as i32 - oy);
+    match &app.mode {
+        Mode::Game(g) => {
+            return if in_rect(game_esc(lay), x + ox, y + oy) { Some(Key::Esc) } else { g.click(x, y) };
+        }
+        Mode::Finish(_) => return Some(Key::Esc),
+        _ => {}
+    }
     let inside = |r: (i32, i32, i32, i32)| (r.0..r.0 + r.2).contains(&x) && (r.1..r.1 + r.3).contains(&y);
     if !showing(app) {
         return None;
@@ -430,6 +447,21 @@ mod tests {
         assert_eq!(click(&app, lay, 100.0, shop_row_y(0) as f32 - 3.0 + oy as f32), None);
         app.mode = Mode::Normal;
         assert_eq!(click(&app, lay, 1.0, 1.0), None);
+    }
+
+    #[test]
+    fn in_a_game_a_click_on_a_pad_or_esc_acts_and_a_result_card_goes_on() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        let lay = Layout::MIN;
+        let (ox, oy) = lay.centred_card();
+        app.mode = Mode::Game(crate::games::Game::new(1, &mut app.pet));
+        // The second pad: 20 + 52 across, 72 down.
+        assert_eq!(click(&app, lay, (ox + 20 + 52 + 5) as f32, (oy + 72 + 5) as f32), Some(Key::Char('2')));
+        assert_eq!(click(&app, lay, (ox + 2) as f32, (oy + 2) as f32), None);
+        let (ex, ey, _, _) = game_esc(lay);
+        assert_eq!(click(&app, lay, (ex + 3) as f32, (ey + 3) as f32), Some(Key::Esc));
+        app.mode = Mode::Game(crate::games::Game::new(2, &mut app.pet));
+        assert_eq!(click(&app, lay, (ox + 20 + 52 + 5) as f32, (oy + 72 + 5) as f32), None);
     }
 
     #[test]

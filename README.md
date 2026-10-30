@@ -26,8 +26,8 @@ This puts `tama` in `~/.cargo/bin`, which must be on your `PATH`. After you chan
 
 Run `tama` to open the window. One pet at a time; when it dies you can hatch a new egg with `n`.
 Every action is also a button along the bottom of the window: click it, or press its key (shown
-in the button's corner). The shop, awards, graveyard and game picker have no bar: click their "esc"
-button or anywhere off the card to close them. F11 toggles fullscreen.
+in the button's corner). The shop, awards, graveyard, game picker and the games have no bar: click their "esc"
+button (or, on a card, anywhere off it) to close them. F11 toggles fullscreen.
 
 | Key | Action |
 |---|---|
@@ -57,8 +57,8 @@ the window while you play (the status panel comes back afterwards). When a game 
 screen shows a star per round won, the coins earned and the pet cheering or sulking for three
 seconds (any key skips it).
 
-1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4 (or the buttons). Your pet watches and cheers or sulks.
-2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle moves while you hold ↑/↓ (or W/S, K/J, or the arrow buttons) and stops when you let go.
+1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4 (or click the pads). Your pet watches and cheers or sulks.
+2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle moves while you hold ↑/↓ (or W/S, K/J), or while you hold the mouse button, when it chases the pointer; it stops when you let go.
 
 ### The toilet
 

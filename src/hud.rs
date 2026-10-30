@@ -6,7 +6,6 @@
 use crate::app::{App, Key, Mode};
 use crate::fmt_age;
 use crate::frame::Frame;
-use crate::games::Game;
 use crate::icons::{self, Grid};
 use crate::palette::Pal;
 use crate::pet::{Stage, MAX_HEARTS};
@@ -67,11 +66,6 @@ impl Layout {
     /// Where a 240x128 card goes so it is centred above its hint line.
     pub fn centred_card(self) -> (i32, i32) {
         ((self.w - 240) / 2, (self.card_hint_y() - 128) / 2)
-    }
-
-    /// Where a 240x128 game goes so it is centred above the hint line.
-    pub fn centred_240x128(self) -> (i32, i32) {
-        ((self.w - 240) / 2, (self.hint_y() - 128) / 2)
     }
 }
 
@@ -163,12 +157,6 @@ fn key_name(c: char) -> &'static str {
     }
 }
 
-fn text_button(c: char) -> (Key, Option<Grid>, &'static str, Look) {
-    (Key::Char(c), None, key_name(c), Look::Normal)
-}
-
-const BACK: (Key, Option<Grid>, &str, Look) = (Key::Esc, None, "esc", Look::Normal);
-
 /// Whether the screen has the status panel: not during a game or over a card (shop, awards...).
 fn has_panel(app: &App) -> bool {
     matches!(app.mode, Mode::Normal | Mode::Toilet(_))
@@ -190,10 +178,7 @@ pub fn buttons(app: &App, lay: Layout) -> Vec<Button> {
     row(match &app.mode {
         Mode::Normal if app.pet.stage == Stage::Dead => DEAD_ACTIONS.iter().map(|&c| action(c)).collect(),
         Mode::Normal => ACTIONS.iter().map(|&c| action(c)).collect(),
-        Mode::Game(Game::Memory(_)) => vec![text_button('1'), text_button('2'), text_button('3'), text_button('4'), BACK],
-        Mode::Game(Game::Pong(_)) => vec![(Key::Up, Some(icons::UP), "w", Look::Normal), (Key::Down, Some(icons::DOWN), "s", Look::Normal), BACK],
-        Mode::Finish(_) => vec![BACK],
-        Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Graveyard(_) | Mode::Toilet(_) => Vec::new(),
+        _ => Vec::new(),
     }, lay, bar_w(app, lay))
 }
 
@@ -228,7 +213,7 @@ fn draw_button(f: &mut Frame, b: &Button, hover: bool, bounce: i32) {
 /// The full picture, with `hover` the key under the mouse.
 pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
     let mut f = Frame::new(lay.w, lay.h, Pal::Ink);
-    let (panel_x, hint_y) = (lay.panel_x(), lay.hint_y());
+    let panel_x = lay.panel_x();
     // A game or a card takes the whole width above the hint line, over the dimmed room; the
     // status panel comes back afterwards.
     let game = match &app.mode {
@@ -236,22 +221,22 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
         Mode::Finish(fin) => Some(fin.draw()),
         _ => None,
     };
-    if screens::showing(app) {
+    if !has_panel(app) {
         let y = lay.card_hint_y();
         f.frame(&scene::area(app, lay.w, y), 0, 0);
-        screens::draw(&mut f, app, lay);
+        if let Some(g) = game {
+            let (x, y) = lay.centred_card();
+            if (x, y) != (0, 0) {
+                f.boxed(x - 1, y - 1, g.w + 2, g.h + 2, Pal::Ink, Pal::Slate);
+            }
+            f.frame(&g, x, y);
+            let (ex, ey, ew, eh) = screens::game_esc(lay);
+            f.boxed(ex, ey, ew, eh, Pal::Night, Pal::Slate);
+        } else {
+            screens::draw(&mut f, app, lay);
+        }
         f.rect(0, y, lay.w, CARD_HINT_H, Pal::Ink);
         f.rect(0, y, lay.w, 1, Pal::Dusk);
-        return f;
-    }
-    if let Some(g) = game {
-        f.frame(&scene::area(app, lay.w, hint_y), 0, 0);
-        let (x, y) = lay.centred_240x128();
-        if (x, y) != (0, 0) {
-            f.boxed(x - 1, y - 1, g.w + 2, g.h + 2, Pal::Ink, Pal::Slate);
-        }
-        f.frame(&g, x, y);
-        draw_bar(&mut f, app, lay, hover);
         return f;
     }
     // Header strip over the room, status panel to its right.
@@ -318,13 +303,21 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
         out.push(label("STATUS", panel_x as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
     }
     if let Some((text, colour)) = hint(app) {
-        let y = if screens::showing(app) { lay.card_hint_y() as f32 + CARD_HINT_H as f32 / 2.0 } else { hint_y as f32 + 6.0 };
-        out.push(label(text, bar_w(app, lay) as f32 / 2.0, y, colour, Align::Centre));
+        let (x, y) = if has_panel(app) {
+            (panel_x as f32 / 2.0, hint_y as f32 + 6.0)
+        } else {
+            (lay.w as f32 / 2.0, lay.card_hint_y() as f32 + CARD_HINT_H as f32 / 2.0)
+        };
+        out.push(label(text, x, y, colour, Align::Centre));
     }
     if !in_game {
         out.extend(panel::labels(app, ratio, lay));
     }
     out.extend(screens::labels(app, lay));
+    if matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) {
+        let (x, y, w, h) = screens::game_esc(lay);
+        out.push(label("esc", x as f32 + w as f32 / 2.0, y as f32 + h as f32 / 2.0, Pal::White, Align::Centre));
+    }
     if app.confirming_reset() {
         out.extend(screens::reset_labels(lay));
     }
@@ -344,6 +337,7 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
 mod tests {
     use super::*;
     use crate::font;
+    use crate::games::Game;
     use crate::app::tests::app_with;
 
     #[test]
@@ -413,10 +407,10 @@ mod tests {
         let mut app = app_with(Stage::Baby, |_| {});
         app.mode = Mode::Game(Game::new(2, &mut app.pet));
         let text: Vec<String> = labels(&app, Layout::MIN, 0.5).into_iter().map(|l| l.text).collect();
-        assert!(text.iter().any(|t| t.starts_with("HOLD UP/DOWN")), "{text:?}");
+        assert!(text.iter().any(|t| t.starts_with("HOLD W/S")), "{text:?}");
+        assert!(text.iter().any(|t| t == "esc"), "a game has a way out: {text:?}");
         assert!(!text.iter().any(|t| t == "STATUS"), "the panel makes way for the game");
-        let keys: Vec<Key> = buttons(&app, Layout::MIN).iter().map(|b| b.key).collect();
-        assert_eq!(keys, [Key::Up, Key::Down, Key::Esc]);
+        assert!(buttons(&app, Layout::MIN).is_empty(), "no button bar in a game");
     }
 
     #[test]
