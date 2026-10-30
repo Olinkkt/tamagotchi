@@ -29,7 +29,8 @@ Three goals, in this order:
 
 Times are my own work time, plus your playtesting.
 
-1. **Evolution by habit (MAJOR 2.0.0, about 1 hour).** Details below. Changes the save format.
+1. **Evolution by habit (MAJOR 2.0.0, about 1 hour 20 minutes).** Details below, including the new
+   Plain form. Changes the save format.
 2. **Leaning tint (PATCH, about 15 minutes).** A small tint or accent on the pet that shifts
    towards the form it is heading for. No meter to read.
 3. **Gifts while away (MINOR, about 30 minutes).** Details below.
@@ -45,36 +46,40 @@ Times are my own work time, plus your playtesting.
 
 ## Evolution by habit
 
-Care mistakes no longer pick a form. What you do most during a stage does, and each teen and
+Care mistakes no longer pick a form. What you choose to do during a stage does, and each teen and
 adult form brings its own personality. The birth trait (random) stays for life; a form's
 personality replaces the previous form's, so a pet has at most two traits at once.
 
 | Stage | Form | Habit that earns it | Personality |
 |---|---|---|---|
-| Teen | Tonmarutchi | child stage: mostly meals and snacks | Calm: happiness falls 25% slower |
-| Teen | Hashitamatchi | child stage: mostly games and shop | Spirited: +1 coin per game win |
-| Adult | Kuchipatchi | teen stage: mostly meals | Gourmet: hunger falls 25% slower |
-| Adult | Tarakotchi | teen stage: mostly games | Sporty: +1 extra happy per win |
-| Adult | Ichigotchi | teen stage: mostly snacks | Cuddly: happiness falls 40% slower |
-| Adult | Mametchi | teen stage: mostly scolds | Disciplined: acts up half as often |
-| Adult | Nyorotchi | teen stage: mostly shop | Sturdy: gets sick half as often |
+| Teen | Tonmarutchi | child stage: snacks and shop buys (the default) | Calm: happiness falls 25% slower |
+| Teen | Hashitamatchi | child stage: games | Spirited: +1 coin per game win |
+| Adult | Tarakotchi | teen stage: games | Sporty: +1 extra happy per win |
+| Adult | Ichigotchi | teen stage: snacks | Cuddly: happiness falls 40% slower |
+| Adult | Mametchi | teen stage: scolds | Disciplined: acts up half as often |
+| Adult | Kuchipatchi | teen stage: food bought in the shop | Gourmet: hunger falls 25% slower |
+| Adult | Nyorotchi | teen stage: care items bought (vitamins, toys) | Sturdy: gets sick half as often |
+| Adult | Futsutchi (new, Plain) | teen stage: no habit reached its target | Easygoing: no perk, no downside |
 
-- **Hidden counters, reset each stage.** Meals, snacks, games, scolds and shop buys are counted
-  during a stage; the biggest one picks the next form. Players learn the paths by playing and by
-  reading the family tree, not a wiki.
-- **Only actions that helped count.** A meal counts when the pet was hungry, a snack or a game
-  win when it was missing happy hearts, a scold only on a real naughty call, a shop buy only when
-  the item had an effect. Spamming games gains nothing, and snacks and games compete to refill
-  happiness, which is the choice behind Ichigotchi or Tarakotchi.
-- **Ties** go to the first row. A pet with no habits gets the default form until a neutral
-  "Plain" form exists (see Later).
+- **Choices count, forced things do not.** Meals do not count at all: every pet has to be fed, so
+  they show no preference. Only actions that helped count: a snack or a game win when the pet was
+  missing happy hearts, a scold on a real naughty call, a shop buy that had an effect.
+- **Each habit has a target per stage** (first guesses: games 6, snacks 6, shop food 3, shop care
+  items 3, scolds 2; about an hour of normal play should reach one). Reach a target to unlock its
+  form; if several are reached, the one most over its target wins. Reach none and the pet becomes
+  Plain. Teens have no Plain: with no target reached they are Tonmarutchi.
+- **Counters are hidden and reset each stage.** Players learn the paths by playing and by reading
+  the family tree, not a wiki. Playing randomly gives different forms between pets.
+- **Snacks and games compete** to refill happiness, which is the choice behind Ichigotchi or
+  Tarakotchi. Playing endlessly still earns coins but does not push the form.
 - **Personality as a visible moment.** Each effect is small and clear, with a line of speech
   when it shows, so it feels earned and not like a hidden percentage.
 - **Showing the lean.** The panel says what the pet is heading for, the family tree shows each
   form's habit and personality, and the tint (step 2) shows it on the pet itself.
 - **Save impact.** New counters with defaults, so old saves load. Pets already past teen keep
-  their form and get its personality. The mistakes rule goes away for form choice only; mistakes
-  still affect health and the "Spotless" award.
+  their form and get its personality. Mistakes no longer pick a form but still affect health and
+  the "Spotless" award.
+- **New art:** Futsutchi needs a sprite (spritegen shapes, `cargo art`, 8x preview checked).
 
 Numbers are first guesses, like the rest of the balance.
 
@@ -110,7 +115,6 @@ the room, so a player learns them by seeing them. They are the main coin sink af
 
 ## Later
 
-- **A neutral "Plain" form** for balanced or empty habits. Needs a sprite.
 - **More teen forms** so the child stage can branch more than two ways (each needs sprites).
 - **Generations:** a new egg inherits a colour or accessory, and the family tree can show
   grandparents. Bigger than anything above, so only after the collection and badges exist.
