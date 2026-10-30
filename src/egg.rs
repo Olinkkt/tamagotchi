@@ -4,23 +4,28 @@
 //! The seed is the unix time the egg was laid (`clock - stage_age`), which the save already keeps.
 //! The age is `stage_age` plus the part of a second the game has counted since the last tick.
 
+use std::sync::OnceLock;
+
+use crate::cast::EGG_CRACK_AT;
+use crate::faces::EGG_CRACKS;
 use crate::pet::Pet;
 
 /// When the egg hatches. `Pet` hatches on its own at the same 30 seconds.
 pub const HATCH_MS: u64 = 30_000;
-/// When each crack stage (1 to 6) appears, in milliseconds.
-const CRACK_AT_MS: [u64; 6] = [20_000, 22_000, 24_000, 25_000, 26_000, 28_000];
+/// Each crack stage (1 to 6) appears on the first hard hit after its earliest time, or at its
+/// latest time if no hit came by then, in milliseconds.
+const CRACK_EARLIEST_MS: [u64; 6] = [20_000, 21_500, 23_000, 24_500, 26_000, 27_000];
+const CRACK_LATEST_MS: [u64; 6] = [22_000, 23_500, 25_000, 26_200, 27_200, 28_000];
 /// The egg freezes here, holding its breath, and goes white for the last `FLASH_MS`.
 const PAUSE_MS: u64 = 29_700;
 const FLASH_MS: u64 = 120;
 /// The one shake that is stronger than the rest.
 const STRONGEST_MS: (u64, u64) = (29_000, 29_450);
-/// Shell fragments fly off between these times, one every `CHIP_EVERY_MS`, each for `CHIP_LIFE_MS`.
-const CHIPS_MS: (u64, u64) = (26_000, PAUSE_MS);
-const CHIP_EVERY_MS: u64 = 450;
+/// A shell fragment flies off the crack at every hard hit from this time on, for `CHIP_LIFE_MS`.
+const CHIPS_FROM_MS: u64 = 24_000;
 const CHIP_LIFE_MS: u64 = 420;
-/// The row above which the shell lifts off when it starts to separate.
-pub const SPLIT_ROW: i32 = 12;
+/// How far below the top of the egg the crack runs, where the fragments start.
+const CHIP_START_DY: i32 = 13;
 
 /// How lively the egg is during one stretch of its life. Every range is a bound, not a value.
 struct Phase {
@@ -148,7 +153,8 @@ pub struct Pose {
     pub dy: i32,
     /// Degrees, clockwise, around the egg's feet.
     pub tilt: i32,
-    /// How many pixels the top of the shell is lifted off the bottom.
+    /// How many pixels the top half of the shell is lifted off the bottom half. Only once the
+    /// crack runs all the way across.
     pub lift: i32,
     /// Which cracks show: 0 (none) to 6.
     pub cracks: usize,
@@ -156,8 +162,41 @@ pub struct Pose {
     pub flash: bool,
 }
 
-pub fn crack_stage(age_ms: u64) -> usize {
-    CRACK_AT_MS.iter().filter(|&&at| age_ms >= at).count()
+/// A hard hit: a shake that is wide or leaves the ground. It is what the egg cracks on.
+fn is_hit(s: &Shake) -> bool {
+    s.dx.abs() >= 3 || s.jump > 0
+}
+
+/// How many cracks show (0 to 6): one more on each hard hit once its earliest time has come, and
+/// never later than its latest time.
+pub fn crack_stage(seed: u64, age_ms: u64) -> usize {
+    let forced = |ms| CRACK_LATEST_MS.iter().filter(|&&at| ms >= at).count();
+    let mut stage = 0;
+    for s in shakes(seed, age_ms).iter().filter(|s| s.at <= age_ms && is_hit(s)) {
+        stage = stage.max(forced(s.at));
+        if stage < 6 && s.at >= CRACK_EARLIEST_MS[stage] {
+            stage += 1;
+        }
+    }
+    stage.max(forced(age_ms))
+}
+
+/// For each column of the egg sprite from `EGG_CRACK_AT.0`, the row the shell splits at: the
+/// zigzag of the last crack grid, so the cracks and the split are one drawing.
+fn split_line() -> &'static [i32] {
+    static LINE: OnceLock<Vec<i32>> = OnceLock::new();
+    LINE.get_or_init(|| {
+        let grid = &EGG_CRACKS[5];
+        (0..grid[0].len())
+            .map(|x| EGG_CRACK_AT.1 + grid.iter().position(|row| row.as_bytes()[x] == b'k').expect("a crack in every column") as i32)
+            .collect()
+    })
+}
+
+/// The first row of the egg's bottom half in column `x`; the top half is everything above it.
+pub fn split_row(x: i32) -> i32 {
+    let line = split_line();
+    line[(x - EGG_CRACK_AT.0).clamp(0, line.len() as i32 - 1) as usize]
 }
 
 /// The strongest shake: three hard ones in a row, the way depending only on the seed.
@@ -170,8 +209,8 @@ fn strongest(seed: u64, age_ms: u64) -> (i32, i32, i32) {
 }
 
 pub fn pose(seed: u64, age_ms: u64) -> Pose {
-    let cracks = crack_stage(age_ms);
-    let resting = Pose { cracks, lift: if age_ms >= 28_000 { 1 } else { 0 }, ..Pose::default() };
+    let cracks = crack_stage(seed, age_ms);
+    let resting = Pose { cracks, lift: i32::from(cracks == 6), ..Pose::default() };
     if age_ms >= PAUSE_MS {
         return Pose { flash: age_ms + FLASH_MS >= HATCH_MS, ..resting };
     }
@@ -182,11 +221,7 @@ pub fn pose(seed: u64, age_ms: u64) -> Pose {
         active.map_or((0, 0, 0), |s| shape(&s, (age_ms - s.at) as f32 / s.len as f32))
     };
     let moving = dx != 0 || tilt != 0 || dy != 0;
-    let lift = match age_ms {
-        a if a >= 26_000 && moving => 2,
-        a if a >= 24_000 && moving => 1,
-        _ => resting.lift,
-    };
+    let lift = if cracks == 6 && moving { 2 } else { resting.lift };
     Pose { dx, dy, tilt, lift, ..resting }
 }
 
@@ -194,22 +229,24 @@ pub fn pose(seed: u64, age_ms: u64) -> Pose {
 pub struct Chip {
     pub dx: i32,
     pub dy: i32,
+    /// Part of the painted pattern rather than plain shell.
+    pub spotted: bool,
 }
 
 pub fn chips(seed: u64, age_ms: u64) -> Vec<Chip> {
-    let (from, to) = CHIPS_MS;
-    if !(from..to).contains(&age_ms) {
+    if !(CHIPS_FROM_MS..PAUSE_MS).contains(&age_ms) {
         return Vec::new();
     }
-    let last = (age_ms - from) / CHIP_EVERY_MS;
-    (0..=last)
-        .filter_map(|i| {
-            let born = from + i * CHIP_EVERY_MS;
-            let mut rng = Rng(seed ^ (i + 1).wrapping_mul(0xD1B5_4A32_D192_ED03));
-            let (dir, speed) = (rng.sign(), rng.px((6, 12)));
-            let u = age_ms.checked_sub(born).filter(|&a| a < CHIP_LIFE_MS)? as f32 / CHIP_LIFE_MS as f32;
+    shakes(seed, age_ms)
+        .iter()
+        .filter(|s| is_hit(s) && s.at >= CHIPS_FROM_MS)
+        .filter_map(|s| {
+            let mut rng = Rng(seed ^ s.at.wrapping_mul(0xD1B5_4A32_D192_ED03));
+            let (dir, speed, from) = (rng.sign(), rng.px((6, 12)), rng.px((0, 12)) - 6);
+            let u = age_ms.checked_sub(s.at).filter(|&a| a < CHIP_LIFE_MS)? as f32 / CHIP_LIFE_MS as f32;
             // Out sideways at an even speed, up and then down under gravity.
-            Some(Chip { dx: dir * (u * speed as f32) as i32, dy: (28.0 * u * u - 14.0 * u) as i32 })
+            let (dx, dy) = ((u * speed as f32) as i32, (28.0 * u * u - 14.0 * u) as i32);
+            Some(Chip { dx: from + dir * dx, dy: CHIP_START_DY + dy, spotted: rng.percent(30) })
         })
         .collect()
 }
@@ -302,26 +339,56 @@ mod tests {
     }
 
     #[test]
-    fn cracks_come_on_schedule() {
-        let stages: Vec<usize> = [0, 19_999, 20_000, 22_000, 24_000, 25_000, 26_000, 27_999, 28_000, 29_999].map(crack_stage).to_vec();
-        assert_eq!(stages, [0, 0, 1, 2, 3, 4, 5, 5, 6, 6]);
+    fn cracks_never_come_before_20_s_or_later_than_28_s() {
+        for seed in 0..40 {
+            assert_eq!(crack_stage(seed, 19_999), 0, "seed {seed}");
+            assert!((20_000..HATCH_MS).step_by(10).all(|ms| crack_stage(seed, ms) >= CRACK_LATEST_MS.iter().filter(|&&at| ms >= at).count()));
+            assert_eq!(crack_stage(seed, 28_000), 6, "seed {seed}");
+            let stages: Vec<usize> = (0..HATCH_MS).step_by(10).map(|ms| crack_stage(seed, ms)).collect();
+            assert!(stages.windows(2).all(|w| w[0] <= w[1] && w[1] <= w[0] + 1), "seed {seed}: one at a time, never undone");
+        }
     }
 
     #[test]
-    fn the_shell_lifts_apart_only_once_it_is_cracking() {
+    fn a_crack_appears_on_a_hard_hit() {
+        let mut on_a_hit = 0;
         for seed in 0..40 {
-            assert!(trace(seed, 0, 24_000).iter().all(|p| p.lift == 0));
-            assert!(trace(seed, 24_000, 26_000).iter().all(|p| p.lift <= 1));
+            let hits: Vec<u64> = shakes(seed, PAUSE_MS).iter().filter(|s| is_hit(s)).map(|s| s.at).collect();
+            for ms in 20_000..CRACK_LATEST_MS[0] {
+                if crack_stage(seed, ms) == 1 && crack_stage(seed, ms - 1) == 0 {
+                    assert!(hits.contains(&ms), "seed {seed}: the first crack at {ms} is not on a hit");
+                    on_a_hit += 1;
+                }
+            }
+        }
+        assert!(on_a_hit > 10, "most eggs crack on a hit before they are forced to: {on_a_hit}");
+    }
+
+    #[test]
+    fn the_split_line_is_the_last_crack_across_the_whole_shell() {
+        let line = split_line();
+        assert_eq!(line.len(), EGG_CRACKS[5][0].len());
+        assert!(line.windows(2).all(|w| (w[0] - w[1]).abs() <= 1), "no jumps in the line: {line:?}");
+        assert!(line.iter().any(|&r| r != line[0]), "it is a zigzag, not a straight row");
+        assert_eq!(split_row(-50), line[0]);
+        assert_eq!(split_row(500), line[line.len() - 1]);
+    }
+
+    #[test]
+    fn the_shell_lifts_apart_only_once_the_crack_runs_all_the_way_across() {
+        for seed in 0..40 {
+            assert!(trace(seed, 0, HATCH_MS).iter().all(|p| (p.lift > 0) == (p.cracks == 6)), "seed {seed}");
             assert!(trace(seed, 28_000, HATCH_MS).iter().all(|p| p.lift >= 1));
+            assert!(trace(seed, PAUSE_MS, HATCH_MS).iter().all(|p| p.lift == 1), "a 1 px gap at the end");
         }
     }
 
     #[test]
     fn fragments_fly_late_and_only_briefly() {
-        assert!(chips(5, 25_999).is_empty());
-        assert!((26_000..PAUSE_MS).step_by(50).any(|ms| !chips(5, ms).is_empty()));
+        assert!(chips(5, CHIPS_FROM_MS - 1).is_empty());
+        assert!((CHIPS_FROM_MS..PAUSE_MS).step_by(50).any(|ms| !chips(5, ms).is_empty()));
         assert!(chips(5, HATCH_MS).is_empty(), "none left once the egg has broken");
-        assert!((26_000..PAUSE_MS).step_by(50).all(|ms| chips(5, ms).len() <= 2));
+        assert!((CHIPS_FROM_MS..PAUSE_MS).step_by(50).all(|ms| chips(5, ms).len() <= 4));
     }
 
     #[test]
@@ -333,6 +400,6 @@ mod tests {
         let again = egg.clone();
         assert_eq!(seed(&egg), 1000);
         assert_eq!(pose(seed(&egg), 25_300), pose(seed(&again), 25_300));
-        assert_eq!(pose(seed(&egg), 25_300).cracks, 4);
+        assert_eq!(pose(seed(&egg), 25_300).cracks, crack_stage(1000, 25_300));
     }
 }

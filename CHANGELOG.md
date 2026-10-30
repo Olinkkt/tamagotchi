@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.3
+
+- The egg's crack is now one zigzag across its middle that grows outwards from the centre, a bit
+  more on each hard shake. When it runs all the way across, the top half lifts and rocks while the
+  bottom half stays put.
+- The egg ends as two halves with a one-pixel gap, exactly where the burst starts. Flying bits of
+  shell are shell-coloured instead of white squares and come off the crack.
+
 ## 1.4.2
 
 - Internal: the changelog writing rules now live in `CLAUDE.md`.

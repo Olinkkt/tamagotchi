@@ -75,15 +75,26 @@ impl Sprite {
         out
     }
 
-    /// Everything above row `split` raised `lift` pixels, leaving a gap.
-    pub fn lifted(&self, split: i32, lift: i32) -> Sprite {
+    /// Cut along a ragged line into the pixels above it and the rest, both the size of the whole.
+    /// `cut(x)` is the first row of the lower part in column `x`.
+    pub fn halves(&self, cut: impl Fn(i32) -> i32) -> (Sprite, Sprite) {
+        let mut top = Sprite { w: self.w, h: self.h, px: vec![None; self.px.len()] };
+        let mut bottom = top.clone();
+        for y in 0..self.h {
+            for x in 0..self.w {
+                let i = (y * self.w + x) as usize;
+                if y < cut(x) { top.px[i] = self.px[i] } else { bottom.px[i] = self.px[i] }
+            }
+        }
+        (top, bottom)
+    }
+
+    /// Moved up `by` pixels (down if negative), keeping the size.
+    pub fn raised(&self, by: i32) -> Sprite {
         let mut out = Sprite { w: self.w, h: self.h, px: vec![None; self.px.len()] };
         for y in 0..self.h {
-            let to = if y < split { y - lift } else { y };
             for x in 0..self.w {
-                if to >= 0 {
-                    out.px[(to * self.w + x) as usize] = self.get(x, y);
-                }
+                out.px[(y * self.w + x) as usize] = self.get(x, y + by);
             }
         }
         out

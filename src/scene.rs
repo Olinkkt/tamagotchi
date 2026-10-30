@@ -222,15 +222,27 @@ fn pet_sprite(m: &Moment, c: &Character) -> Sprite {
     assemble(p, c, &overlay, m.beat())
 }
 
-/// The egg with the cracks it has so far, its shell lifting apart and the whole thing tilted.
+/// The egg with the cracks it has so far. Once the crack runs all the way across it splits along
+/// it: the bowl stays planted and the cap lifts and rocks. Before that the whole egg tilts.
 fn egg_sprite(m: &Moment, c: &Character) -> Sprite {
     let pose = m.egg_pose();
-    let mut sprite = assemble(m.pet, c, &cracks_at(pose.cracks), m.beat());
-    if pose.lift > 0 {
-        sprite = sprite.lifted(egg::SPLIT_ROW, pose.lift);
+    let sprite = assemble(m.pet, c, &cracks_at(pose.cracks), m.beat());
+    let middle = c.size as f32 / 2.0;
+    if pose.lift == 0 {
+        // Tilting pivots on the feet, so the egg never looks as if it has left the ground.
+        return sprite.tilted(pose.tilt, middle, art::body(c).bottom() as f32);
     }
-    // Tilting pivots on the feet, so the egg never looks as if it has left the ground.
-    sprite.tilted(pose.tilt, c.size as f32 / 2.0, art::body(c).bottom() as f32)
+    let (mut cap, mut bowl) = sprite.halves(egg::split_row);
+    // The cap's cut edge gets an outline of its own, like the crack gives the bowl.
+    for x in 0..cap.w {
+        let y = egg::split_row(x) - 1;
+        if cap.get(x, y).is_some() {
+            cap.put(x, y, Pal::Ink);
+        }
+    }
+    let hinge = egg::split_row(c.size as i32 / 2) as f32;
+    bowl.over(&cap.raised(pose.lift).tilted(pose.tilt, middle, hinge));
+    bowl
 }
 
 /// The cracks of crack stage `n` (1 to 6); none for a whole egg.
@@ -246,7 +258,7 @@ fn cracks_at(n: usize) -> Vec<(i32, i32, Pal)> {
 pub fn posed(p: &Pet, e: Expr) -> Sprite {
     let c = character(p);
     let face: Vec<(i32, i32, Pal)> = match c.face {
-        None if p.stage == Stage::Egg => cracks_at(egg::crack_stage(p.stage_age * 1000)),
+        None if p.stage == Stage::Egg => cracks_at(egg::crack_stage(egg::seed(p), p.stage_age * 1000)),
         Some(spot) => faces::pixels(faces::grid(spot.style, e)).map(|(x, y, col)| (spot.x + x, spot.y + y, col)).collect(),
         None => Vec::new(),
     };
@@ -293,19 +305,22 @@ fn progress(t: f32, from: f32, len: f32) -> f32 {
 }
 
 /// Where the shell's bowl and cap are (top-left corners), `t` seconds after the egg burst: at
-/// first on top of each other where the egg was, then the bowl hops left and the cap is thrown
-/// right, landing in the places they stay.
+/// first exactly where the two halves of the egg were, then the bowl hops left and the cap is
+/// thrown right, landing in the places they stay.
 fn shell_pieces(t: f32, s: Size) -> [(i32, i32); 2] {
     let cells = art::cells(&cast::SHELL);
     let floor = s.floor() + 2;
     let (bowl_y, cap_y) = ((floor - cells[0].bottom()) as f32, (floor - cells[1].bottom()) as f32);
     let (start_x, bowl_x, cap_x) = ((s.centre() - 12) as f32, (s.centre() - 46) as f32, (s.centre() + 22) as f32);
+    // The egg stands on the floor and its cap is lifted one pixel (see `egg::pose`).
+    let egg = art::body(&cast::EGG);
+    let bowl_start = (s.floor() - cells[0].bottom()) as f32;
+    let cap_start = (s.floor() - egg.bottom() + egg.top() - 1 - cells[1].top()) as f32;
     let lerp = |a: f32, b: f32, u: f32| a + (b - a) * u;
     let ease = |u: f32| 1.0 - (1.0 - u) * (1.0 - u);
     let (ub, uc) = (progress(t, 0.0, HATCH_BOWL), progress(t, 0.0, HATCH_CAP));
-    let bowl = (lerp(start_x, bowl_x, ease(ub)), bowl_y - BOWL_HOP_PX * arc(ub));
-    // The cap starts perched on the bowl.
-    let cap = (lerp(start_x, cap_x, ease(uc)), lerp(bowl_y - 12.0, cap_y, uc) - CAP_ARC_PX * arc(uc));
+    let bowl = (lerp(start_x, bowl_x, ease(ub)), lerp(bowl_start, bowl_y, ease(ub)) - BOWL_HOP_PX * arc(ub));
+    let cap = (lerp(start_x, cap_x, ease(uc)), lerp(cap_start, cap_y, uc) - CAP_ARC_PX * arc(uc));
     [(bowl.0.round() as i32, bowl.1.round() as i32), (cap.0.round() as i32, cap.1.round() as i32)]
 }
 
@@ -325,7 +340,9 @@ fn draw_shell(f: &mut Frame, t: f32, s: Size) {
 fn draw_chips(f: &mut Frame, m: &Moment, at: Place) {
     let (x, y) = (at.x + at.size / 2, at.head);
     for chip in egg::chips(egg::seed(m.pet), m.egg_ms()) {
-        f.rect(x + chip.dx, y + chip.dy, 2, 2, Pal::White);
+        // Shell-coloured, with a shaded underside.
+        f.rect(x + chip.dx, y + chip.dy, 2, 1, if chip.spotted { Pal::Teal } else { Pal::White });
+        f.rect(x + chip.dx, y + chip.dy + 1, 2, 1, Pal::Mist);
     }
 }
 
@@ -598,11 +615,75 @@ mod tests {
 
     #[test]
     fn the_cracks_get_bigger_each_stage() {
-        let cracks = |age: u64| cracks_at(egg::crack_stage(age * 1000));
-        let counts: Vec<usize> = [3, 20, 22, 24, 25, 26, 28].iter().map(|&a| cracks(a).len()).collect();
+        let counts: Vec<usize> = (0..=6).map(|n| cracks_at(n).len()).collect();
         assert_eq!(counts[0], 0);
+        assert_eq!(counts[1], 3, "the first crack is three pixels");
         assert!(counts.windows(2).all(|w| w[0] < w[1]), "{counts:?}");
-        assert!(cracks(28).iter().all(|c| c.2 == Pal::Ink || c.2 == Pal::Night), "ink cracks only, no glow");
+        assert!(cracks_at(6).iter().all(|c| c.2 == Pal::Ink || c.2 == Pal::Night), "ink cracks only, no glow");
+    }
+
+    #[test]
+    fn the_cracks_grow_outwards_from_the_middle() {
+        let xs = |n: usize| {
+            let x: Vec<i32> = cracks_at(n).iter().map(|c| c.0).collect();
+            (*x.iter().min().unwrap(), *x.iter().max().unwrap())
+        };
+        let middle = cast::EGG_CRACK_AT.0 + 9;
+        for n in 1..=6 {
+            let (lo, hi) = xs(n);
+            assert!(lo <= middle && hi >= middle, "stage {n} covers the middle");
+            if n > 1 {
+                assert!(xs(n - 1).0 >= lo && xs(n - 1).1 <= hi, "stage {n} only adds");
+            }
+        }
+        assert_eq!(xs(6).1 - xs(6).0 + 1, 18, "the last one runs the whole width");
+    }
+
+    /// The rows with something in them in column `x`.
+    fn column(sp: &Sprite, x: i32) -> Vec<i32> {
+        (0..sp.h).filter(|&y| sp.get(x, y).is_some()).collect()
+    }
+
+    fn pixels_of(sp: &Sprite) -> Vec<Option<Pal>> {
+        (0..sp.h).flat_map(|y| (0..sp.w).map(move |x| sp.get(x, y))).collect()
+    }
+
+    fn egg_frame(p: &Pet, sub_ms: u64) -> Sprite {
+        egg_sprite(&Moment { pet: p, fx: None, ms: 0, shell: None, sub_ms }, &character(p))
+    }
+
+    #[test]
+    fn the_split_egg_ends_exactly_where_the_burst_starts() {
+        let mut p = pet(Stage::Egg);
+        p.stage_age = 29;
+        let m = Moment { pet: &p, fx: None, ms: 0, shell: None, sub_ms: 800 };
+        let (egg, s) = (egg_frame(&p, 800), Size { w: W, h: H });
+        let at = place(&m, &character(&p), s);
+        let ([top, bottom], [bowl, cap]) = ({ let (t, b) = egg.halves(egg::split_row); [t, b] }, shell_pieces(0.0, s));
+        let cells = art::cells(&cast::SHELL);
+        // The bowl stands where the bottom half did, the cap where the lifted top half did.
+        assert_eq!(at.y + bottom.bottom(), bowl.1 + cells[0].bottom(), "bowl feet");
+        assert_eq!(at.y + top.top(), cap.1 + cells[1].top(), "cap top");
+        let left = |sp: &Sprite| (0..sp.w).find(|&x| !column(sp, x).is_empty()).unwrap();
+        assert_eq!(at.x + left(&bottom), bowl.0 + left(&cells[0]), "bowl left");
+        assert_eq!(at.x + left(&top), cap.0 + left(&cells[1]), "cap left");
+        // A thin gap along the whole zigzag, wherever the two halves meet.
+        for x in 0..egg.w {
+            let (above, below) = (column(&top, x), column(&bottom, x));
+            if let (Some(a), Some(b)) = (above.last(), below.first()) {
+                assert!((2..=3).contains(&(b - a)), "column {x}: gap {} px", b - a - 1);
+            }
+        }
+    }
+
+    #[test]
+    fn the_cap_rocks_but_the_bowl_stays_planted() {
+        let mut p = pet(Stage::Egg);
+        p.stage_age = 28;
+        let bowls: Vec<Vec<Option<Pal>>> = (0..1000).step_by(25).map(|ms| pixels_of(&egg_frame(&p, ms).halves(egg::split_row).1)).collect();
+        assert!(bowls.windows(2).all(|w| w[0] == w[1]), "the bowl never moves or tilts");
+        let caps: Vec<Vec<Option<Pal>>> = (0..1000).step_by(25).map(|ms| pixels_of(&egg_frame(&p, ms).halves(egg::split_row).0)).collect();
+        assert!(caps.windows(2).any(|w| w[0] != w[1]), "but the cap does");
     }
 
     #[test]
