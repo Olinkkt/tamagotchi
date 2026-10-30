@@ -18,7 +18,6 @@ use crate::scene;
 const CARD: (i32, i32, i32, i32) = (4, 4, 232, 120);
 const TITLE_Y: f32 = 12.0;
 const BODY_Y: i32 = 22;
-const SHOP_ROW: i32 = 24;
 const GAME_CARD: (i32, i32) = (14, 34);
 const GAME_CARD_H: i32 = 70;
 const GAME_CARD_GAP: i32 = 6;
@@ -61,24 +60,24 @@ fn item_icon(item: pet::Item) -> Grid {
     }
 }
 
-fn shop_row_y(i: usize) -> i32 {
-    BODY_Y + 2 + i as i32 * SHOP_ROW
+/// The shop is a row of cards, laid out like the game picker's.
+const SHOP_Y: i32 = 28;
+const SHOP_H: i32 = 88;
+
+fn shop_card(i: usize) -> (i32, i32, i32, i32) {
+    (game_card_x(i as i32), SHOP_Y, game_card_w(), SHOP_H)
 }
 
 fn draw_shop(f: &mut Frame, app: &App) {
     f.grid(icons::COIN, ESC.0 - 10, ESC.1 + 3);
     for (i, item) in pet::Item::ALL.iter().enumerate() {
-        let y = shop_row_y(i);
+        let (x, y, w, h) = shop_card(i);
         let can = app.profile.coins >= item.price();
-        f.boxed(CARD.0 + 4, y, CARD.2 - 8, SHOP_ROW - 3, if can { Pal::Dusk } else { Pal::Ink }, Pal::Night);
-        keycap(f, CARD.0 + 8, y + 6, can);
-        let mut icon = Frame::new(12, 12, if can { Pal::Dusk } else { Pal::Ink });
-        icon.grid(item_icon(*item), 0, 0);
-        if !can {
-            icon.tint(0, 0, 12, 12, |p| if p == Pal::Ink { p } else { p.dark() });
-        }
-        f.frame(&icon, CARD.0 + 22, y + 4);
-        f.grid(icons::COIN, CARD.0 + CARD.2 - 14, y + 7);
+        f.boxed(x, y, w, h, if can { Pal::Dusk } else { Pal::Ink }, if can { Pal::Slate } else { Pal::Dusk });
+        keycap(f, x + 4, y + 4, can);
+        f.rect(x + 3, y + 15, w - 6, 26, if can { Pal::Night } else { Pal::Ink });
+        f.grid_scaled(item_icon(*item), x + (w - 24) / 2, y + 16, 2, |p| if can || p == Pal::Ink { p } else { p.dark() });
+        f.grid(icons::COIN, x + w / 2 - 9, y + h - 12);
     }
 }
 
@@ -88,13 +87,16 @@ fn shop_labels(app: &App) -> Vec<Label> {
         right(app.profile.coins.to_string(), (ESC.0 - 12) as f32, ESC.1 as f32 + 6.5, Pal::Yellow),
     ];
     for (i, item) in pet::Item::ALL.iter().enumerate() {
-        let y = shop_row_y(i) as f32;
+        let (x, y, w, h) = shop_card(i);
+        let (x, y, mid) = (x as f32, y as f32, (x + w / 2) as f32);
         let can = app.profile.coins >= item.price();
         let (name, blurb, price) = if can { (Pal::White, Pal::Mist, Pal::Yellow) } else { (Pal::Slate, Pal::Dusk, Pal::Slate) };
-        v.push(centred((i + 1).to_string(), CARD.0 as f32 + 12.5, y + 10.5, Pal::White));
-        v.push(label(item.name(), CARD.0 as f32 + 40.0, y + 6.5, name));
-        v.push(label(item.blurb(), CARD.0 as f32 + 40.0, y + 14.5, blurb));
-        v.push(right(item.price().to_string(), (CARD.0 + CARD.2 - 16) as f32, y + 10.5, price));
+        v.push(centred((i + 1).to_string(), x + 8.5, y + 8.5, Pal::White));
+        v.push(centred(item.name().to_uppercase(), mid, y + 47.0, name));
+        for (n, line) in item.blurb().iter().enumerate() {
+            v.push(centred(*line, mid, y + 56.0 + n as f32 * 8.0, blurb));
+        }
+        v.push(label(item.price().to_string(), mid - 1.0, y + h as f32 - 8.5, price));
     }
     v
 }
@@ -295,7 +297,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
 /// The line under a card.
 pub fn hint(app: &App) -> Option<(String, Pal)> {
     Some(match &app.mode {
-        Mode::Chooser => ("PRESS 1 OR 2, OR CLICK A GAME".into(), Pal::Yellow),
+        Mode::Chooser => ("PRESS 1-4, OR CLICK A GAME".into(), Pal::Yellow),
         Mode::Shop => ("PRESS 1-4 OR CLICK TO BUY".into(), Pal::Yellow),
         Mode::Awards => match profile::ACHIEVEMENTS.iter().find(|a| !app.profile.has(a.id)) {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
@@ -336,7 +338,7 @@ pub fn click(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
         return Some(Key::Esc);
     }
     match app.mode {
-        Mode::Shop => (0..4).find(|&i| (shop_row_y(i)..shop_row_y(i) + SHOP_ROW - 3).contains(&y) && (CARD.0..CARD.0 + CARD.2).contains(&x)).map(|i| Key::Char((b'1' + i as u8) as char)),
+        Mode::Shop => (0..4).find(|&i| inside(shop_card(i))).map(|i| Key::Char((b'1' + i as u8) as char)),
         Mode::Chooser => (0..crate::games::CHOICES.len() as i32).find(|&i| (game_card_x(i)..game_card_x(i) + game_card_w()).contains(&x) && (GAME_CARD.1..GAME_CARD.1 + GAME_CARD_H).contains(&y)).map(|i| Key::Char((b'1' + i as u8) as char)),
         _ => None,
     }
@@ -360,7 +362,7 @@ pub fn hover_rect(app: &App, lay: Layout, x: f32, y: f32) -> Option<(i32, i32, i
         return Some(moved(ESC));
     }
     match app.mode {
-        Mode::Shop => (0..4).find(|&i| in_rect((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3), x, y)).map(|i| moved((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3))),
+        Mode::Shop => (0..4).find(|&i| in_rect(shop_card(i), x, y)).map(|i| moved(shop_card(i))),
         Mode::Chooser => (0..crate::games::CHOICES.len() as i32).find(|&i| in_rect((game_card_x(i), GAME_CARD.1, game_card_w(), GAME_CARD_H), x, y)).map(|i| moved((game_card_x(i), GAME_CARD.1, game_card_w(), GAME_CARD_H))),
         _ => None,
     }
@@ -417,11 +419,11 @@ mod tests {
         app.profile.coins = 7;
         app.mode = Mode::Shop;
         let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
-        for want in ["SHOP", "7", "Fancy meal", "Vitamins", "12"] {
+        for want in ["SHOP", "7", "FANCY MEAL", "VITAMINS", "12", "no sickness"] {
             assert!(text.iter().any(|t| t == want), "shop is missing {want}: {text:?}");
         }
-        assert_eq!(click(&app, Layout::MIN, 100.0, shop_row_y(2) as f32 + 5.0 + Layout::MIN.centred_card().1 as f32), Some(Key::Char('3')));
-        assert_eq!(click(&app, Layout::MIN, 100.0, shop_row_y(0) as f32 - 3.0 + Layout::MIN.centred_card().1 as f32), None);
+        assert_eq!(click(&app, Layout::MIN, (shop_card(2).0 + 5) as f32 + Layout::MIN.centred_card().0 as f32, (shop_card(2).1 + 5) as f32 + Layout::MIN.centred_card().1 as f32), Some(Key::Char('3')));
+        assert_eq!(click(&app, Layout::MIN, (shop_card(0).0 + 5) as f32 + Layout::MIN.centred_card().0 as f32, SHOP_Y as f32 - 3.0 + Layout::MIN.centred_card().1 as f32), None);
     }
 
     #[test]
@@ -484,7 +486,7 @@ mod tests {
         assert_eq!((ox, oy), (80, 38));
         let title = labels(&app, lay).into_iter().find(|l| l.text == "SHOP").unwrap();
         assert_eq!((title.x, title.y), (CARD.0 as f32 + 6.0 + 80.0, TITLE_Y + 38.0));
-        assert_eq!(click(&app, lay, 180.0, shop_row_y(1) as f32 + 5.0 + 38.0), Some(Key::Char('2')));
+        assert_eq!(click(&app, lay, (shop_card(1).0 + 5 + 80) as f32, (SHOP_Y + 5 + 38) as f32), Some(Key::Char('2')));
     }
 
     #[test]
@@ -495,7 +497,7 @@ mod tests {
         let (ox, oy) = lay.centred_card();
         assert_eq!(click(&app, lay, (ox + ESC.0 + 3) as f32, (oy + ESC.1 + 3) as f32), Some(Key::Esc));
         assert_eq!(click(&app, lay, 1.0, 1.0), Some(Key::Esc));
-        assert_eq!(click(&app, lay, 100.0, shop_row_y(0) as f32 - 3.0 + oy as f32), None);
+        assert_eq!(click(&app, lay, (shop_card(0).0 + 5 + ox) as f32, SHOP_Y as f32 - 3.0 + oy as f32), None);
         app.mode = Mode::Normal;
         assert_eq!(click(&app, lay, 1.0, 1.0), None);
     }

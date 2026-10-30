@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.17.1
+
+- The shop is now a row of four cards like the game picker: a big picture of each item, its name,
+  what it does on two short lines, and the price. Cards you cannot afford go dark.
+- The game picker hint now says "press 1-4" instead of "1 or 2".
+
 ## 1.17.0
 
 - The light is gone: no `l` key, no light button, no `tama light`, and no care mistake for leaving it

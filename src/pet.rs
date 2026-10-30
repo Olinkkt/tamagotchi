@@ -90,12 +90,13 @@ impl Item {
         }
     }
 
-    pub fn blurb(self) -> &'static str {
+    /// What it does, in two short lines for the shop card.
+    pub fn blurb(self) -> [&'static str; 2] {
         match self {
-            Item::FancyMeal => "+2 hunger, a bit heavy",
-            Item::Toy => "+2 happy, burns weight",
-            Item::Salad => "+1 hunger, lighter",
-            Item::Vitamins => "no sickness for 3 hours",
+            Item::FancyMeal => ["+2 hunger", "a bit heavy"],
+            Item::Toy => ["+2 happy", "burns weight"],
+            Item::Salad => ["+1 hunger", "lighter"],
+            Item::Vitamins => ["no sickness", "for 3 hours"],
         }
     }
 }
