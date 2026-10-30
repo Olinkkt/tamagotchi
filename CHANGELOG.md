@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.2
+
+- In Shells the pet's feet no longer poke out while its cup hops over another one or bobs
+  waiting for your pick.
+
 ## 1.15.1
 
 - In Shells all three cups are now the same colour, so you have to follow the pet instead of a colour.

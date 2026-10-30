@@ -169,12 +169,13 @@ impl Shells {
             (Phase::Reveal(..), Some(false)) => Expr::Sad,
             _ => Expr::Idle,
         };
-        let (hx, _) = self.cup_pose(self.hides);
-        draw_pet(&mut f, &self.look, mood, hx, CUP_TOP + CUP_H);
+        // A cup you have not picked yet bobs a little when it is your turn.
+        let wait = if matches!(self.phase, Phase::Pick) { (t % 2) as i32 } else { 0 };
+        // The pet moves with its cup, hops and bobs included, so its feet never show.
+        let (hx, hhop) = self.cup_pose(self.hides);
+        draw_pet(&mut f, &self.look, mood, hx, CUP_TOP + CUP_H + hhop - wait);
         for cup in 0..3 {
             let (x, hop) = self.cup_pose(cup);
-            // A cup you have not picked yet bobs a little when it is your turn.
-            let wait = if matches!(self.phase, Phase::Pick) { (t % 2) as i32 } else { 0 };
             let lift = if self.lifted(cup) { LIFT } else { 0 };
             draw_cup(&mut f, x, CUP_TOP + hop - lift - wait);
         }
