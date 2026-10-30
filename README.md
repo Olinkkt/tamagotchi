@@ -49,6 +49,9 @@ This puts `tama` in `~/.cargo/bin`, which must be on your `PATH`. After you chan
 `tama --update` rebuilds from the same source folder and replaces the installed copy.
 (There is no download-based updater yet.)
 
+On Linux, run `tama --install-desktop` once to add tama to your app menu with an icon, so you can
+start it without a terminal. Run it again after moving the `tama` binary.
+
 ## Playing
 
 Run `tama` to open the window. One pet at a time; when it dies you can hatch a new egg with `n`.

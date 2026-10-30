@@ -23,6 +23,7 @@ fn conf() -> Conf {
         window_width: Layout::MIN.w * START_SCALE,
         window_height: Layout::MIN.h * START_SCALE,
         window_resizable: true,
+        platform: macroquad::miniquad::conf::Platform { linux_wm_class: "tama", ..Default::default() },
         ..Default::default()
     }
 }

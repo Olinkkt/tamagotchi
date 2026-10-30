@@ -368,10 +368,42 @@ fn update() -> i32 {
     }
 }
 
+/// `--install-desktop`: add tama to the Linux app menu (a launcher entry and its icon).
+fn install_desktop() -> i32 {
+    let (Some(data), Ok(exe)) = (dirs::data_dir(), std::env::current_exe()) else {
+        eprintln!("Could not find your data folder or this program's path.");
+        return 1;
+    };
+    let icon = data.join("icons/hicolor/256x256/apps/tama.png");
+    let entry = data.join("applications/tama.desktop");
+    let text = format!(
+        "[Desktop Entry]\nType=Application\nName=tama\nComment=A pixel-art tamagotchi\nExec={}\nIcon=tama\nCategories=Game;\nStartupWMClass=tama\nTerminal=false\n",
+        exe.display()
+    );
+    let write = |path: &std::path::Path, bytes: &[u8]| -> std::io::Result<()> {
+        std::fs::create_dir_all(path.parent().unwrap_or(path))?;
+        std::fs::write(path, bytes)
+    };
+    let result = write(&icon, include_bytes!("../assets/icon.png")).and_then(|()| write(&entry, text.as_bytes()));
+    match result {
+        Ok(()) => {
+            println!("Added tama to your app menu ({}). Search for \"tama\" in your launcher.", entry.display());
+            0
+        }
+        Err(e) => {
+            eprintln!("Could not write the launcher files: {e}");
+            1
+        }
+    }
+}
+
 /// Handle a `--flag` that prints something and exits. Returns the exit code when handled.
 pub fn flags(args: &[String]) -> Option<i32> {
     if args.iter().any(|a| a == "--update") {
         return Some(update());
+    }
+    if args.iter().any(|a| a == "--install-desktop") {
+        return Some(install_desktop());
     }
     if let Some(i) = args.iter().position(|a| a == "--animate") {
         match args.get(i + 1).map(String::as_str) {
@@ -394,7 +426,7 @@ pub fn flags(args: &[String]) -> Option<i32> {
         return Some(0);
     }
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("tama - a pixel-art tamagotchi\n\n  tama            play (opens the window)\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|toilet|medicine|scold   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --gallery  write tama-gallery.png with every character and expression");
+        println!("tama - a pixel-art tamagotchi\n\n  tama            play (opens the window)\n  tama status     one line for a status bar (tmux: set -g status-right '#(tama status)'); --waybar prints JSON with a short text and a hover tooltip\n  tama feed|snack|toilet|medicine|scold   care for the pet without opening the game\n  tama hook zsh   shell snippet: git commits feed the pet, failed commands make it sad (eval \"$(tama hook zsh)\")\n  tama watch      desktop notifications when the pet needs you (run it in the background; `tama watch --test` sends a test)\n  tama --update   reinstall the newest version\n  tama --install-desktop   add tama to your app menu (Linux)\n  tama --animate on|off   show/hide the animated ears, wings, tail\n  tama --version  print the version\n  tama --dev      developer mode (separate test save)\n  tama --gallery  write tama-gallery.png with every character and expression");
         return Some(0);
     }
     if args.iter().any(|a| a == "--gallery") {

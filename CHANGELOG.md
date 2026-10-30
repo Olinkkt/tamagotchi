@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.19.0
+
+- New `tama --install-desktop` adds tama to your Linux app menu with its own icon, so you can start
+  it from the launcher without a terminal. The window now identifies itself as "tama".
 ## 1.18.2
 
 - The clock on the wall now shows the real time, with hour and minute hands that move.
