@@ -371,7 +371,7 @@ fn draw_bubble(f: &mut Frame, x: i32, y: i32, key: char) {
     }
 }
 
-fn draw_effects(f: &mut Frame, m: &Moment, at: Place, s: Size) {
+fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
     let Some((fx, t)) = m.fx else { return };
     let (px, py, size, cx) = (at.x, at.head, at.size, at.x + at.size / 2);
     match fx {
@@ -381,11 +381,17 @@ fn draw_effects(f: &mut Frame, m: &Moment, at: Place, s: Size) {
             }
         }
         Fx::Eat if t < 0.9 => {
-            // Tossed in from the top right, lands beside the pet with a hop, then eaten in two bites.
-            let (ex, ey) = (px + size - 2, at.y + size - 8);
+            // Tossed in from the top right, lands in the pet's mouth, then eaten in two bites.
+            let (ex, ey) = match c.face {
+                Some(spot) => {
+                    let g = faces::grid(spot.style, Expr::Eating);
+                    (px + spot.x + g[0].len() as i32 / 2 - 3, at.y + spot.y + g.len() as i32 - 5)
+                }
+                None => (px + size - 2, at.y + size - 8),
+            };
             let (sx, sy) = (s.w - 8, 4);
             let u = (t / 0.25).min(1.0);
-            let hop = if t > 0.25 { let v = ((t - 0.25) / 0.08).min(1.0); (4.0 * 4.0 * v * (1.0 - v)) as i32 } else { 0 };
+            let hop = if t > 0.25 { let v = ((t - 0.25) / 0.08).min(1.0); (2.0 * 4.0 * v * (1.0 - v)) as i32 } else { 0 };
             let x = sx + ((ex - sx) as f32 * u) as i32;
             let y = sy + ((ey - sy) as f32 * u) as i32 - (24.0 * 4.0 * u * (1.0 - u)) as i32 - hop;
             let icon = if t < 0.5 { icons::APPLE } else if t < 0.7 { icons::APPLE_BITTEN } else { icons::APPLE_CORE };
@@ -506,7 +512,7 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
             draw_bubble(&mut f, x, (at.head - 16 + (m.beat() % 2) as i32).max(1), key);
         }
     }
-    draw_effects(&mut f, m, at, s);
+    draw_effects(&mut f, m, &c, at, s);
     f
 }
 

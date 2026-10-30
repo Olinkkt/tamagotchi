@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+
+- The food now lands in the pet's mouth, whichever form it is, instead of beside it.
+
 ## 1.5.0
 
 - Food is now tossed in from the top right in an arc, lands next to the pet with a little hop and
