@@ -15,6 +15,7 @@ use crate::pet::{Pet, Stage};
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Fx {
     Eat,
+    Snack,
     Hearts,
     Heal,
     Clean,
@@ -25,7 +26,7 @@ pub enum Fx {
 impl Fx {
     pub fn duration_secs(self) -> f32 {
         match self {
-            Fx::Eat => 1.8,
+            Fx::Eat | Fx::Snack => 1.8,
             Fx::Hearts => 1.6,
             Fx::Heal => 1.4,
             Fx::Clean => 1.0,
@@ -155,7 +156,7 @@ pub fn light(p: &Pet) -> Light {
 /// The face to show, following the same rules as the old terminal pet.
 pub fn expression(m: &Moment) -> Expr {
     let p = m.pet;
-    let eating = m.fx_is(Fx::Eat).is_some_and(|f| (0.3..0.9).contains(&f) && ((f * 8.0) as i32) % 2 == 0);
+    let eating = m.fx_is(Fx::Eat).or(m.fx_is(Fx::Snack)).is_some_and(|f| (0.3..0.9).contains(&f) && ((f * 8.0) as i32) % 2 == 0);
     let base = if p.asleep || (p.load.low_battery && calm(p)) {
         Expr::Sleeping
     } else if p.sick {
@@ -204,7 +205,7 @@ fn motion(m: &Moment) -> (i32, i32) {
         }
         _ if m.pet.asleep => (0, -(beat / 3 % 2)),
         // Stands still while it eats, so the food stays in its mouth.
-        _ if m.fx_is(Fx::Eat).is_some() => (0, 0),
+        _ if m.fx_is(Fx::Eat).or(m.fx_is(Fx::Snack)).is_some() => (0, 0),
         _ => (0, -(beat % 2)),
     }
 }
@@ -382,8 +383,8 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
                 f.grid(icons::HEART, cx - 18 + i * 13, py - 4 - (t * 22.0) as i32 + (i % 2) * 4);
             }
         }
-        Fx::Eat if t < 0.9 => {
-            // Tossed in from the top right, lands in the pet's mouth, then eaten in two bites.
+        Fx::Eat | Fx::Snack if t < 0.9 => {
+            // Tossed in from the top right, lands in the pet's mouth, then eaten in two bites (or licked, for candy).
             let (ex, ey) = match c.face {
                 Some(spot) => {
                     let g = faces::grid(spot.style, Expr::Eating);
@@ -396,13 +397,19 @@ fn draw_effects(f: &mut Frame, m: &Moment, c: &Character, at: Place, s: Size) {
             let hop = if t > 0.25 { let v = ((t - 0.25) / 0.08).min(1.0); (2.0 * 4.0 * v * (1.0 - v)) as i32 } else { 0 };
             let x = sx + ((ex - sx) as f32 * u) as i32;
             let y = sy + ((ey - sy) as f32 * u) as i32 - (24.0 * 4.0 * u * (1.0 - u)) as i32 - hop;
-            let icon = if t < 0.5 { icons::APPLE } else if t < 0.7 { icons::APPLE_BITTEN } else { icons::APPLE_CORE };
+            let [whole, bitten, last] = if fx == Fx::Snack {
+                [icons::CANDY, icons::CANDY_UNWRAPPED, icons::CANDY_LICKED]
+            } else {
+                [icons::APPLE, icons::APPLE_BITTEN, icons::APPLE_CORE]
+            };
+            let icon = if t < 0.5 { whole } else if t < 0.7 { bitten } else { last };
+            let crumb = if fx == Fx::Snack { "v" } else { "n" };
             f.grid(icon, x, y);
             for bite in [0.5, 0.7, 0.88] {
                 if (bite..bite + 0.06).contains(&t) {
                     let k = ((t - bite) * 100.0) as i32;
-                    f.grid(&["n"], ex + 6 + k, ey - k);
-                    f.grid(&["n"], ex + 2 - k / 2, ey - 2 - k);
+                    f.grid(&[crumb], ex + 6 + k, ey - k);
+                    f.grid(&[crumb], ex + 2 - k / 2, ey - 2 - k);
                 }
             }
             if t >= 0.82 {
@@ -547,7 +554,7 @@ mod tests {
 
     #[test]
     fn every_stage_and_effect_draws_without_panicking() {
-        let fxs = [None, Some(Fx::Eat), Some(Fx::Hearts), Some(Fx::Heal), Some(Fx::Clean), Some(Fx::Scold), Some(Fx::Evolve)];
+        let fxs = [None, Some(Fx::Eat), Some(Fx::Snack), Some(Fx::Hearts), Some(Fx::Heal), Some(Fx::Clean), Some(Fx::Scold), Some(Fx::Evolve)];
         for stage in [Stage::Egg, Stage::Baby, Stage::Child, Stage::Teen, Stage::Adult, Stage::Dead] {
             let mut p = pet(stage);
             p.poops = 3;
@@ -774,6 +781,7 @@ mod tests {
         p.sick = false;
         p.hunger = 3;
         assert_eq!(face(&p, Some((Fx::Eat, 0.5))), Expr::Eating);
+        assert_eq!(face(&p, Some((Fx::Snack, 0.5))), Expr::Eating);
         assert_eq!(expression(&Moment { pet: &p, fx: None, ms: 350 * 8, shell: None, sub_ms: 0 }), Expr::Blink);
     }
 

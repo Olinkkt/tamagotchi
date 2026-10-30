@@ -496,6 +496,9 @@ impl App {
         };
         self.message = msg;
         self.react(before);
+        if code == Key::Char('s') && self.pet.happy > before.1 {
+            self.trigger(scene::Fx::Snack);
+        }
     }
 
     /// Developer keys, active only with `--dev` while the panel is open. Returns true if handled.

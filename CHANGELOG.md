@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.6.0
+
+- Snacks get their own animation: a wrapped candy is tossed in, lands in the pet's mouth, gets
+  unwrapped and licked down to nothing. Meals keep the apple.
+
 ## 1.5.3
 
 - The food sits a little lower, so you can see the top of the mouth chewing above it.

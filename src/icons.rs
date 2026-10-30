@@ -309,6 +309,9 @@ pub const ANGER: Grid = &["rr.rr", "r...r", ".....", "r...r", "rr.rr"];
 pub const APPLE: Grid = &["...ng..", ".kkkkk.", "krwrrrk", "krrrrrk", "krrrrmk", ".krrmk.", "..kkk.."];
 pub const APPLE_BITTEN: Grid = &["...ng..", ".kkkk..", "krwrrk.", "krrrk..", "krrrrk.", ".krrmk.", "..kkk.."];
 pub const APPLE_CORE: Grid = &["...n...", "..kwk..", ".kwwwk.", ".kwnwk.", ".kwwwk.", "..kwk..", "...k..."];
+pub const CANDY: Grid = &[".......", "k.kkk.k", "ykvwvky", "kkvwvkk", "ykvwvky", "k.kkk.k", "......."];
+pub const CANDY_UNWRAPPED: Grid = &["..kkk..", ".kvwvk.", "kvwvvvk", "kwvvvwk", "kvvvwvk", ".kvwvk.", "..kkk.."];
+pub const CANDY_LICKED: Grid = &[".......", ".......", "..kkk..", ".kvwvk.", "..kkk..", ".......", "......."];
 
 #[cfg(test)]
 mod tests {
@@ -318,7 +321,7 @@ mod tests {
     #[test]
     fn icons_are_rectangular_and_use_palette_letters() {
         let keys = "fsplmcdbagqn".chars().map(|k| for_key(k).unwrap());
-        for g in keys.chain([CAKE, SALAD, VITAMINS, CHECK, UP, DOWN, STAR, HEART_FULL, HEART_EMPTY, COIN, Z, SWEAT, BATTERY, HEART, SPARKLE, ANGER, APPLE, APPLE_BITTEN, APPLE_CORE]) {
+        for g in keys.chain([CAKE, SALAD, VITAMINS, CHECK, UP, DOWN, STAR, HEART_FULL, HEART_EMPTY, COIN, Z, SWEAT, BATTERY, HEART, SPARKLE, ANGER, APPLE, APPLE_BITTEN, APPLE_CORE, CANDY, CANDY_UNWRAPPED, CANDY_LICKED]) {
             for row in g {
                 assert_eq!(row.len(), g[0].len(), "{g:?}");
                 assert!(row.chars().all(|c| c == '.' || colour(c).is_some()), "{row}");
