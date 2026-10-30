@@ -37,6 +37,14 @@ impl Frame {
     }
 
     /// A rectangle with a 1px border.
+    /// A one-pixel border drawn over whatever is already there.
+    pub fn outline(&mut self, x: i32, y: i32, w: i32, h: i32, p: Pal) {
+        self.rect(x, y, w, 1, p);
+        self.rect(x, y + h - 1, w, 1, p);
+        self.rect(x, y, 1, h, p);
+        self.rect(x + w - 1, y, 1, h, p);
+    }
+
     pub fn boxed(&mut self, x: i32, y: i32, w: i32, h: i32, fill: Pal, border: Pal) {
         self.rect(x, y, w, h, border);
         self.rect(x + 1, y + 1, w - 2, h - 2, fill);

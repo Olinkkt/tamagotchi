@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.1
+
+- Things you can click now get a white outline when the pointer is over them: shop rows, the two
+  games, Memory pads and the "esc" buttons.
+
 ## 1.12.0
 
 - The games lose the button bar too. Click a Memory pad to repeat the pattern, hold the mouse

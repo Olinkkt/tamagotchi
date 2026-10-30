@@ -177,7 +177,11 @@ async fn main_loop(mut app: App) {
         app.aim(aim);
         app.update();
 
-        image.bytes = hud::frame(&app, lay, hud::button_at(&app, lay, sx, sy)).rgba();
+        let mut picture = hud::frame(&app, lay, hud::button_at(&app, lay, sx, sy));
+        if let Some((x, y, w, h)) = screens::hover_rect(&app, lay, sx, sy) {
+            picture.outline(x, y, w, h, Pal::White);
+        }
+        image.bytes = picture.rgba();
         texture.update(&image);
         clear_background(colour(LETTERBOX));
         let dest = vec2(lay.w as f32 * v.scale, lay.h as f32 * v.scale);

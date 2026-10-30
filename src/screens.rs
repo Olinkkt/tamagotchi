@@ -316,6 +316,30 @@ pub fn click(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
     }
 }
 
+/// The box on screen (scene pixels) to outline under the mouse, if it is over something clickable.
+/// Clicking off a card also closes it, but that is not worth an outline.
+pub fn hover_rect(app: &App, lay: Layout, x: f32, y: f32) -> Option<(i32, i32, i32, i32)> {
+    let (ox, oy) = lay.centred_card();
+    let (x, y) = (x as i32 - ox, y as i32 - oy);
+    let moved = |r: (i32, i32, i32, i32)| (r.0 + ox, r.1 + oy, r.2, r.3);
+    match &app.mode {
+        Mode::Game(g) => {
+            let esc = game_esc(lay);
+            return if in_rect(esc, x + ox, y + oy) { Some(esc) } else { g.hover_rect(x, y).map(moved) };
+        }
+        _ if !showing(app) => return None,
+        _ => {}
+    }
+    if in_rect(ESC, x, y) {
+        return Some(moved(ESC));
+    }
+    match app.mode {
+        Mode::Shop => (0..4).find(|&i| in_rect((CARD.0, shop_row_y(i), CARD.2, SHOP_ROW - 3), x, y)).map(|i| moved((CARD.0 + 2, shop_row_y(i), CARD.2 - 4, SHOP_ROW - 3))),
+        Mode::Chooser => (0..2).find(|&i| in_rect((game_card_x(i), GAME_CARD.1, GAME_CARD.2, 70), x, y)).map(|i| moved((game_card_x(i), GAME_CARD.1, GAME_CARD.2, 70))),
+        _ => None,
+    }
+}
+
 const RESET_W: i32 = 120;
 const RESET_H: i32 = 44;
 

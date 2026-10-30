@@ -56,6 +56,14 @@ impl Game {
         }
     }
 
+    /// The rectangle of the clickable part of the picture under (`x`, `y`), for a hover outline.
+    pub fn hover_rect(&self, x: i32, y: i32) -> Option<(i32, i32, i32, i32)> {
+        match self {
+            Game::Memory(_) => Memory::pad_at(x, y).map(|n| (20 + (n as i32 - 1) * (PAD_W + PAD_GAP), PAD_Y, PAD_W, PAD_H)),
+            Game::Pong(_) => None,
+        }
+    }
+
     /// Where the mouse is held down (a row of the game's own picture): Pong's paddle follows it.
     pub fn aim(&mut self, y: Option<f32>) {
         if let Game::Pong(g) = self {
