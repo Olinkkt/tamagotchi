@@ -17,7 +17,7 @@ in Rust, drawn in 24 colours.
   a slower, safe pace. Come back to find out how it went.
 - **Five adults to raise.** How well you care for the pet decides what it grows into. Collect
   them all in the awards.
-- **Mini-games, coins and a shop.** Memory and Pong, played by keyboard or mouse. Win coins and
+- **Mini-games, coins and a shop.** Memory, Pong and Shells, played by keyboard or mouse. Win coins and
   spend them on treats.
 - **Mouse or keyboard.** Every action is a button and a key, and everything clickable lights up
   when you hover it.
@@ -79,13 +79,14 @@ right now are dimmed.
 Any game makes the pet a little lighter, and winning makes it happier. A perfect game forgives
 one care mistake.
 
-Both are drawn in the same pixel art as the pet, scores included, and take the full width of
+All of them are drawn in the same pixel art as the pet, scores included, and take the full width of
 the window while you play (the status panel comes back afterwards). When a game ends, a result
 screen shows a star per round won, the coins earned and the pet cheering or sulking for three
 seconds (any key skips it).
 
 1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4 (or click the pads). Your pet watches and cheers or sulks.
 2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle moves while you hold ↑/↓ (or W/S, K/J), or while you hold the mouse button, when it chases the pointer; it stops when you let go.
+3. **Shells**: your pet hides under one of three cups, then the cups swap places. Pick the cup it is under with keys 1 to 3 (or click it). Three rounds, with more and faster swaps each time.
 
 ### The toilet
 

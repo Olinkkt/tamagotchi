@@ -19,7 +19,9 @@ const CARD: (i32, i32, i32, i32) = (4, 4, 232, 120);
 const TITLE_Y: f32 = 12.0;
 const BODY_Y: i32 = 22;
 const SHOP_ROW: i32 = 24;
-const GAME_CARD: (i32, i32, i32) = (28, 34, 82);
+const GAME_CARD: (i32, i32) = (14, 34);
+const GAME_CARD_H: i32 = 70;
+const GAME_CARD_GAP: i32 = 6;
 /// The close button in a card's top-right corner.
 const ESC: (i32, i32, i32, i32) = (CARD.0 + CARD.2 - 19, CARD.1 + 2, 15, 11);
 
@@ -192,28 +194,47 @@ fn graveyard_labels(entries: &[String]) -> Vec<Label> {
     v
 }
 
+fn game_card_w() -> i32 {
+    let n = crate::games::CHOICES.len() as i32;
+    (CARD.2 - 2 * (GAME_CARD.0 - CARD.0) - GAME_CARD_GAP * (n - 1)) / n
+}
+
 fn game_card_x(i: i32) -> i32 {
-    GAME_CARD.0 + i * (GAME_CARD.2 + 20)
+    GAME_CARD.0 + i * (game_card_w() + GAME_CARD_GAP)
 }
 
 fn draw_chooser(f: &mut Frame) {
-    let (_, y, w) = GAME_CARD;
-    for i in 0..2 {
+    let (y, w) = (GAME_CARD.1, game_card_w());
+    for i in 0..crate::games::CHOICES.len() as i32 {
         let x = game_card_x(i);
-        f.boxed(x, y, w, 70, Pal::Dusk, Pal::Slate);
+        f.boxed(x, y, w, GAME_CARD_H, Pal::Dusk, Pal::Slate);
         keycap(f, x + 4, y + 4, false);
-        if i == 0 {
-            // Four little pads, one of them lit.
-            for (n, c) in [Pal::Red, Pal::Yellow, Pal::Green, Pal::Sky].into_iter().enumerate() {
-                let fill = if n == 1 { c.highlight() } else { c.shadow() };
-                f.boxed(x + 8 + n as i32 * 17, y + 26, 15, 15, fill, Pal::Ink);
+        match i {
+            0 => {
+                // Four little pads, one of them lit.
+                let (gap, side) = (2, 4);
+                let size = (w - 2 * side - 3 * gap) / 4;
+                for (n, c) in [Pal::Red, Pal::Yellow, Pal::Green, Pal::Sky].into_iter().enumerate() {
+                    let fill = if n == 1 { c.highlight() } else { c.shadow() };
+                    f.boxed(x + side + n as i32 * (size + gap), y + 26, size, size, fill, Pal::Ink);
+                }
             }
-        } else {
-            f.rect(x + 6, y + 20, w - 12, 28, Pal::DeepTeal);
-            f.rect(x + w / 2, y + 22, 1, 24, Pal::Teal);
-            f.boxed(x + 10, y + 26, 3, 12, Pal::Pink, Pal::Ink);
-            f.boxed(x + 40, y + 30, 4, 4, Pal::Yellow, Pal::Orange);
-            f.boxed(x + w - 14, y + 28, 6, 10, Pal::Mist, Pal::Ink);
+            1 => {
+                f.rect(x + 3, y + 20, w - 6, 28, Pal::DeepTeal);
+                f.rect(x + w / 2, y + 22, 1, 24, Pal::Teal);
+                f.boxed(x + 5, y + 26, 3, 12, Pal::Pink, Pal::Ink);
+                f.boxed(x + w / 2 - 6, y + 30, 4, 4, Pal::Yellow, Pal::Orange);
+                f.boxed(x + w - 9, y + 28, 4, 10, Pal::Mist, Pal::Ink);
+            }
+            2 => {
+                // Three cups in a row, the middle one lifted.
+                for n in 0..3 {
+                    let cx = x + w / 6 + n * w / 3;
+                    let top = if n == 1 { y + 22 } else { y + 30 };
+                    f.boxed(cx - 5, top, 10, 14, [Pal::Orange, Pal::Pink, Pal::Sky][n as usize], Pal::Ink);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -223,7 +244,7 @@ fn chooser_labels() -> Vec<Label> {
     for (i, (key, name)) in crate::games::CHOICES.iter().enumerate() {
         let x = game_card_x(i as i32) as f32;
         v.push(centred(*key, x + 8.5, GAME_CARD.1 as f32 + 8.5, Pal::White));
-        v.push(centred(name.to_uppercase(), x + GAME_CARD.2 as f32 / 2.0, GAME_CARD.1 as f32 + 60.0, Pal::White));
+        v.push(centred(name.to_uppercase(), x + game_card_w() as f32 / 2.0, GAME_CARD.1 as f32 + 60.0, Pal::White));
     }
     v.push(centred("Any game burns a little weight; winning makes it happier.", 120.0, 114.0, Pal::Mist));
     v
@@ -315,7 +336,7 @@ pub fn click(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
     }
     match app.mode {
         Mode::Shop => (0..4).find(|&i| (shop_row_y(i)..shop_row_y(i) + SHOP_ROW - 3).contains(&y) && (CARD.0..CARD.0 + CARD.2).contains(&x)).map(|i| Key::Char((b'1' + i as u8) as char)),
-        Mode::Chooser => (0..2).find(|&i| (game_card_x(i)..game_card_x(i) + GAME_CARD.2).contains(&x) && (GAME_CARD.1..GAME_CARD.1 + 70).contains(&y)).map(|i| Key::Char((b'1' + i as u8) as char)),
+        Mode::Chooser => (0..crate::games::CHOICES.len() as i32).find(|&i| (game_card_x(i)..game_card_x(i) + game_card_w()).contains(&x) && (GAME_CARD.1..GAME_CARD.1 + GAME_CARD_H).contains(&y)).map(|i| Key::Char((b'1' + i as u8) as char)),
         _ => None,
     }
 }
@@ -339,7 +360,7 @@ pub fn hover_rect(app: &App, lay: Layout, x: f32, y: f32) -> Option<(i32, i32, i
     }
     match app.mode {
         Mode::Shop => (0..4).find(|&i| in_rect((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3), x, y)).map(|i| moved((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3))),
-        Mode::Chooser => (0..2).find(|&i| in_rect((game_card_x(i), GAME_CARD.1, GAME_CARD.2, 70), x, y)).map(|i| moved((game_card_x(i), GAME_CARD.1, GAME_CARD.2, 70))),
+        Mode::Chooser => (0..crate::games::CHOICES.len() as i32).find(|&i| in_rect((game_card_x(i), GAME_CARD.1, game_card_w(), GAME_CARD_H), x, y)).map(|i| moved((game_card_x(i), GAME_CARD.1, game_card_w(), GAME_CARD_H))),
         _ => None,
     }
 }

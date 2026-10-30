@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.13.0
+
+- A third mini-game, Shells: your pet hides under one of three cups, the cups swap places, and you
+  pick the one it is under (keys 1 to 3, or click). Three rounds, each with more and faster swaps.
+- The game picker now has room for more games: its cards are smaller and sit in a row.
+
 ## 1.12.10
 
 - Pong is easier: the paddle is taller, the ball starts slower and speeds up less with each

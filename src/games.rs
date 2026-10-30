@@ -13,13 +13,16 @@ use crate::palette::Pal;
 use crate::pet::Pet;
 use crate::scene;
 
+mod shells;
+use shells::Shells;
+
 pub enum Outcome {
     Continue,
     Done { wins: u8, rounds: u8 },
     Quit,
 }
 
-pub const CHOICES: [(&str, &str); 2] = [("1", "memory"), ("2", "pong")];
+pub const CHOICES: [(&str, &str); 3] = [("1", "memory"), ("2", "pong"), ("3", "shells")];
 
 /// The size of the picture a game draws.
 pub const GW: i32 = 240;
@@ -28,12 +31,14 @@ pub const GH: i32 = 128;
 pub enum Game {
     Memory(Memory),
     Pong(Pong),
+    Shells(Shells),
 }
 
 impl Game {
     pub fn new(kind: u8, pet: &mut Pet) -> Game {
         match kind {
             1 => Game::Memory(Memory::new(pet)),
+            3 => Game::Shells(Shells::new(pet)),
             _ => Game::Pong(Pong::new(pet)),
         }
     }
@@ -45,6 +50,7 @@ impl Game {
         match self {
             Game::Memory(g) => g.key(code),
             Game::Pong(_) => Outcome::Continue,
+            Game::Shells(g) => g.key(code),
         }
     }
 
@@ -53,6 +59,7 @@ impl Game {
         match self {
             Game::Memory(_) => Memory::pad_at(x, y).map(|n| Key::Char((b'0' + n) as char)),
             Game::Pong(_) => None,
+            Game::Shells(g) => g.slot_at(x, y).map(|s| Key::Char((b'1' + s as u8) as char)),
         }
     }
 
@@ -61,6 +68,7 @@ impl Game {
         match self {
             Game::Memory(_) => Memory::pad_at(x, y).map(|n| (20 + (n as i32 - 1) * (PAD_W + PAD_GAP), PAD_Y, PAD_W, PAD_H)),
             Game::Pong(_) => None,
+            Game::Shells(g) => g.hover_rect(x, y),
         }
     }
 
@@ -83,6 +91,7 @@ impl Game {
         match self {
             Game::Memory(g) => g.tick(pet),
             Game::Pong(g) => g.tick(),
+            Game::Shells(g) => g.tick(pet),
         }
     }
 
@@ -90,6 +99,7 @@ impl Game {
         match self {
             Game::Memory(g) => g.draw(),
             Game::Pong(g) => g.draw(),
+            Game::Shells(g) => g.draw(),
         }
     }
 
@@ -104,6 +114,7 @@ impl Game {
                 Some(_) => "WRONG - IT WAS PAD 4",
                 None => "WATCH THE PATTERN",
             },
+            Game::Shells(g) => g.hint(),
             Game::Pong(_) => "HOLD W/S OR THE MOUSE TO MOVE - RETURN IT 5 TIMES",
         }
     }
@@ -131,6 +142,19 @@ fn backdrop() -> Frame {
 fn draw_pet(f: &mut Frame, pet: &Pet, e: Expr, cx: i32, floor: i32) {
     let s = scene::posed(pet, e);
     f.sprite(&s, cx - s.w / 2, floor - s.bottom());
+}
+
+/// Rounds, top left: green for a win, red for a miss, white for the one being played.
+fn draw_rounds(f: &mut Frame, results: &[bool], round: u8) {
+    for r in 0..MEMORY_ROUNDS as usize {
+        let col = match results.get(r) {
+            Some(true) => Pal::Green,
+            Some(false) => Pal::Red,
+            None if r + 1 == round as usize => Pal::White,
+            None => Pal::Slate,
+        };
+        f.boxed(6 + r as i32 * 10, 6, 8, 8, col, Pal::Ink);
+    }
 }
 
 fn anim_clock(born: Instant) -> u64 {
@@ -306,16 +330,7 @@ impl Memory {
         for n in 1..=4u8 {
             Memory::draw_pad(&mut f, n, lit == Some(n), shake, wrong == Some(n));
         }
-        // Rounds, top left: green for a win, red for a miss, white for the one being played.
-        for r in 0..MEMORY_ROUNDS as usize {
-            let col = match self.results.get(r) {
-                Some(true) => Pal::Green,
-                Some(false) => Pal::Red,
-                None if r + 1 == self.round as usize => Pal::White,
-                None => Pal::Slate,
-            };
-            f.boxed(6 + r as i32 * 10, 6, 8, 8, col, Pal::Ink);
-        }
+        draw_rounds(&mut f, &self.results, self.round);
         // Your progress through the pattern, as pips on the floor once it is your turn.
         if let MPhase::Input(pos) = self.phase {
             let n = self.seq.len() as i32;
@@ -577,7 +592,7 @@ mod tests {
 
     #[test]
     fn escape_quits_every_game() {
-        for kind in 1..=2 {
+        for kind in 1..=3 {
             let mut p = pet();
             let mut g = Game::new(kind, &mut p);
             assert!(matches!(g.key(Key::Esc), Outcome::Quit), "game {kind}");
@@ -708,9 +723,9 @@ mod tests {
     }
 
     #[test]
-    fn the_picker_offers_two_games_and_each_one_draws() {
-        assert_eq!(CHOICES.len(), 2);
-        for kind in 1..=2 {
+    fn the_picker_offers_every_game_and_each_one_draws() {
+        assert_eq!(CHOICES.len(), 3);
+        for kind in 1..=3 {
             let mut p = pet();
             let g = Game::new(kind, &mut p);
             let f = g.draw();
