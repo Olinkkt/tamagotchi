@@ -473,13 +473,13 @@ impl App {
         }
         match &mut self.mode {
             Mode::Game(g) => {
-                let outcome = g.key(code);
+                let outcome = g.key(code, &mut self.pet);
                 self.handle_outcome(outcome);
                 return;
             }
             Mode::Chooser => {
                 match code {
-                    Key::Char(c @ '1'..='4') => {
+                    Key::Char(c @ '1'..='5') => {
                         let g = games::Game::new(c as u8 - b'0', &mut self.pet);
                         self.mode = Mode::Game(g);
                     }

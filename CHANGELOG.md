@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.15.0
+
+- A fifth mini-game, Rock Paper Scissors: pick a hand (keys 1 to 3, R/P/S, or click), watch both
+  hands shake three times, then see who wins. Win two of three rounds; a tie is played again.
+
 ## 1.14.0
 
 - A fourth mini-game, Slots: three reels spin and you stop them one by one with space or a click.

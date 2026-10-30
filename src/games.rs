@@ -13,10 +13,15 @@ use crate::palette::Pal;
 use crate::pet::Pet;
 use crate::scene;
 
+mod janken;
 mod shells;
 mod slots;
+use janken::Janken;
 use shells::Shells;
 use slots::Slots;
+
+/// A hand for the picker's card.
+pub const RPS_ICON: icons::Grid = janken::PAPER;
 
 pub enum Outcome {
     Continue,
@@ -24,7 +29,7 @@ pub enum Outcome {
     Quit,
 }
 
-pub const CHOICES: [(&str, &str); 4] = [("1", "memory"), ("2", "pong"), ("3", "shells"), ("4", "slots")];
+pub const CHOICES: [(&str, &str); 5] = [("1", "memory"), ("2", "pong"), ("3", "shells"), ("4", "slots"), ("5", "rps")];
 
 /// The size of the picture a game draws.
 pub const GW: i32 = 240;
@@ -35,6 +40,7 @@ pub enum Game {
     Pong(Pong),
     Shells(Shells),
     Slots(Slots),
+    Janken(Janken),
 }
 
 impl Game {
@@ -43,11 +49,12 @@ impl Game {
             1 => Game::Memory(Memory::new(pet)),
             3 => Game::Shells(Shells::new(pet)),
             4 => Game::Slots(Slots::new(pet)),
+            5 => Game::Janken(Janken::new(pet)),
             _ => Game::Pong(Pong::new(pet)),
         }
     }
 
-    pub fn key(&mut self, code: Key) -> Outcome {
+    pub fn key(&mut self, code: Key, pet: &mut Pet) -> Outcome {
         if matches!(code, Key::Esc | Key::Char('q')) {
             return Outcome::Quit;
         }
@@ -56,6 +63,7 @@ impl Game {
             Game::Pong(_) => Outcome::Continue,
             Game::Shells(g) => g.key(code),
             Game::Slots(g) => g.key(code),
+            Game::Janken(g) => g.key(code, pet),
         }
     }
 
@@ -67,6 +75,7 @@ impl Game {
             Game::Shells(g) => g.slot_at(x, y).map(|s| Key::Char((b'1' + s as u8) as char)),
             // Any click on the picture stops the next reel.
             Game::Slots(_) => Some(Key::Char(' ')),
+            Game::Janken(g) => g.button_at(x, y).map(|i| Key::Char((b'1' + i as u8) as char)),
         }
     }
 
@@ -77,6 +86,7 @@ impl Game {
             Game::Pong(_) => None,
             Game::Shells(g) => g.hover_rect(x, y),
             Game::Slots(_) => None,
+            Game::Janken(g) => g.hover_rect(x, y),
         }
     }
 
@@ -101,6 +111,7 @@ impl Game {
             Game::Pong(g) => g.tick(),
             Game::Shells(g) => g.tick(pet),
             Game::Slots(g) => g.tick(pet),
+            Game::Janken(g) => g.tick(),
         }
     }
 
@@ -110,6 +121,7 @@ impl Game {
             Game::Pong(g) => g.draw(),
             Game::Shells(g) => g.draw(),
             Game::Slots(g) => g.draw(),
+            Game::Janken(g) => g.draw(),
         }
     }
 
@@ -126,6 +138,7 @@ impl Game {
             },
             Game::Shells(g) => g.hint(),
             Game::Slots(g) => g.hint(),
+            Game::Janken(g) => g.hint(),
             Game::Pong(_) => "HOLD W/S OR THE MOUSE TO MOVE - RETURN IT 5 TIMES",
         }
     }
@@ -603,10 +616,10 @@ mod tests {
 
     #[test]
     fn escape_quits_every_game() {
-        for kind in 1..=4 {
+        for kind in 1..=5 {
             let mut p = pet();
             let mut g = Game::new(kind, &mut p);
-            assert!(matches!(g.key(Key::Esc), Outcome::Quit), "game {kind}");
+            assert!(matches!(g.key(Key::Esc, &mut p), Outcome::Quit), "game {kind}");
         }
     }
 
@@ -735,8 +748,8 @@ mod tests {
 
     #[test]
     fn the_picker_offers_every_game_and_each_one_draws() {
-        assert_eq!(CHOICES.len(), 4);
-        for kind in 1..=4 {
+        assert_eq!(CHOICES.len(), 5);
+        for kind in 1..=5 {
             let mut p = pet();
             let g = Game::new(kind, &mut p);
             let f = g.draw();

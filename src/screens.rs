@@ -239,6 +239,7 @@ fn draw_chooser(f: &mut Frame) {
                 f.boxed(x + w / 2 - 14, y + 22, 28, 24, Pal::Cream, Pal::Ink);
                 f.grid(icons::STAR, x + w / 2 - 5, y + 28);
             }
+            4 => f.grid_scaled(crate::games::RPS_ICON, x + (w - 30) / 2, y + 20, 2, |p| p),
             _ => {}
         }
     }
