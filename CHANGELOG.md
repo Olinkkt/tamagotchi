@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.21.2
+
+- The README now shows a real screenshot of the game window.
+
 ## 1.21.1
 
 - Fixes the GitHub release build, so the one-line install has a download to fetch.

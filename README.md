@@ -3,6 +3,10 @@
 <p align="center"><b>A pixel-art tamagotchi that lives in a window, in your status bar and in your shell.</b></p>
 
 <p align="center">
+  <img src="docs/screenshot.png" alt="The game window: a baby in its room with the status panel" width="560">
+</p>
+
+<p align="center">
   <img src="docs/gallery.png" alt="Every character and expression" width="560">
 </p>
 
