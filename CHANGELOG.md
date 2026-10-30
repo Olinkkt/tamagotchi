@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.10.0
+
+- The game picker, shop, awards and graveyard now take the whole window like the games do: the
+  status panel and header step aside, and the hint line and button bar stretch edge to edge.
+
 ## 1.9.1
 
 - Internal cleanup after the status panel change; nothing looks different.

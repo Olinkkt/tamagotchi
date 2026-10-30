@@ -157,10 +157,15 @@ fn text_button(c: char) -> (Key, Option<Grid>, &'static str, Look) {
 
 const BACK: (Key, Option<Grid>, &str, Look) = (Key::Esc, None, "esc", Look::Normal);
 
-/// How wide the hint line and button bar are: the whole screen for a game, otherwise just the
-/// space under the room, since the status panel runs all the way down.
+/// Whether the screen has the status panel: not during a game or over a card (shop, awards...).
+fn has_panel(app: &App) -> bool {
+    matches!(app.mode, Mode::Normal | Mode::Toilet(_))
+}
+
+/// How wide the hint line and button bar are: the whole screen when there is no status panel,
+/// otherwise just the space under the room, since the panel runs all the way down.
 fn bar_w(app: &App, lay: Layout) -> i32 {
-    if matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) { lay.w } else { lay.panel_x() }
+    if has_panel(app) { lay.panel_x() } else { lay.w }
 }
 
 /// The buttons along the bottom for the current mode.
@@ -214,20 +219,24 @@ fn draw_button(f: &mut Frame, b: &Button, hover: bool, bounce: i32) {
 pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
     let mut f = Frame::new(lay.w, lay.h, Pal::Ink);
     let (panel_x, hint_y) = (lay.panel_x(), lay.hint_y());
-    // A game takes the whole width above the hint line, over the dimmed room; the status panel
-    // comes back afterwards.
+    // A game or a card takes the whole width above the hint line, over the dimmed room; the
+    // status panel comes back afterwards.
     let game = match &app.mode {
         Mode::Game(g) => Some(g.draw()),
         Mode::Finish(fin) => Some(fin.draw()),
         _ => None,
     };
-    if let Some(g) = game {
+    if !has_panel(app) {
         f.frame(&scene::area(app, lay.w, hint_y), 0, 0);
-        let (x, y) = lay.centred_240x128();
-        if (x, y) != (0, 0) {
-            f.boxed(x - 1, y - 1, g.w + 2, g.h + 2, Pal::Ink, Pal::Slate);
+        if let Some(g) = game {
+            let (x, y) = lay.centred_240x128();
+            if (x, y) != (0, 0) {
+                f.boxed(x - 1, y - 1, g.w + 2, g.h + 2, Pal::Ink, Pal::Slate);
+            }
+            f.frame(&g, x, y);
+        } else {
+            screens::draw(&mut f, app, lay);
         }
-        f.frame(&g, x, y);
         draw_bar(&mut f, app, lay, hover);
         return f;
     }
@@ -241,10 +250,7 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
     f.frame(&room, 0, ROOM_Y);
     f.boxed(panel_x, 0, PANEL_W, lay.h, Pal::Night, Pal::Dusk);
     f.rect(panel_x + 1, 11, PANEL_W - 2, 1, Pal::Dusk);
-    if matches!(app.mode, Mode::Normal | Mode::Toilet(_)) {
-        panel::draw(&mut f, app, lay);
-    }
-    screens::draw(&mut f, app, lay);
+    panel::draw(&mut f, app, lay);
     if app.confirming_reset() {
         screens::draw_reset(&mut f, lay);
     }
@@ -288,7 +294,7 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
     let mut out = Vec::new();
     let (panel_x, hint_y) = (lay.panel_x(), lay.hint_y());
     // Games and cards cover the header and the panel.
-    let in_game = !matches!(app.mode, Mode::Normal | Mode::Toilet(_));
+    let in_game = !has_panel(app);
     let mut head = format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age));
     if app.dev {
         head.push_str(" · DEV");
@@ -362,6 +368,20 @@ mod tests {
         let app = app_with(Stage::Baby, |_| {});
         let text: Vec<String> = labels(&app, Layout::MIN, 0.5).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t.starts_with("Babytchi · Baby")), "{text:?}");
+    }
+
+    #[test]
+    fn cards_and_games_have_no_panel_and_a_full_width_bar() {
+        let lay = Layout::MIN;
+        let mut app = app_with(Stage::Adult, |_| {});
+        let normal = bar_w(&app, lay);
+        assert_eq!(normal, lay.panel_x());
+        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Graveyard(Vec::new())] {
+            app.mode = mode;
+            assert_eq!(bar_w(&app, lay), lay.w);
+            let text: Vec<String> = labels(&app, lay, 0.5).into_iter().map(|l| l.text).collect();
+            assert!(!text.iter().any(|t| t == "STATUS"), "{text:?}");
+        }
     }
 
     #[test]
