@@ -1,5 +1,5 @@
-//! The iris wipe between scenes: the picture closes to a black circle around the pet, the game
-//! swaps scenes while it is shut, and the circle opens again around the pet in the new scene.
+//! The iris wipe between scenes: the picture closes to a black circle around the middle, the game
+//! swaps scenes while it is shut, and the circle opens again in the new scene.
 //! It runs on real time, so the game speed does not change it.
 
 use std::time::Instant;
@@ -7,8 +7,8 @@ use std::time::Instant;
 use crate::frame::Frame;
 use crate::palette::Pal;
 
-const CLOSE_SECS: f32 = 0.45;
-const OPEN_SECS: f32 = 0.45;
+const CLOSE_SECS: f32 = 0.8;
+const OPEN_SECS: f32 = 0.8;
 
 /// Where the wipe takes the player.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

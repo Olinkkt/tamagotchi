@@ -13,11 +13,11 @@ use crate::palette::Pal;
 use crate::scene;
 
 /// The whole visit, in seconds.
-pub const VISIT_SECS: f32 = 5.7;
+pub const VISIT_SECS: f32 = 5.9;
 /// The pet sits with the door open, then the door swings shut, stays shut, and swings open.
-const SETTLE: f32 = 0.8;
+const SETTLE: f32 = 1.2;
 const SWING: f32 = 0.7;
-const OPEN_AT: f32 = 4.2;
+const OPEN_AT: f32 = 4.6;
 
 pub struct Visit {
     started: Instant,
@@ -79,13 +79,6 @@ fn view(booth: usize, w: i32, h: i32) -> (i32, (i32, i32)) {
     let (cw, ch) = (w.min(master.w), h.min(master.h));
     let sx = (booth_x(booth) - cw / 2).clamp(0, master.w - cw);
     (sx, ((w - cw) / 2 - sx, h - ch - (master.h - ch)))
-}
-
-/// The middle of the pet on its toilet, in area pixels.
-pub fn spot(app: &App, visit: &Visit, w: i32, h: i32) -> (i32, i32) {
-    let (_, (ox, oy)) = view(visit.booth, w, h);
-    let body = art::body(&scene::character(&app.pet));
-    (booth_x(visit.booth) + ox, cast::TOILET_TOP + oy + 7 - (body.bottom() - body.top()) / 2)
 }
 
 /// The washroom, centred on the pet's booth and as large as the area allows.

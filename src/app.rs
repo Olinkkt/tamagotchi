@@ -824,10 +824,10 @@ pub(crate) mod tests {
             assert!(app.wiping() && matches!(app.mode, Mode::Normal), "the wipe starts in the room");
             app.on_key(Key::Char('f'));
             assert_eq!(app.pet.hunger, 3, "keys do nothing during the wipe");
-            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.5);
+            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.9);
             app.update();
             assert!(matches!(app.mode, Mode::Toilet(_)), "scenes change while the picture is shut");
-            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.5);
+            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.9);
             app.update();
             assert!(!app.wiping() && app.pet.urge.is_none());
         });

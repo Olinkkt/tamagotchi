@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.2
+
+- The iris wipe is slower (about a second and a half in all) and closes on the middle of the
+  screen instead of on the pet.
+
 ## 1.7.1
 
 - Going to the toilet and coming back now uses an iris wipe: the picture closes to a black circle
