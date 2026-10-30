@@ -1,9 +1,9 @@
 # Changelog
 
-## 1.12.3
+## 1.12.4
 
-- The "esc" button on cards sits evenly in the corner, with the same gap above, below and to the
-  right.
+- The shop's coin count moves next to the "SHOP" title, away from the "esc" button. The card's
+  "esc" button is back to its old size.
 
 ## 1.12.2
 

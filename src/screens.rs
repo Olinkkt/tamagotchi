@@ -21,7 +21,7 @@ const BODY_Y: i32 = 22;
 const SHOP_ROW: i32 = 24;
 const GAME_CARD: (i32, i32, i32) = (28, 34, 82);
 /// The close button in a card's top-right corner.
-const ESC: (i32, i32, i32, i32) = (CARD.0 + CARD.2 - 17, CARD.1 + 2, 15, 12);
+const ESC: (i32, i32, i32, i32) = (CARD.0 + CARD.2 - 19, CARD.1 + 2, 15, 11);
 
 fn label(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
     Label { text: text.into(), x, y, colour, align: Align::Left }
@@ -60,7 +60,7 @@ fn shop_row_y(i: usize) -> i32 {
 }
 
 fn draw_shop(f: &mut Frame, app: &App) {
-    f.grid(icons::COIN, CARD.0 + CARD.2 - 46, 7);
+    f.grid(icons::COIN, CARD.0 + 36, 7);
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i);
         let can = app.profile.coins >= item.price();
@@ -79,7 +79,7 @@ fn draw_shop(f: &mut Frame, app: &App) {
 fn shop_labels(app: &App) -> Vec<Label> {
     let mut v = vec![
         label("SHOP", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
-        label(app.profile.coins.to_string(), (CARD.0 + CARD.2 - 37) as f32, TITLE_Y, Pal::Yellow),
+        label(app.profile.coins.to_string(), (CARD.0 + 45) as f32, TITLE_Y, Pal::Yellow),
     ];
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i) as f32;
