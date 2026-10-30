@@ -380,9 +380,26 @@ fn draw_effects(f: &mut Frame, m: &Moment, at: Place, s: Size) {
                 f.grid(icons::HEART, cx - 18 + i * 13, py - 4 - (t * 22.0) as i32 + (i % 2) * 4);
             }
         }
-        Fx::Eat if t < 0.5 => {
-            let x = s.w - 10 - ((t / 0.5) * (s.w - 10 - cx - 8) as f32) as i32;
-            f.grid(icons::APPLE, x, at.y + size / 2);
+        Fx::Eat if t < 0.9 => {
+            // Tossed in from the top right, lands beside the pet with a hop, then eaten in two bites.
+            let (ex, ey) = (px + size - 2, at.y + size - 8);
+            let (sx, sy) = (s.w - 8, 4);
+            let u = (t / 0.25).min(1.0);
+            let hop = if t > 0.25 { let v = ((t - 0.25) / 0.08).min(1.0); (4.0 * 4.0 * v * (1.0 - v)) as i32 } else { 0 };
+            let x = sx + ((ex - sx) as f32 * u) as i32;
+            let y = sy + ((ey - sy) as f32 * u) as i32 - (24.0 * 4.0 * u * (1.0 - u)) as i32 - hop;
+            let icon = if t < 0.5 { icons::APPLE } else if t < 0.7 { icons::APPLE_BITTEN } else { icons::APPLE_CORE };
+            f.grid(icon, x, y);
+            for bite in [0.5, 0.7, 0.88] {
+                if (bite..bite + 0.06).contains(&t) {
+                    let k = ((t - bite) * 100.0) as i32;
+                    f.grid(&["n"], ex + 6 + k, ey - k);
+                    f.grid(&["n"], ex + 2 - k / 2, ey - 2 - k);
+                }
+            }
+            if t >= 0.82 {
+                f.grid(icons::SPARKLE, ex, ey - 2);
+            }
         }
         Fx::Heal => {
             for (i, (x, y)) in [(-20, 4), (14, 0), (-16, 22), (18, 18)].into_iter().enumerate() {

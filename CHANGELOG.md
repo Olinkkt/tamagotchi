@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.0
+
+- Food is now tossed in from the top right in an arc, lands next to the pet with a little hop and
+  is eaten in two bites, leaving a core that vanishes in a sparkle. It no longer glides across.
+
 ## 1.4.4
 
 - Nyorotchi's body is now a round blob like the other adults instead of a tall egg shape. The
