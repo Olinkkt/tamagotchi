@@ -60,7 +60,7 @@ fn shop_row_y(i: usize) -> i32 {
 }
 
 fn draw_shop(f: &mut Frame, app: &App) {
-    f.grid(icons::COIN, CARD.0 + 36, 7);
+    f.grid(icons::COIN, ESC.0 - 26, ESC.1 + 3);
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i);
         let can = app.profile.coins >= item.price();
@@ -79,7 +79,7 @@ fn draw_shop(f: &mut Frame, app: &App) {
 fn shop_labels(app: &App) -> Vec<Label> {
     let mut v = vec![
         label("SHOP", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
-        label(app.profile.coins.to_string(), (CARD.0 + 45) as f32, TITLE_Y, Pal::Yellow),
+        label(app.profile.coins.to_string(), (ESC.0 - 17) as f32, ESC.1 as f32 + 6.5, Pal::Yellow),
     ];
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i) as f32;
@@ -256,7 +256,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         _ => Vec::new(),
     };
     if showing(app) {
-        v.push(centred("esc", ESC.0 as f32 + ESC.2 as f32 / 2.0, ESC.1 as f32 + ESC.3 as f32 / 2.0, Pal::White));
+        v.push(centred("esc", ESC.0 as f32 + ESC.2 as f32 / 2.0 + 0.25, ESC.1 as f32 + ESC.3 as f32 / 2.0 - 0.25, Pal::White));
     }
     let (ox, oy) = lay.centred_card();
     for l in &mut v {
@@ -282,7 +282,7 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
 
 /// The close button over a game: the top-right corner of the screen.
 pub fn game_esc(lay: Layout) -> (i32, i32, i32, i32) {
-    (lay.w - 19, 3, 15, 11)
+    (lay.w - 20, 3, 16, 12)
 }
 
 fn in_rect(r: (i32, i32, i32, i32), x: i32, y: i32) -> bool {

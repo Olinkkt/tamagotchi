@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.12.5
+
+- The shop's coin count sits left of the "esc" button, number beside the coin and level with it.
+  The "esc" text is centred in its button.
+
 ## 1.12.4
 
 - The shop's coin count moves next to the "SHOP" title, away from the "esc" button. The card's
