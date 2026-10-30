@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.14.0
+
+- A fourth mini-game, Slots: three reels spin and you stop them one by one with space or a click.
+  Two matching symbols win the round, three alike is a jackpot. Three rounds, each one faster.
+
 ## 1.13.0
 
 - A third mini-game, Shells: your pet hides under one of three cups, the cups swap places, and you

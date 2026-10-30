@@ -234,6 +234,11 @@ fn draw_chooser(f: &mut Frame) {
                     f.boxed(cx - 5, top, 10, 14, [Pal::Orange, Pal::Pink, Pal::Sky][n as usize], Pal::Ink);
                 }
             }
+            3 => {
+                // A little reel window with a star in it.
+                f.boxed(x + w / 2 - 14, y + 22, 28, 24, Pal::Cream, Pal::Ink);
+                f.grid(icons::STAR, x + w / 2 - 5, y + 28);
+            }
             _ => {}
         }
     }
