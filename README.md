@@ -64,7 +64,7 @@ seconds (any key skips it).
 A minute or two after a meal (and rarely out of nowhere) the pet needs the toilet: a bubble appears
 and the **Clean** button becomes **Toilet** (`t`). Press it and the view moves to a washroom with
 five booths. The pet sits in a random one, the door swings shut, and about five seconds later it
-opens and you are back in the room. Snacks do not cause it. If you ignore the call for 10 minutes,
+opens and you are back in the room. An iris wipe closes and opens around the pet at both ends. Snacks do not cause it. If you ignore the call for 10 minutes,
 the pet has an accident: Happy -1, a care mistake and a chance of sickness. While the game is
 closed the call waits for you and never ends in an accident. `tama toilet` does it from the shell.
 

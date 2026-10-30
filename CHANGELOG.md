@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.1
+
+- Going to the toilet and coming back now uses an iris wipe: the picture closes to a black circle
+  around the pet, the scene changes, and the circle opens around the pet in the washroom (and
+  again on the way out, with a few hearts). Buttons do nothing for that half second.
+
 ## 1.7.0
 
 - The pet now needs the toilet a minute or two after a meal, and rarely out of nowhere, instead of

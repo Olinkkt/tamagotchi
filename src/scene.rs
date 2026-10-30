@@ -254,6 +254,16 @@ fn cracks_at(n: usize) -> Vec<(i32, i32, Pal)> {
     faces::pixels(&faces::EGG_CRACKS[n - 1]).map(|(dx, dy, c)| (x + dx, y + dy, c)).collect()
 }
 
+/// The middle of the pet in an area `w` x `h`: where the iris wipe closes and opens.
+pub fn pet_spot(app: &App, w: i32, h: i32) -> (i32, i32) {
+    if let Mode::Toilet(visit) = &app.mode {
+        return toilet::spot(app, visit, w, h);
+    }
+    let c = character(&app.pet);
+    let at = place(&Moment::of(app), &c, Size { w, h });
+    (at.x + at.size / 2, (at.head + at.y + art::body(&c).bottom()) / 2)
+}
+
 /// The pet as it sits in the washroom booth.
 pub fn seated(app: &App) -> Sprite {
     pet_sprite(&Moment::of(app), &character(&app.pet))

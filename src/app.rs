@@ -7,6 +7,7 @@ use crate::cast;
 use crate::config::Config;
 use crate::pet::{self, Pet, Stage, MAX_HEARTS};
 use crate::profile::{self, Profile};
+use crate::wipe::{Next, Wipe};
 use crate::{fmt_age, games, save, scene, sysinfo, toilet, MAX_CATCHUP_TICKS, MAX_QUEUED_EVENTS};
 
 /// A key press, in the terms the game cares about. Each frontend translates its own events.
@@ -52,6 +53,8 @@ pub struct App {
     was_calling: bool,
     pub started: Instant,
     fx: Option<(scene::Fx, Instant)>,
+    /// The iris wipe in progress between two scenes; keys do nothing until it is over.
+    pub(crate) wipe: Option<Wipe>,
     /// When the egg hatched, so its shell can lie on the floor for a while.
     shell_at: Option<Instant>,
     last_stage: Stage,
@@ -172,6 +175,7 @@ impl App {
             was_calling: false,
             started: Instant::now(),
             fx: None,
+            wipe: None,
             shell_at: None,
             last_stage: Stage::Egg,
             confirm_reset: false,
@@ -316,9 +320,10 @@ impl App {
         if matches!(self.mode, Mode::Game(_) | Mode::Chooser) && (self.pet.asleep || !self.pet.alive()) {
             self.mode = Mode::Normal;
         }
-        if matches!(&self.mode, Mode::Toilet(v) if v.done()) {
-            self.mode = Mode::Normal;
+        if self.wipe.is_none() && matches!(&self.mode, Mode::Toilet(v) if v.done()) {
+            self.wipe = Some(Wipe::new(Next::Room));
         }
+        self.run_wipe();
         self.tick_game();
         if matches!(&self.mode, Mode::Finish(f) if f.expired()) {
             self.mode = Mode::Normal;
@@ -343,6 +348,31 @@ impl App {
             let _ = save::save_profile(&self.profile);
             save::heartbeat();
             self.last_save = Instant::now();
+        }
+    }
+
+    pub fn wiping(&self) -> bool {
+        self.wipe.is_some()
+    }
+
+    pub fn wipe(&self) -> Option<&Wipe> {
+        self.wipe.as_ref()
+    }
+
+    /// Change scenes at the moment the wipe is shut, and drop it once it has opened again.
+    fn run_wipe(&mut self) {
+        let Some(wipe) = &mut self.wipe else { return };
+        if wipe.swap_now() {
+            match wipe.next {
+                Next::Toilet(booth) => self.mode = Mode::Toilet(toilet::Visit::new(booth)),
+                Next::Room => {
+                    self.mode = Mode::Normal;
+                    self.trigger(scene::Fx::Hearts);
+                }
+            }
+        }
+        if self.wipe.as_ref().is_some_and(Wipe::done) {
+            self.wipe = None;
         }
     }
 
@@ -392,6 +422,9 @@ impl App {
     }
 
     fn handle(&mut self, code: Key, dev_keys: bool) {
+        if self.wipe.is_some() {
+            return;
+        }
         match &mut self.mode {
             Mode::Game(g) => {
                 let outcome = g.key(code);
@@ -485,7 +518,7 @@ impl App {
                 let goes = self.pet.needs_toilet();
                 let msg = self.pet.toilet();
                 if goes {
-                    self.mode = Mode::Toilet(toilet::Visit::new(self.pet.rand(cast::BOOTHS as u64) as usize));
+                    self.wipe = Some(Wipe::new(Next::Toilet(self.pet.rand(cast::BOOTHS as u64) as usize)));
                 }
                 msg
             }
@@ -780,6 +813,23 @@ pub(crate) mod tests {
             assert!(matches!(app.mode, Mode::Awards));
             app.on_key(Key::Char('x'));
             assert!(matches!(app.mode, Mode::Normal));
+        });
+    }
+
+    #[test]
+    fn the_toilet_key_wipes_into_the_washroom_and_back_out() {
+        save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Adult, |p| p.urge = Some(0));
+            app.on_key(Key::Char('t'));
+            assert!(app.wiping() && matches!(app.mode, Mode::Normal), "the wipe starts in the room");
+            app.on_key(Key::Char('f'));
+            assert_eq!(app.pet.hunger, 3, "keys do nothing during the wipe");
+            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.5);
+            app.update();
+            assert!(matches!(app.mode, Mode::Toilet(_)), "scenes change while the picture is shut");
+            app.wipe.as_mut().unwrap().started -= Duration::from_secs_f32(0.5);
+            app.update();
+            assert!(!app.wiping() && app.pet.urge.is_none());
         });
     }
 }

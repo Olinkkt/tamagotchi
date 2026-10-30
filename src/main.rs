@@ -24,6 +24,7 @@ mod scene;
 mod screens;
 mod sysinfo;
 mod toilet;
+mod wipe;
 mod window;
 
 const MAX_CATCHUP_TICKS: u64 = 86_400;

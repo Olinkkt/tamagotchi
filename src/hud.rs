@@ -234,8 +234,12 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
     // Header strip over the room, status panel to its right.
     f.rect(0, 0, panel_x, ROOM_Y, Pal::Night);
     f.rect(0, ROOM_Y - 1, panel_x, 1, Pal::Dusk);
-    f.frame(&scene::area(app, panel_x, lay.room_h()), 0, ROOM_Y);
-    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) {
+    let mut room = scene::area(app, panel_x, lay.room_h());
+    if let Some(wipe) = app.wipe() {
+        wipe.cover(&mut room, scene::pet_spot(app, panel_x, lay.room_h()));
+    }
+    f.frame(&room, 0, ROOM_Y);
+    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) && !app.wiping() {
         f.tint(0, lay.message_y(), panel_x, hint_y - lay.message_y(), Pal::dark);
     }
     f.boxed(panel_x, 0, PANEL_W, hint_y, Pal::Night, Pal::Dusk);
@@ -298,7 +302,7 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
     if let Some((text, colour)) = hint(app) {
         out.push(label(text, lay.w as f32 / 2.0, hint_y as f32 + 6.0, colour, Align::Centre));
     }
-    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) {
+    if !app.message.is_empty() && matches!(app.mode, Mode::Normal) && !app.wiping() {
         // One line only: long messages lose their tail rather than spill over the panel.
         let max = ((panel_x - 8) as f32 / ratio) as i32;
         let mut text = app.message.clone();
