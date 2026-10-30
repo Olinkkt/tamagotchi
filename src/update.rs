@@ -3,9 +3,9 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-/// GitHub repo (`owner/name`) that updates come from when the local source folder is not newer.
+/// GitHub repo (`owner/name`) whose newest release is the update when the local source folder is not newer.
 const REPO: &str = "Olinkkt/tamagotchi";
-const BRANCH: &str = "master";
+const ASSET: &str = "tama-linux-x86_64";
 
 pub type Version = (u32, u32, u32);
 
@@ -58,11 +58,14 @@ fn local_version() -> Option<Version> {
     parse_version(&std::fs::read_to_string(source_dir()?.join("Cargo.toml")).ok()?)
 }
 
-/// The version on GitHub, asked with curl so the game needs no networking code. None when offline.
+/// The newest release on GitHub, read from where `/releases/latest` redirects to (no API needed),
+/// asked with curl so the game has no networking code. None when offline or there is no release.
 fn remote_version() -> Option<Version> {
-    let url = format!("https://raw.githubusercontent.com/{REPO}/{BRANCH}/Cargo.toml");
-    let out = Command::new("curl").args(["-fsS", "--max-time", "8", &url]).output().ok()?;
-    out.status.success().then(|| parse_version(&String::from_utf8_lossy(&out.stdout))).flatten()
+    let url = format!("https://github.com/{REPO}/releases/latest");
+    let out = Command::new("curl").args(["-fsSL", "--max-time", "8", "-o", "/dev/null", "-w", "%{url_effective}", &url]).output().ok()?;
+    let landed = String::from_utf8_lossy(&out.stdout);
+    let tag = landed.rsplit_once("/tag/v")?.1;
+    parse_version(&format!("version = \"{}\"", tag.trim()))
 }
 
 /// Is there a newer version anywhere? Slow (it uses the network): run it off the main thread.
@@ -79,24 +82,29 @@ fn cargo() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("cargo"))
 }
 
-/// Reinstall from the newest source. With nothing newer, rebuild from the local folder if there is
-/// one, else from GitHub. Returns an exit code.
+/// Install the newest version: build the local folder if it is ahead, else download the GitHub
+/// release. With nothing newer, rebuild the local folder if there is one. Returns an exit code.
 pub fn install() -> i32 {
-    let origin = check().map(|f| f.origin).unwrap_or(if source_dir().is_some() { Origin::Local } else { Origin::Github });
-    let mut cmd = Command::new(cargo());
-    // --locked builds with the versions in Cargo.lock, which are known to work.
-    cmd.args(["install", "--force", "--locked"]);
-    match (origin, source_dir()) {
-        (Origin::Local, Some(src)) => {
-            println!("Rebuilding from {}", src.display());
-            cmd.arg("--path").arg(src);
+    match check() {
+        Some(Found { origin: Origin::Github, version }) => {
+            println!("Downloading tama {} from github.com/{REPO}", show(version));
+            download()
         }
-        _ => {
-            println!("Installing the newest version from github.com/{REPO}");
-            cmd.args(["--git", &format!("https://github.com/{REPO}"), "--branch", BRANCH]);
+        Some(_) => build_local(),
+        None if source_dir().is_some() => build_local(),
+        None => {
+            println!("tama {} is up to date.", show(running()));
+            0
         }
     }
-    match cmd.status() {
+}
+
+/// Rebuild from the source folder with cargo.
+fn build_local() -> i32 {
+    let Some(src) = source_dir() else { return 1 };
+    println!("Rebuilding from {}", src.display());
+    // --locked builds with the versions in Cargo.lock, which are known to work.
+    match Command::new(cargo()).args(["install", "--force", "--locked", "--path"]).arg(src).status() {
         Ok(s) if s.success() => 0,
         Ok(s) => s.code().unwrap_or(1),
         Err(e) => {
@@ -104,6 +112,32 @@ pub fn install() -> i32 {
             1
         }
     }
+}
+
+/// Replace this program with the newest release binary. It is checked before it is moved into place.
+fn download() -> i32 {
+    if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        eprintln!("There is no download for this system yet; build it with cargo install --git https://github.com/{REPO}");
+        return 1;
+    }
+    let Ok(exe) = std::env::current_exe() else { return 1 };
+    let new = exe.with_extension("new");
+    let url = format!("https://github.com/{REPO}/releases/latest/download/{ASSET}");
+    let fetched = Command::new("curl").args(["-fsSL", "--max-time", "120", "-o"]).arg(&new).arg(&url).status();
+    let installed = fetched.is_ok_and(|s| s.success()) && make_runnable(&new) && std::fs::rename(&new, &exe).is_ok();
+    if !installed {
+        let _ = std::fs::remove_file(&new);
+        eprintln!("Could not download the update. Check your connection and try again.");
+        return 1;
+    }
+    0
+}
+
+/// Mark the downloaded file executable and make sure it starts.
+fn make_runnable(path: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o755)).is_ok()
+        && Command::new(path).arg("--version").output().is_ok_and(|o| o.status.success())
 }
 
 /// Update in the background after the game has closed, then start the game again. The output goes

@@ -27,14 +27,14 @@ in Rust, drawn in 24 colours.
 
 ## Quick start
 
+On 64-bit Linux, one command downloads the game and adds it to your app menu (no Rust needed):
+
 ```sh
-git clone https://github.com/Olinkkt/tamagotchi
-cd tamagotchi
-cargo install --path .
-tama
+curl -fsSL https://raw.githubusercontent.com/Olinkkt/tamagotchi/master/install.sh | sh
 ```
 
-Needs [Rust](https://rustup.rs) 1.86+ and a desktop with OpenGL. More below.
+Then search for "tama" in your launcher. It needs `curl` and a desktop with OpenGL. To build it
+yourself instead, see Install below.
 
 ## Install
 
@@ -46,8 +46,8 @@ cargo install --path .
 ```
 
 This puts `tama` in `~/.cargo/bin`, which must be on your `PATH`. After you change the code,
-`tama --update` installs the newest version: from the source folder if it is ahead, otherwise
-from GitHub (needs Rust). At start-up the game checks for one too and shows "UPDATE X.Y.Z READY -
+`tama --update` installs the newest version: it rebuilds from the source folder if that is ahead
+(needs Rust), otherwise it downloads the newest GitHub release. At start-up the game checks for one too and shows "UPDATE X.Y.Z READY -
 PRESS U"; U closes the game, installs it and opens it again (progress is in `update.log` in the data
 folder). Nothing installs unless you press U.
 
@@ -327,7 +327,7 @@ Source layout:
 | `pet.rs` | the simulation: needs, growth, evolution, shop items |
 | `profile.rs` | coins, achievements, the adult collection |
 | `cli.rs` | shell commands, `--flags`, status bar, notifications, `--update` |
-| `update.rs` | finds the newest version (local folder or GitHub) and installs it |
+| `update.rs` | finds the newest version (local folder or GitHub release) and installs it |
 | `save.rs` | save files (with a format `version`), profile, graveyard, lock |
 | `sysinfo.rs` | machine load |
 | `config.rs` | settings |

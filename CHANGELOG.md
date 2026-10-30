@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.21.0
+
+- New players on 64-bit Linux can install with one command (see the README): it downloads the game,
+  puts it in `~/.local/bin` and adds it to the app menu. No Rust needed.
+- Updates from GitHub now download the new version instead of compiling it, so they take seconds.
+  Your own source folder still wins while it is ahead.
 ## 1.20.1
 
 - The app-menu entry from `tama --install-desktop` now points straight at its icon file, so launchers

@@ -1,0 +1,25 @@
+name: release
+
+# Builds the Linux binary when a version tag (vX.Y.Z) is pushed and attaches it to a GitHub release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    # An older Ubuntu, so the binary runs on older distros too.
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --locked
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp target/release/tama tama-linux-x86_64
+          notes=$(awk -v v="${GITHUB_REF_NAME#v}" '$0 == "## " v {f=1; next} /^## /{f=0} f' CHANGELOG.md)
+          gh release create "$GITHUB_REF_NAME" tama-linux-x86_64 --title "$GITHUB_REF_NAME" --notes "$notes"
