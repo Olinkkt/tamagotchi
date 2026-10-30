@@ -567,7 +567,6 @@ impl App {
                 msg
             }
             Key::Char('d') => self.pet.scold(),
-            Key::Char('l') => self.pet.toggle_light(),
             Key::Char('n') if !self.pet.alive() => {
                 self.pet = self.fresh_pet();
                 self.shell_at = None;

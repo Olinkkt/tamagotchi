@@ -110,7 +110,7 @@ fn label(text: impl Into<String>, x: f32, y: f32, colour: Pal, align: Align) -> 
     Label { text: text.into(), x, y, colour, align }
 }
 
-const ACTIONS: [char; 11] = ['f', 's', 'p', 'l', 'm', 't', 'd', 'b', 'a', 'g', 'q'];
+const ACTIONS: [char; 10] = ['f', 's', 'p', 'm', 't', 'd', 'b', 'a', 'g', 'q'];
 const DEAD_ACTIONS: [char; 4] = ['n', 'a', 'g', 'q'];
 
 /// Whether an action would do anything right now (the rest are drawn dimmed).
@@ -122,7 +122,6 @@ fn useful(app: &App, key: char) -> bool {
         'm' => p.sick,
         't' => p.needs_toilet(),
         'd' => p.disc_call.is_some(),
-        'l' => p.asleep,
         _ => true,
     }
 }
@@ -142,7 +141,6 @@ fn key_name(c: char) -> &'static str {
         'f' => "f",
         's' => "s",
         'p' => "p",
-        'l' => "l",
         'm' => "m",
         't' => "t",
         'd' => "d",
@@ -347,7 +345,7 @@ mod tests {
         let lay = Layout::new(320, 160);
         let bar = buttons(&app, lay);
         let keys: String = bar.iter().filter_map(|b| if let Key::Char(c) = b.key { Some(c) } else { None }).collect();
-        assert_eq!(keys, "fsplmtdbagq");
+        assert_eq!(keys, "fspmtdbagq");
         assert!(bar.iter().all(|b| b.x >= 0 && b.x + BUTTON <= lay.panel_x() && b.y + BUTTON <= 160), "buttons stay on screen");
         let feed = bar[0];
         assert_eq!(button_at(&app, lay, feed.x as f32 + 8.0, feed.y as f32 + 8.0), Some(Key::Char('f')));
@@ -416,8 +414,7 @@ mod tests {
 
     #[test]
     fn the_need_hints_fit_the_screen_at_the_coarsest_text_scale() {
-        let states: [fn(&mut crate::pet::Pet); 6] = [
-            |p| p.asleep = true,
+        let states: [fn(&mut crate::pet::Pet); 5] = [
             |p| p.sick = true,
             |p| p.hunger = 0,
             |p| p.disc_call = Some(0),

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.17.0
+
+- The light is gone: no `l` key, no light button, no `tama light`, and no care mistake for leaving it
+  on. A sleeping pet just sleeps in the dark room. Saves keep working.
+
 ## 1.16.0
 
 - Slots is gone from the game picker. Shells and Rock Paper Scissors stay, and Rock Paper Scissors is

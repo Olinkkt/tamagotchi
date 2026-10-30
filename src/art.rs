@@ -114,13 +114,12 @@ impl Sprite {
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Light {
     Day,
-    Lamp,
     Dark,
 }
 
 struct Art {
     sheets: Vec<(&'static str, Vec<Sprite>)>,
-    rooms: [Sprite; 3],
+    rooms: [Sprite; 2],
     washroom: Sprite,
     door: Sprite,
     toilet: Sprite,
@@ -157,7 +156,6 @@ fn art() -> &'static Art {
             .collect(),
         rooms: [
             Sprite::decode(include_bytes!("../assets/sprites/room_day.png")),
-            Sprite::decode(include_bytes!("../assets/sprites/room_lamp.png")),
             Sprite::decode(include_bytes!("../assets/sprites/room_dark.png")),
         ],
         washroom: Sprite::decode(include_bytes!("../assets/sprites/washroom.png")),
@@ -203,7 +201,7 @@ mod tests {
             assert!(cells.iter().all(|s| s.w == c.size as i32 && s.h == c.size as i32));
             assert!(cells[0].bottom() > c.size as i32 / 2, "{} is mostly empty", c.name);
         }
-        for light in [Light::Day, Light::Lamp, Light::Dark] {
+        for light in [Light::Day, Light::Dark] {
             let r = room(light);
             assert_eq!((r.w, r.h), (cast::ROOM_MASTER.0 as i32, cast::ROOM_MASTER.1 as i32));
             assert!((0..r.h).all(|y| (0..r.w).all(|x| r.get(x, y).is_some())), "the room has no holes");

@@ -131,7 +131,6 @@ pub struct Pet {
     pub sick: bool,
     pub doses: u8,
     pub asleep: bool,
-    pub light_on: bool,
     pub mistakes: u32,
     pub disc_call: Option<u64>,
     pub cause_of_death: Option<String>,
@@ -168,7 +167,6 @@ pub struct Pet {
     hunger_zero: u64,
     happy_zero: u64,
     sick_t: u64,
-    light_t: u64,
     rng: u64,
     #[serde(skip)]
     pub events: Vec<String>,
@@ -190,7 +188,6 @@ impl Pet {
             sick: false,
             doses: 0,
             asleep: false,
-            light_on: true,
             mistakes: 0,
             disc_call: None,
             cause_of_death: None,
@@ -210,7 +207,6 @@ impl Pet {
             hunger_zero: 0,
             happy_zero: 0,
             sick_t: 0,
-            light_t: 0,
             rng: seed | 1,
             events: Vec::new(),
         };
@@ -319,7 +315,7 @@ impl Pet {
             _ => {}
         }
         if self.asleep {
-            return self.light_on.then_some(('l', "It's asleep with the light on - turn it off"));
+            return None;
         }
         if self.sick {
             Some(('m', "Sick! Give it medicine"))
@@ -376,12 +372,6 @@ impl Pet {
         }
         self.update_sleep();
         if self.asleep {
-            if self.light_on && !self.safe_away() {
-                self.light_t += 1;
-                if self.light_t == 600 {
-                    self.mistake("left the light on while sleeping");
-                }
-            }
             return;
         }
         self.decay();
@@ -397,8 +387,6 @@ impl Pet {
         let asleep = self.in_sleep_hours();
         if asleep != self.asleep {
             self.asleep = asleep;
-            self.light_on = !self.safe_away();
-            self.light_t = 0;
             let msg = if asleep { "went to sleep." } else { "woke up!" };
             self.events.push(format!("{} {msg}", self.species));
         }
@@ -787,14 +775,6 @@ impl Pet {
             "It didn't deserve that! Happy -1.".into()
         }
     }
-
-    pub fn toggle_light(&mut self) -> String {
-        if !self.asleep {
-            return "The pet is awake; lights don't matter.".into();
-        }
-        self.light_on = !self.light_on;
-        if self.light_on { "Light on.".into() } else { "Light off. Sweet dreams.".into() }
-    }
 }
 
 #[cfg(test)]
@@ -1169,7 +1149,6 @@ mod tests {
                 p.medicine();
                 p.medicine();
                 p.scold();
-                if p.asleep && p.light_on { p.toggle_light(); }
             }
         }
         assert!(p.alive());

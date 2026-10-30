@@ -61,7 +61,6 @@ button (or, on a card, anywhere off it) to close them. F11 toggles fullscreen.
 | `f` | feed a meal (+1 hunger heart) |
 | `s` | snack (+1 happy heart; makes it heavier, and sometimes sick) |
 | `p` | play: pick a mini-game (see below) |
-| `l` | light on/off (only matters while it sleeps) |
 | `m` | medicine (a sick pet needs two doses) |
 | `t` | take it to the toilet (when it needs to go) |
 | `d` | scold, but only when it is being naughty |
@@ -131,7 +130,7 @@ off in an arc, and the two halves of the shell stay on the floor for a few secon
 Care mistakes (counted over its whole life) decide what it grows into:
 
 - Ignoring hunger, unhappiness or sickness for 15 minutes, ignoring a naughty call for
-  10 minutes, or leaving the light on while it sleeps for 10 minutes each add one mistake.
+  10 minutes each add one mistake.
 
 | Becoming | Needs |
 |---|---|
@@ -167,7 +166,7 @@ and loads no graphics, so the status bar and `tama watch` stay light.
 tama                 play (opens the window)
 tama status          one line for a status bar, e.g. (T_T) Marutchi ♡♡♡♡ ♥♥♥♡ ! feed
 tama status --waybar JSON for waybar: short text, a hover tooltip, and a class
-tama feed|snack|toilet|medicine|scold|light
+tama feed|snack|toilet|medicine|scold
                      care for the pet without opening the game (refused while it is open)
 tama hook zsh        print a shell snippet so commits feed the pet and failed commands upset it
 tama event commit|fail  tell the pet about a shell event (the hook calls this)

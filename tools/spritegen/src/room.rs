@@ -1,5 +1,5 @@
 //! The pet's room, drawn in room pixels on a 4x canvas and shrunk like a sprite.
-//! Three versions: daytime, asleep with the lamp on, and asleep in the dark.
+//! Two versions: daytime, and asleep in the dark.
 //!
 //! Everything is authored in "stage" coordinates, the standard 160x116 room. The image made is
 //! the larger master of `cast::ROOM_MASTER`: the stage sits at its bottom centre, the wall and
@@ -27,7 +27,6 @@ const XS: std::ops::Range<i32> = -SX..(W as i32 + SX);
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Light {
     Day,
-    Lamp,
     Dark,
 }
 
@@ -206,13 +205,13 @@ fn rug() -> Img {
     lined(&s)
 }
 
-fn lamp(on: bool) -> Img {
+fn lamp() -> Img {
     let mut s = canvas();
     // The cord reaches up to the top of the master, however tall the room is cropped.
     s.rect(79.5, -SY as f32, 1.0, 8.0 + SY as f32, Ink);
     s.poly(&[(75.0, 8.0), (85.0, 8.0), (90.0, 16.0), (70.0, 16.0)], Yellow);
     s.poly(&[(72.5, 12.0), (87.5, 12.0), (90.0, 16.0), (70.0, 16.0)], Orange);
-    s.ellipse(80.0, 17.5, 2.5, 2.0, if on { Cream } else { Mist });
+    s.ellipse(80.0, 17.5, 2.5, 2.0, Mist);
     lined(&s)
 }
 
@@ -255,19 +254,9 @@ fn light_patch(img: &mut Img, hit: impl Fn(f32, f32) -> bool, f: impl Fn(Pal) ->
 /// Where light from the window lands on the floor.
 const WINDOW_PATCH: [(f32, f32); 4] = [(20.0, 85.0), (52.0, 85.0), (66.0, 98.0), (30.0, 98.0)];
 
-fn in_lamp_pool(x: f32, y: f32) -> bool {
-    let (dx, dy) = ((x - 80.0) / 28.0, (y - 101.0) / 7.0);
-    dx * dx + dy * dy <= 1.0
-}
-
-fn near_bulb(x: f32, y: f32) -> bool {
-    let (dx, dy) = (x - 80.0, y - 18.5);
-    (dx * dx + dy * dy).sqrt() <= 4.0 && y > 16.0
-}
-
 pub fn room(light: Light) -> Img {
     let view = view(light);
-    let front = [window(), curtains(), shelf(), clock(), floor(), rug(), lamp(light == Light::Lamp)];
+    let front = [window(), curtains(), shelf(), clock(), floor(), rug(), lamp()];
     let mut img = wall();
     img.blit(&view, 0, 0);
     for part in &front {
@@ -275,10 +264,6 @@ pub fn room(light: Light) -> Img {
     }
     match light {
         Light::Day => light_patch(&mut img, |x, y| inside(&WINDOW_PATCH, x, y), lit),
-        Light::Lamp => {
-            light_patch(&mut img, in_lamp_pool, lit);
-            light_patch(&mut img, near_bulb, |p| if p == Cream { p } else { lit(p) });
-        }
         Light::Dark => {
             let moonlit: Vec<bool> =
                 (0..MW * MH).map(|i| inside(&WINDOW_PATCH, (i % MW) as f32 - SX as f32 + 0.5, (i / MW) as f32 - SY as f32 + 0.5)).collect();

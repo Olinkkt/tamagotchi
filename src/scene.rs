@@ -146,11 +146,7 @@ fn assemble(p: &Pet, c: &Character, face: &[(i32, i32, Pal)], beat: u64) -> Spri
 }
 
 pub fn light(p: &Pet) -> Light {
-    match (p.asleep && p.alive(), p.light_on) {
-        (false, _) => Light::Day,
-        (true, true) => Light::Lamp,
-        (true, false) => Light::Dark,
-    }
+    if p.asleep && p.alive() { Light::Dark } else { Light::Day }
 }
 
 /// The face to show, following the same rules as the old terminal pet.
@@ -749,8 +745,6 @@ mod tests {
         let mut p = pet(Stage::Baby);
         assert_eq!(light(&p), Light::Day);
         p.asleep = true;
-        assert_eq!(light(&p), Light::Lamp);
-        p.light_on = false;
         assert_eq!(light(&p), Light::Dark);
         assert_eq!(expression(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms: 0 }), Expr::Sleeping);
     }

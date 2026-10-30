@@ -152,7 +152,7 @@ fn main() {
     }
     img::save_preview(&sheet, &preview.join("cast.png"), 4);
     let baby = posed(&cast::BABY, &chars::cells(&cast::BABY), Expr::Happy, None);
-    for (light, name) in [(room::Light::Day, "day"), (room::Light::Lamp, "lamp"), (room::Light::Dark, "dark")] {
+    for (light, name) in [(room::Light::Day, "day"), (room::Light::Dark, "dark")] {
         let r = room::room(light);
         img::save(&r, &sprites.join(format!("room_{name}.png")));
         img::save_preview(&r, &preview.join(format!("room_{name}.png")), 2);
