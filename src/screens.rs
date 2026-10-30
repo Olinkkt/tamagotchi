@@ -228,7 +228,7 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
     if !showing(app) {
         return;
     }
-    f.tint(0, 0, lay.w, lay.hint_y(), Pal::dark);
+    f.tint(0, 0, lay.w, lay.h, Pal::dark);
     // The card is laid out as if the screen were the smallest one, then moved to the middle.
     let mut local = Frame::new(240, 128, Pal::Ink);
     card(&mut local);

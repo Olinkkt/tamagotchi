@@ -76,7 +76,7 @@ pub fn labels(app: &App, ratio: f32, lay: Layout) -> Vec<Label> {
     let p = &app.pet;
     let dx = (lay.panel_x() - BASE_X) as f32;
     let (col, value_x) = (LEFT + dx, VALUE_X as f32 + dx);
-    let flow_bottom = (lay.hint_y() - FLOW_MARGIN) as f32;
+    let flow_bottom = (lay.h - FLOW_MARGIN) as f32;
     let max = (WIDTH / ratio) as i32;
     let text = |t: &str, x: f32, y: f32, c: Pal| Label { text: t.into(), x, y, colour: c, align: Align::Left };
     let mut out = Vec::new();
@@ -176,7 +176,7 @@ mod tests {
         app.log = (0..20).map(|i| format!("Something long happened to the pet, number {i}")).collect();
         for l in labels(&app, ratio, Layout::MIN) {
             assert!(l.x + font::width(&l.text) as f32 * ratio <= 240.0 - 1.0, "too wide: {}", l.text);
-            assert!(l.y <= 125.0, "below the panel: {}", l.text);
+            assert!(l.y <= 157.0, "below the panel: {}", l.text);
         }
     }
 

@@ -96,7 +96,7 @@ fn draw_label(v: &Viewport, l: &Label) {
 /// The developer panel: plain text over the status panel, every dev key with what it changes.
 fn draw_dev_panel(v: &Viewport, app: &App) {
     let (x, y) = (v.x + (v.layout.panel_x() as f32 + 2.0) * v.scale, v.y + 13.0 * v.scale);
-    let (w, h) = (76.0 * v.scale, (v.layout.hint_y() - 15) as f32 * v.scale);
+    let (w, h) = (76.0 * v.scale, (v.layout.h - 15) as f32 * v.scale);
     draw_rectangle(x - 2.0, y - 2.0, w, h, Color::from_rgba(0, 0, 0, 225));
     let p = &app.pet;
     let on = |b: bool| if b { "ON" } else { "off" };

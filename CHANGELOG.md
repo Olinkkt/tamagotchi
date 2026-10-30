@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.2
+
+- The status sidebar now runs the full height of the window, and the action buttons are centred in
+  the space under the room instead of across the whole screen.
+
 ## 1.8.1
 
 - The speech bubble sits up and to the right of the pet's head, where the need icons appear.

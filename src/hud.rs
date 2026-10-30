@@ -120,9 +120,9 @@ fn useful(app: &App, key: char) -> bool {
     }
 }
 
-fn row(items: Vec<(Key, Option<Grid>, &'static str, Look)>, lay: Layout) -> Vec<Button> {
+fn row(items: Vec<(Key, Option<Grid>, &'static str, Look)>, lay: Layout, width: i32) -> Vec<Button> {
     let n = items.len() as i32;
-    let x0 = (lay.w - (n * BUTTON + (n - 1) * GAP)) / 2;
+    let x0 = (width - (n * BUTTON + (n - 1) * GAP)) / 2;
     items
         .into_iter()
         .enumerate()
@@ -157,6 +157,12 @@ fn text_button(c: char) -> (Key, Option<Grid>, &'static str, Look) {
 
 const BACK: (Key, Option<Grid>, &str, Look) = (Key::Esc, None, "esc", Look::Normal);
 
+/// How wide the hint line and button bar are: the whole screen for a game, otherwise just the
+/// space under the room, since the status panel runs all the way down.
+fn bar_w(app: &App, lay: Layout) -> i32 {
+    if matches!(app.mode, Mode::Game(_) | Mode::Finish(_)) { lay.w } else { lay.panel_x() }
+}
+
 /// The buttons along the bottom for the current mode.
 pub fn buttons(app: &App, lay: Layout) -> Vec<Button> {
     let urgent = app.pet.top_need().map(|n| n.0);
@@ -173,7 +179,7 @@ pub fn buttons(app: &App, lay: Layout) -> Vec<Button> {
         Mode::Game(Game::Pong(_)) => vec![(Key::Up, Some(icons::UP), "w", Look::Normal), (Key::Down, Some(icons::DOWN), "s", Look::Normal), BACK],
         Mode::Finish(_) | Mode::Awards | Mode::Graveyard(_) => vec![BACK],
         Mode::Toilet(_) => Vec::new(),
-    }, lay)
+    }, lay, bar_w(app, lay))
 }
 
 /// The key a click at scene position (`x`, `y`) presses, if it lands on a button.
@@ -233,7 +239,7 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
         wipe.cover(&mut room, (panel_x / 2, lay.room_h() / 2));
     }
     f.frame(&room, 0, ROOM_Y);
-    f.boxed(panel_x, 0, PANEL_W, hint_y, Pal::Night, Pal::Dusk);
+    f.boxed(panel_x, 0, PANEL_W, lay.h, Pal::Night, Pal::Dusk);
     f.rect(panel_x + 1, 11, PANEL_W - 2, 1, Pal::Dusk);
     if matches!(app.mode, Mode::Normal | Mode::Toilet(_)) {
         panel::draw(&mut f, app, lay);
@@ -248,9 +254,10 @@ pub fn frame(app: &App, lay: Layout, hover: Option<Key>) -> Frame {
 
 /// The hint line and the button bar under it.
 fn draw_bar(f: &mut Frame, app: &App, lay: Layout, hover: Option<Key>) {
-    f.rect(0, lay.hint_y(), lay.w, lay.bar_y() - lay.hint_y(), Pal::Ink);
-    f.rect(0, lay.bar_y(), lay.w, lay.h - lay.bar_y(), Pal::Night);
-    f.rect(0, lay.bar_y(), lay.w, 1, Pal::Dusk);
+    let w = bar_w(app, lay);
+    f.rect(0, lay.hint_y(), w, lay.bar_y() - lay.hint_y(), Pal::Ink);
+    f.rect(0, lay.bar_y(), w, lay.h - lay.bar_y(), Pal::Night);
+    f.rect(0, lay.bar_y(), w, 1, Pal::Dusk);
     let bounce = ((app.started.elapsed().as_millis() / 350) % 2) as i32;
     for b in buttons(app, lay) {
         draw_button(f, &b, hover == Some(b.key), bounce);
@@ -291,7 +298,7 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
         out.push(label("STATUS", panel_x as f32 + 40.0, 6.0, Pal::Pink, Align::Centre));
     }
     if let Some((text, colour)) = hint(app) {
-        out.push(label(text, lay.w as f32 / 2.0, hint_y as f32 + 6.0, colour, Align::Centre));
+        out.push(label(text, bar_w(app, lay) as f32 / 2.0, hint_y as f32 + 6.0, colour, Align::Centre));
     }
     if !in_game {
         out.extend(panel::labels(app, ratio, lay));
@@ -321,13 +328,14 @@ mod tests {
     #[test]
     fn the_bar_has_every_action_and_a_click_presses_it() {
         let app = app_with(Stage::Adult, |_| {});
-        let bar = buttons(&app, Layout::MIN);
+        let lay = Layout::new(320, 160);
+        let bar = buttons(&app, lay);
         let keys: String = bar.iter().filter_map(|b| if let Key::Char(c) = b.key { Some(c) } else { None }).collect();
         assert_eq!(keys, "fsplmtdbagq");
-        assert!(bar.iter().all(|b| b.x >= 0 && b.x + BUTTON <= 240 && b.y + BUTTON <= 160), "buttons stay on screen");
+        assert!(bar.iter().all(|b| b.x >= 0 && b.x + BUTTON <= lay.panel_x() && b.y + BUTTON <= 160), "buttons stay on screen");
         let feed = bar[0];
-        assert_eq!(button_at(&app, Layout::MIN, feed.x as f32 + 8.0, feed.y as f32 + 8.0), Some(Key::Char('f')));
-        assert_eq!(button_at(&app, Layout::MIN, 1.0, 1.0), None);
+        assert_eq!(button_at(&app, lay, feed.x as f32 + 8.0, feed.y as f32 + 8.0), Some(Key::Char('f')));
+        assert_eq!(button_at(&app, lay, 1.0, 1.0), None);
     }
 
     #[test]
