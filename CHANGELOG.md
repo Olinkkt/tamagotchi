@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.1
+
+- The family tree's legend now says what is under each form (habit and personality) instead of the
+  old mistake numbers.
+
 ## 2.0.0
 
 - What you do now picks the form, not care mistakes. Winning games leads to Tarakotchi, snacks to

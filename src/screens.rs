@@ -396,7 +396,7 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
             None => ("EVERY AWARD UNLOCKED!".into(), Pal::Yellow),
         },
-        Mode::Tree => ("YELLOW: NOW  BLUE: NEXT  NUMBERS: MISTAKES  *: 75% DISCIPLINE".into(), Pal::Mist),
+        Mode::Tree => ("YELLOW: NOW  BLUE: NEXT  UNDER EACH: HABIT, PERSONALITY".into(), Pal::Mist),
         Mode::Graveyard(_) => ("ANY KEY TO GO BACK".into(), Pal::Mist),
         _ => return None,
     })
