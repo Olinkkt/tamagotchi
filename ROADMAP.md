@@ -25,34 +25,21 @@ Three goals, in this order:
 - 1.23 to 1.24: the shell hook and the CPU, RAM and battery reactions were removed.
 - 1.25: the family tree screen (`e`).
 - 2.0: evolution by habit, personalities and the Plain form (Futsutchi); 2.0.3: the leaning tint.
+- 2.1: gifts while away and the keepsakes page.
 
 ## Next, in order
 
 Times are my own work time, plus your playtesting.
 
-1. **Gifts while away (MINOR, about 30 minutes).** Details below.
-2. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
+1. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
    (100, 500, 1000). No fail state.
-3. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
+2. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
    seconds a round.
-4. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
+3. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
    for things you keep, hung or placed in the room.
-5. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
+4. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
    new prices.
-6. **macOS build in the release workflow (MINOR, about 30 minutes).**
-
-## Gifts while away
-
-While the game is closed the pet leaves small gifts, so coming back is a reward and never a
-chore.
-
-- One gift for every 2 hours away, up to 5 waiting. First guess: each gift is 2 to 5 coins or a
-  keepsake.
-- Keepsakes are collectable and appear in a "keepsakes" page next to the awards, shown as
-  silhouettes until found.
-- A short "welcome back" card shows the gifts when the game opens. No gifts are lost or
-  punished if you stay away longer; they just stop piling up at the cap.
-- Works with the existing away rules: the pet is safe and slower while the game is closed.
+5. **macOS build in the release workflow (MINOR, about 30 minutes).**
 
 ## Shop collectibles
 
@@ -64,7 +51,7 @@ the room, so a player learns them by seeing them. They are the main coin sink af
   hatches. This is the first piece of "memory of past pets".
 - **Wall and floor pieces.** Posters, a second rug, a plant, a lamp. A few spots in the room,
   one item per spot, swapped by buying another.
-- **Keepsakes from gifts** (see above) can also be placed, so the two systems feed each other.
+- **Keepsakes from gifts** can also be placed, so the two systems feed each other.
 - Owned collectibles live in the profile, so they survive a pet's death. Old profiles load as
   before (new fields have defaults).
 - Palette rule: only the 24 colours, drawn as pixel grids like the other icons, with a preview

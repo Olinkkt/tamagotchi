@@ -32,6 +32,10 @@ pub enum Mode {
     Graveyard(Vec<String>),
     Shop,
     Awards,
+    /// The keepsakes found so far, next to the awards.
+    Keepsakes,
+    /// The welcome-back card: what the pet left while you were away.
+    Gifts(Vec<profile::Gift>),
     /// The family tree: every form and what it takes to get there.
     Tree,
     /// The pet in a washroom booth; nothing can be done until it comes out.
@@ -170,6 +174,15 @@ impl App {
             app.say("Missed you!");
         }
         app.profile = save::load_profile();
+        // Gifts count from the last time the game ran, not from the pet's save, which care
+        // commands from the terminal also refresh.
+        let there = app.pet.alive() && app.pet.stage != Stage::Egg && !fresh;
+        let (profile, pet) = (&mut app.profile, &mut app.pet);
+        let gifts = profile.collect_gifts(save::now(), there, |n| pet.rand(n));
+        if !gifts.is_empty() {
+            app.mode = Mode::Gifts(gifts);
+        }
+        let _ = save::save_profile(&app.profile);
         app.drain_events();
         app.last_stage = app.pet.stage;
         save::heartbeat();
@@ -217,7 +230,7 @@ impl App {
     /// Save everything and give up the lock. Called once when the game closes.
     pub fn shutdown(&self) {
         let _ = save::save(&self.pet);
-        let _ = save::save_profile(&self.profile);
+        let _ = save::save_profile(&Profile { last_seen: save::now(), ..self.profile.clone() });
         save::release();
     }
 
@@ -392,6 +405,7 @@ impl App {
         }
         if self.last_save.elapsed() > Duration::from_secs(10) {
             let _ = save::save(&self.pet);
+            self.profile.last_seen = save::now();
             let _ = save::save_profile(&self.profile);
             save::heartbeat();
             self.last_save = Instant::now();
@@ -507,7 +521,15 @@ impl App {
                 }
                 return;
             }
-            Mode::Awards | Mode::Tree | Mode::Graveyard(_) => {
+            Mode::Awards => {
+                self.mode = if matches!(code, Key::Right | Key::Char('k')) { Mode::Keepsakes } else { Mode::Normal };
+                return;
+            }
+            Mode::Keepsakes => {
+                self.mode = if matches!(code, Key::Left | Key::Char('a')) { Mode::Awards } else { Mode::Normal };
+                return;
+            }
+            Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_) => {
                 self.mode = Mode::Normal;
                 return;
             }

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0
+
+- Your pet now leaves gifts while the game is closed: one for every 2 hours away, up to 5 waiting
+  when you come back. Each is 2 to 5 coins or a keepsake. A "welcome back" card shows them when the
+  game opens. Nothing is lost or punished if you stay away longer; the pile just stops at 5.
+- New keepsakes page: press `k` on the awards screen (`a`), or the right arrow. Six keepsakes
+  (acorn, pebble, feather, button, seashell, clover) show as silhouettes until found, and each is
+  given only once. Found keepsakes belong to you and survive a pet dying.
+- Saves and profiles from before load as before; the first run after updating counts no gifts.
+
 ## 2.0.3
 
 - Your pet's outline now takes on the colour of the form it is heading for: a dotted rim once a

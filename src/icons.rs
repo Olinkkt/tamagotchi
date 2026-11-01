@@ -355,3 +355,94 @@ mod tests {
         }
     }
 }
+
+/// Little things the pet brings home while you are away, 12x12 each.
+pub const ACORN: Grid = &[
+    "....kkkk....",
+    "..kknnnnkk..",
+    ".knnnnnunnk.",
+    ".kkkkkkkkkk.",
+    "..kttttttk..",
+    "..kctttttk..",
+    "..kttttttk..",
+    "...kttttk...",
+    "...kttttk...",
+    "....kttk....",
+    ".....kk.....",
+    "............",
+];
+
+pub const PEBBLE: Grid = &[
+    "............",
+    "............",
+    "....kkkk....",
+    "..kkhhhhkk..",
+    ".khhwwhhhhk.",
+    ".khwhhhhhhk.",
+    "khhhhhhhaahk",
+    "khhhhhhhhaak",
+    ".khhhhhhaak.",
+    "..kkaaaakk..",
+    "....kkkk....",
+    "............",
+];
+
+pub const FEATHER: Grid = &[
+    "........kkk.",
+    ".......kwwsk",
+    "......kwwwsk",
+    ".....kwwwssk",
+    "....kwwwwsk.",
+    "...kwwwwssk.",
+    "..kwwwwsk...",
+    ".kwwwwsk....",
+    "kkwwsk......",
+    "knkk........",
+    "kn..........",
+    "k...........",
+];
+
+pub const BUTTON: Grid = &[
+    "...kkkkkk...",
+    "..kppppppk..",
+    ".kpppppppbk.",
+    ".kppkppkppk.",
+    ".kpppppppbk.",
+    ".kppkppkppk.",
+    ".kpppppppbk.",
+    "..kppppppk..",
+    "...kkkkkk...",
+    "............",
+    "............",
+    "............",
+];
+
+pub const SEASHELL: Grid = &[
+    "............",
+    "....kkkk....",
+    "..kkpbpbkk..",
+    ".kpbpbpbpbk.",
+    ".kbpbpbpbpk.",
+    ".kpbpbpbpbk.",
+    "..kpbpbpbk..",
+    "...kpbpbk...",
+    "....kkkk....",
+    "....kuuk....",
+    ".....kk.....",
+    "............",
+];
+
+pub const CLOVER: Grid = &[
+    "............",
+    "..kkk..kkk..",
+    ".kgllk.kllgk",
+    ".kgggkkkgggk",
+    "..kgggkgggk.",
+    "..kkgggggkk.",
+    ".kgggkkgggk.",
+    ".kllgk.kgllk",
+    "..kkk..kkk..",
+    "......kn....",
+    ".....kn.....",
+    "............",
+];

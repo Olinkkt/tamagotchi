@@ -125,6 +125,12 @@ the six adult species, in colour once you have raised one and as a silhouette un
 to you, not to one pet, so they survive a pet dying; they live in `profile.json` next to the save.
 Prices and rewards are first guesses.
 
+**Gifts while away.** While the game is closed, your pet leaves a gift for every 2 hours (up to 5
+waiting): 2 to 5 coins, or a keepsake it has not found yet. A "welcome back" card shows them when
+you open the game. Press `k` on the awards screen (or the right arrow) for the keepsakes page: six
+little things (acorn, pebble, feather, button, seashell, clover), shown as silhouettes until found.
+An egg or a pet that has passed away leaves nothing. Staying away longer never costs anything.
+
 ### Growing up
 
 ```

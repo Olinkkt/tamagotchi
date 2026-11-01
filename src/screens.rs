@@ -39,7 +39,7 @@ fn centred(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
 
 /// Whether one of the cards is up, hiding the room and the panel.
 pub fn showing(app: &App) -> bool {
-    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Tree | Mode::Graveyard(_))
+    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Keepsakes | Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_))
 }
 
 fn card(f: &mut Frame) {
@@ -146,11 +146,74 @@ fn awards_labels(app: &App) -> Vec<Label> {
     let p = &app.profile;
     let mut v = vec![
         label(format!("AWARDS {}/{}", p.achievements.len(), profile::ACHIEVEMENTS.len()), CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
+        label(format!("k: keepsakes {}/{}", p.keepsakes.len(), profile::KEEPSAKES.len()), (CARD.0 + 120) as f32, BODY_Y as f32 + 5.5 + 4.0 * AWARD_ROW, Pal::Mist),
         label(format!("adults raised {}/{}", p.adults.len(), profile::ADULT_SPECIES.len()), (CARD.0 + 120) as f32, TITLE_Y, Pal::Mist),
     ];
     for (i, a) in profile::ACHIEVEMENTS.iter().enumerate() {
         let (x, y) = (CARD.0 + 18 + (i as i32 / 5) * 110, BODY_Y as f32 + 5.5 + (i % 5) as f32 * AWARD_ROW);
         v.push(label(a.name, x as f32, y, if p.has(a.id) { Pal::Green } else { Pal::Mist }));
+    }
+    v
+}
+
+/// Where keepsake `i` sits on its page: three across, two down.
+fn keepsake_at(i: usize) -> (i32, i32) {
+    (CARD.0 + 28 + (i as i32 % 3) * 70, BODY_Y + 8 + (i as i32 / 3) * 44)
+}
+
+fn draw_keepsakes(f: &mut Frame, app: &App) {
+    for (i, k) in profile::KEEPSAKES.iter().enumerate() {
+        let found = app.profile.found(k.id);
+        let (x, y) = keepsake_at(i);
+        f.grid_scaled(k.icon, x, y, 2, |c| if found || c == Pal::Ink { c } else { Pal::Dusk });
+    }
+}
+
+fn keepsakes_labels(app: &App) -> Vec<Label> {
+    let mut v = vec![
+        label(format!("KEEPSAKES {}/{}", app.profile.keepsakes.len(), profile::KEEPSAKES.len()), CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
+        label("left: awards", (CARD.0 + 120) as f32, TITLE_Y, Pal::Mist),
+    ];
+    for (i, k) in profile::KEEPSAKES.iter().enumerate() {
+        let (x, y) = keepsake_at(i);
+        let found = app.profile.found(k.id);
+        v.push(centred(if found { k.name } else { "???" }, (x + 12) as f32, (y + 31) as f32, if found { Pal::Green } else { Pal::Mist }));
+    }
+    v
+}
+
+const GIFT_ROW: i32 = 15;
+
+fn gift_y(i: usize) -> i32 {
+    BODY_Y + 4 + i as i32 * GIFT_ROW
+}
+
+fn draw_gifts(f: &mut Frame, gifts: &[profile::Gift]) {
+    for (i, g) in gifts.iter().enumerate() {
+        let y = gift_y(i);
+        match g {
+            profile::Gift::Coins(_) => f.grid(icons::COIN, CARD.0 + 63, y + 3),
+            profile::Gift::Keepsake(id) => {
+                if let Some(k) = profile::KEEPSAKES.iter().find(|k| k.id == *id) {
+                    f.grid(k.icon, CARD.0 + 60, y);
+                }
+            }
+        }
+    }
+}
+
+fn gifts_labels(gifts: &[profile::Gift]) -> Vec<Label> {
+    let mut v = vec![label("WELCOME BACK", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink), label("while you were away, it left you", (CARD.0 + 80) as f32, TITLE_Y, Pal::Mist)];
+    for (i, g) in gifts.iter().enumerate() {
+        let (text, colour) = match g {
+            profile::Gift::Coins(n) => (format!("{n} coins"), Pal::Yellow),
+            profile::Gift::Keepsake(id) => {
+                let name = profile::KEEPSAKES.iter().find(|k| k.id == *id).map_or("keepsake", |k| k.name).to_lowercase();
+                let a = if name.starts_with(['a', 'e', 'i', 'o', 'u']) { "an" } else { "a" };
+                (format!("{a} {name} (new keepsake!)"), Pal::Green)
+            }
+        };
+        v.push(label(text, (CARD.0 + 80) as f32, gift_y(i) as f32 + 6.0, colour));
     }
     v
 }
@@ -359,6 +422,8 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
         Mode::Chooser => draw_chooser(&mut local),
         Mode::Shop => draw_shop(&mut local, app),
         Mode::Awards => draw_awards(&mut local, app),
+        Mode::Keepsakes => draw_keepsakes(&mut local, app),
+        Mode::Gifts(gifts) => draw_gifts(&mut local, gifts),
         Mode::Tree => draw_tree(&mut local, app),
         Mode::Graveyard(entries) => draw_graveyard(&mut local, entries),
         _ => {}
@@ -372,6 +437,8 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         Mode::Chooser => chooser_labels(),
         Mode::Shop => shop_labels(app),
         Mode::Awards => awards_labels(app),
+        Mode::Keepsakes => keepsakes_labels(app),
+        Mode::Gifts(gifts) => gifts_labels(gifts),
         Mode::Tree => tree_labels(app),
         Mode::Graveyard(entries) => graveyard_labels(entries),
         _ => Vec::new(),
@@ -396,6 +463,8 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
             None => ("EVERY AWARD UNLOCKED!".into(), Pal::Yellow),
         },
+        Mode::Keepsakes => ("THE PET BRINGS ONE EVERY 2 HOURS YOU ARE AWAY (UP TO 5)".into(), Pal::Mist),
+        Mode::Gifts(_) => ("ANY KEY TO CONTINUE".into(), Pal::Yellow),
         Mode::Tree => ("YELLOW: NOW  BLUE: NEXT  UNDER EACH: HABIT, PERSONALITY".into(), Pal::Mist),
         Mode::Graveyard(_) => ("ANY KEY TO GO BACK".into(), Pal::Mist),
         _ => return None,
@@ -536,6 +605,36 @@ mod tests {
         assert_eq!(now, ["Tonmarutchi"]);
         let next: Vec<&str> = forms.iter().filter(|n| is_on_track(&app, n)).map(|n| n.species).collect();
         assert_eq!(next, ["Tarakotchi"], "six games lead to Tarakotchi");
+    }
+
+    #[test]
+    fn the_welcome_back_card_lists_the_gifts_and_any_key_closes_it() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.mode = Mode::Gifts(vec![profile::Gift::Coins(4), profile::Gift::Keepsake("acorn")]);
+        let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
+        for want in ["WELCOME BACK", "4 coins", "an acorn (new keepsake!)"] {
+            assert!(text.iter().any(|t| t == want), "missing {want}: {text:?}");
+        }
+        assert_eq!(hint(&app).unwrap().0, "ANY KEY TO CONTINUE");
+        app.on_key(Key::Char('x'));
+        assert!(matches!(app.mode, Mode::Normal));
+    }
+
+    #[test]
+    fn the_keepsakes_page_hides_what_is_not_found_and_sits_next_to_the_awards() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.profile.keepsakes.push("pebble".into());
+        app.mode = Mode::Awards;
+        app.on_key(Key::Char('k'));
+        assert!(matches!(app.mode, Mode::Keepsakes));
+        let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
+        assert!(text.iter().any(|t| t == "KEEPSAKES 1/6") && text.iter().any(|t| t == "Pebble"), "{text:?}");
+        assert_eq!(text.iter().filter(|t| *t == "???").count(), 5);
+        app.on_key(Key::Left);
+        assert!(matches!(app.mode, Mode::Awards));
+        app.on_key(Key::Right);
+        app.on_key(Key::Char('x'));
+        assert!(matches!(app.mode, Mode::Normal));
     }
 
     #[test]

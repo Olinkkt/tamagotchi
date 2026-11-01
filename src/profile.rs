@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::icons::{self, Grid};
 use crate::pet::{Pet, Stage};
 
 pub const ADULT_SPECIES: [&str; 6] = ["Mametchi", "Kuchipatchi", "Tarakotchi", "Ichigotchi", "Nyorotchi", "Futsutchi"];
@@ -37,8 +38,35 @@ pub const ACHIEVEMENTS: [Achievement; 9] = [
     Achievement { id: "old_age", name: "A long life", how: "a pet dies of old age" },
     Achievement { id: "gamer", name: "Gamer", how: "win 10 mini-games" },
     Achievement { id: "rich", name: "Piggy bank", how: "earn 100 coins in total" },
-    Achievement { id: "collector", name: "Collector", how: "raise all five adult species" },
+    Achievement { id: "collector", name: "Collector", how: "raise all six adult species" },
 ];
+
+/// Something the pet can bring home while you are away. Shown as a silhouette until found.
+pub struct Keepsake {
+    pub id: &'static str,
+    pub name: &'static str,
+    pub icon: Grid,
+}
+
+pub const KEEPSAKES: [Keepsake; 6] = [
+    Keepsake { id: "acorn", name: "Acorn", icon: icons::ACORN },
+    Keepsake { id: "pebble", name: "Pebble", icon: icons::PEBBLE },
+    Keepsake { id: "feather", name: "Feather", icon: icons::FEATHER },
+    Keepsake { id: "button", name: "Button", icon: icons::BUTTON },
+    Keepsake { id: "seashell", name: "Seashell", icon: icons::SEASHELL },
+    Keepsake { id: "clover", name: "Clover", icon: icons::CLOVER },
+];
+
+/// One gift for every this many seconds away, up to `MAX_GIFTS` when you come back.
+pub const GIFT_EVERY_SECS: u64 = 2 * 3600;
+pub const MAX_GIFTS: u64 = 5;
+
+/// What the pet left while you were away.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Gift {
+    Coins(u32),
+    Keepsake(&'static str),
+}
 
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 #[serde(default)]
@@ -51,6 +79,10 @@ pub struct Profile {
     pub adults: Vec<String>,
     /// Unix time of the last game that paid in full.
     pub last_full_pay: u64,
+    /// Keepsakes found (ids from `KEEPSAKES`).
+    pub keepsakes: Vec<String>,
+    /// Unix time the game last ran; what gifts are counted from. 0 until the first run.
+    pub last_seen: u64,
 }
 
 impl Profile {
@@ -69,6 +101,35 @@ impl Profile {
         } else {
             reward / 2
         }
+    }
+
+    /// Hand out the gifts for the time since the game last ran, and note that it runs now.
+    /// A pet that is not there to leave them (an egg, or gone) leaves none. Never takes anything
+    /// away, and more than `MAX_GIFTS` worth of time away just stops adding up.
+    pub fn collect_gifts(&mut self, now: u64, pet_is_there: bool, mut rand: impl FnMut(u64) -> u64) -> Vec<Gift> {
+        let away = if self.last_seen == 0 { 0 } else { now.saturating_sub(self.last_seen) };
+        self.last_seen = now;
+        let mut gifts = Vec::new();
+        if !pet_is_there {
+            return gifts;
+        }
+        for _ in 0..(away / GIFT_EVERY_SECS).min(MAX_GIFTS) {
+            let unfound: Vec<&Keepsake> = KEEPSAKES.iter().filter(|k| !self.found(k.id)).collect();
+            if !unfound.is_empty() && rand(3) == 0 {
+                let k = unfound[rand(unfound.len() as u64) as usize];
+                self.keepsakes.push(k.id.to_string());
+                gifts.push(Gift::Keepsake(k.id));
+            } else {
+                let coins = 2 + rand(4) as u32;
+                self.add_coins(coins);
+                gifts.push(Gift::Coins(coins));
+            }
+        }
+        gifts
+    }
+
+    pub fn found(&self, id: &str) -> bool {
+        self.keepsakes.iter().any(|k| k == id)
     }
 
     pub fn has(&self, id: &str) -> bool {
@@ -121,6 +182,63 @@ mod tests {
         p.stage = Stage::Adult;
         p.species = species.into();
         p
+    }
+
+    #[test]
+    fn one_gift_per_two_hours_away_up_to_five() {
+        let mut roll = 1u64;
+        let mut rand = |n: u64| {
+            roll = roll.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            (roll >> 33) % n
+        };
+        let mut p = Profile { last_seen: 1_000, ..Profile::default() };
+        assert!(p.collect_gifts(1_000 + 2 * 3600 - 1, true, &mut rand).is_empty(), "under two hours is nothing");
+        p.last_seen = 1_000;
+        assert_eq!(p.collect_gifts(1_000 + 4 * 3600 + 5, true, &mut rand).len(), 2);
+        p.last_seen = 1_000;
+        assert_eq!(p.collect_gifts(1_000 + 30 * 24 * 3600, true, &mut rand).len() as u64, MAX_GIFTS, "the pile stops at the cap");
+        assert_eq!(p.last_seen, 1_000 + 30 * 24 * 3600);
+    }
+
+    #[test]
+    fn gifts_are_a_few_coins_or_a_new_keepsake_and_never_a_repeat() {
+        let mut p = Profile { last_seen: 1, ..Profile::default() };
+        let mut n = 0u64;
+        for round in 0..40 {
+            p.last_seen = 1;
+            let gifts = p.collect_gifts(1 + 10 * 3600, true, |m| {
+                n += 1;
+                n % m
+            });
+            for g in gifts {
+                match g {
+                    Gift::Coins(c) => assert!((2..=5).contains(&c), "round {round}: {c}"),
+                    Gift::Keepsake(id) => assert!(p.found(id)),
+                }
+            }
+        }
+        let mut ids = p.keepsakes.clone();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), p.keepsakes.len(), "no keepsake is given twice");
+        assert!(p.coins > 0 && p.coins == p.coins_earned);
+    }
+
+    #[test]
+    fn no_pet_to_leave_gifts_or_a_first_run_means_none() {
+        let mut p = Profile::default();
+        assert!(p.collect_gifts(99_999, true, |_| 0).is_empty(), "a first run has nothing to count from");
+        assert_eq!(p.last_seen, 99_999);
+        assert!(p.collect_gifts(99_999 + 10 * 3600, false, |_| 0).is_empty(), "an egg or a gone pet leaves none");
+        assert_eq!(p.coins, 0);
+    }
+
+    #[test]
+    fn every_keepsake_icon_is_a_12_by_12_grid() {
+        for k in KEEPSAKES.iter() {
+            assert_eq!(k.icon.len(), 12, "{}", k.name);
+            assert!(k.icon.iter().all(|r| r.chars().count() == 12), "{}", k.name);
+        }
     }
 
     #[test]
