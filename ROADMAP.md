@@ -27,13 +27,13 @@ Three goals, in this order:
 - 2.0: evolution by habit, personalities and the Plain form (Futsutchi); 2.0.3: the leaning tint.
 - 2.1: gifts while away and the keepsakes page; 2.2: care badges; 2.3: the Stop and Hop mini-games.
 - 2.4: shop collectibles, the memorial plaque and the keepsake windowsill.
-- 2.5: four new shop treats.
+- 2.5: four new shop treats; 2.6: macOS builds in the release (untested on a real Mac).
 
 ## Next, in order
 
 Times are my own work time, plus your playtesting.
 
-1. **macOS build in the release workflow (MINOR, about 30 minutes).**
+Nothing is queued. Pick the next thing from "Later", or add new ideas here.
 
 ## Later
 
@@ -41,7 +41,8 @@ Times are my own work time, plus your playtesting.
 - **Generations:** a new egg inherits a colour or accessory, and the family tree can show
   grandparents. Bigger than anything above, so only after the collection and badges exist.
 - **Memory of past pets** with milestones, built on the graveyard and the memorial plaque.
-- **Windows build.**
+- **Windows build** (the same workflow can build it; saves and the lock file need a check).
+- **Try the macOS build on a real Mac** and fix what shows up.
 
 ## Dropped
 

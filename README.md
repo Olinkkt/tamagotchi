@@ -31,14 +31,19 @@ in Rust, drawn in 24 colours.
 
 ## Quick start
 
-On 64-bit Linux, one command downloads the game and adds it to your app menu (no Rust needed):
+On 64-bit Linux and on macOS (Apple silicon or Intel), one command downloads the game (no Rust
+needed). On Linux it also adds it to your app menu:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Olinkkt/tamagotchi/main/install.sh | sh
 ```
 
-Then search for "tama" in your launcher. It needs `curl` and a desktop with OpenGL. To build it
-yourself instead, see Install below.
+Then search for "tama" in your launcher (Linux), or run `tama` in a terminal (macOS; add
+`~/.local/bin` to your `PATH` if the installer says so). It needs `curl` and a desktop with OpenGL.
+To build it yourself instead, see Install below.
+
+The macOS build is new and has not been tried on a real Mac yet; if it does not start, please say so
+(`cargo install --path .` works there too). Windows is not supported yet.
 
 ## Install
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.6.0
+
+- macOS is now supported by the release: every new version also comes as a download for Apple
+  silicon and for Intel Macs. The one-line install command and `tama --update` pick the right file
+  for your system. It has not been tried on a real Mac yet.
+- Linux is unchanged. Nothing about saves or config changes.
+
 ## 2.5.0
 
 - Four new treats on a new "treats" shelf in the shop (press `Tab`): a cupcake (+1 hunger and +1

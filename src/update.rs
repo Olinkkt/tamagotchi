@@ -5,7 +5,20 @@ use std::process::Command;
 
 /// GitHub repo (`owner/name`) whose newest release is the update when the local source folder is not newer.
 const REPO: &str = "Olinkkt/tamagotchi";
-const ASSET: &str = "tama-linux-x86_64";
+
+/// The release file built for this system, if there is one. The names match `release.yml` and
+/// `install.sh`.
+fn asset() -> Option<&'static str> {
+    if cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+        Some("tama-linux-x86_64")
+    } else if cfg!(all(target_os = "macos", target_arch = "aarch64")) {
+        Some("tama-macos-arm64")
+    } else if cfg!(all(target_os = "macos", target_arch = "x86_64")) {
+        Some("tama-macos-x86_64")
+    } else {
+        None
+    }
+}
 
 pub type Version = (u32, u32, u32);
 
@@ -116,13 +129,13 @@ fn build_local() -> i32 {
 
 /// Replace this program with the newest release binary. It is checked before it is moved into place.
 fn download() -> i32 {
-    if !cfg!(all(target_os = "linux", target_arch = "x86_64")) {
+    let Some(asset) = asset() else {
         eprintln!("There is no download for this system yet; build it with cargo install --git https://github.com/{REPO}");
         return 1;
-    }
+    };
     let Ok(exe) = std::env::current_exe() else { return 1 };
     let new = exe.with_extension("new");
-    let url = format!("https://github.com/{REPO}/releases/latest/download/{ASSET}");
+    let url = format!("https://github.com/{REPO}/releases/latest/download/{asset}");
     let fetched = Command::new("curl").args(["-fsSL", "--max-time", "120", "-o"]).arg(&new).arg(&url).status();
     let installed = fetched.is_ok_and(|s| s.success()) && make_runnable(&new) && std::fs::rename(&new, &exe).is_ok();
     if !installed {
@@ -169,6 +182,20 @@ pub fn install_and_relaunch() {}
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_download_names_are_the_ones_the_release_and_the_installer_use() {
+        let workflow = include_str!("../.github/workflows/release.yml");
+        let installer = include_str!("../install.sh");
+        for name in ["tama-linux-x86_64", "tama-macos-arm64", "tama-macos-x86_64"] {
+            assert!(workflow.contains(&format!("asset: {name}")), "release.yml does not build {name}");
+            assert!(installer.contains(&format!("asset={name}")), "install.sh does not fetch {name}");
+        }
+        // Whatever system the tests run on, its own file is one the release builds.
+        if let Some(own) = asset() {
+            assert!(workflow.contains(own));
+        }
+    }
 
     #[test]
     fn reads_the_package_version() {

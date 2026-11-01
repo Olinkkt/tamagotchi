@@ -1,6 +1,7 @@
 name: release
 
-# Builds the Linux binary when a version tag (vX.Y.Z) is pushed and attaches it to a GitHub release.
+# Builds the game when a version tag (vX.Y.Z) is pushed and attaches the binaries to a GitHub
+# release: 64-bit Linux, and macOS for Apple silicon and Intel.
 on:
   push:
     tags: ["v*"]
@@ -9,17 +10,55 @@ permissions:
   contents: write
 
 jobs:
-  linux:
-    # An older Ubuntu, so the binary runs on older distros too.
-    runs-on: ubuntu-22.04
+  build:
+    strategy:
+      # One platform failing must not stop the others from being released.
+      fail-fast: false
+      matrix:
+        include:
+          # An older Ubuntu, so the binary runs on older distros too.
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            asset: tama-linux-x86_64
+          # Both Mac builds come from one Apple silicon runner; the Intel one is cross-built.
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            asset: tama-macos-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            asset: tama-macos-x86_64
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --release --locked
+        with:
+          targets: ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Check it starts
+        # A failed check is only a warning: the binary is still published.
+        continue-on-error: true
+        run: ./target/${{ matrix.target }}/release/tama --version
+      - run: cp target/${{ matrix.target }}/release/tama ${{ matrix.asset }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    needs: build
+    # Publish whatever was built, even if one platform failed.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp target/release/tama tama-linux-x86_64
+          ls -l dist
           notes=$(awk -v v="${GITHUB_REF_NAME#v}" '$0 == "## " v {f=1; next} /^## /{f=0} f' CHANGELOG.md)
-          gh release create "$GITHUB_REF_NAME" tama-linux-x86_64 --title "$GITHUB_REF_NAME" --notes "$notes"
+          gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --notes "$notes"
