@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use crate::cast;
 use crate::config::Config;
 use crate::pet::{self, Pet, Stage, MAX_HEARTS};
+use crate::decor;
 use crate::profile::{self, Profile};
 use crate::speech;
 use crate::wipe::{Next, Wipe};
@@ -55,6 +56,8 @@ pub struct App {
     pub log: Vec<String>,
     pub cfg: Config,
     pub profile: Profile,
+    /// Which shelf of the shop is showing: the care items, or the things for the room.
+    pub shop_keep: bool,
     pub tz: i64,
     pub speed: f64,
     tick_acc: f64,
@@ -208,6 +211,7 @@ impl App {
             log: if message.is_empty() { Vec::new() } else { vec![message] },
             cfg,
             profile: Profile::default(),
+            shop_keep: false,
             tz,
             speed,
             tick_acc: 0.0,
@@ -257,6 +261,19 @@ impl App {
                 });
             }
             Err(msg) => self.say(&msg),
+        }
+    }
+
+    /// Buy the `i`th thing for the room and put it where it goes.
+    fn buy_decor(&mut self, i: usize) {
+        let Some(d) = decor::DECOR.get(i) else { return };
+        match self.profile.buy_decor(d) {
+            Ok(()) => {
+                let _ = save::save_profile(&self.profile);
+                self.mode = Mode::Normal;
+                self.say(&format!("A {} for the room!", d.name.to_lowercase()));
+            }
+            Err(msg) => self.say(msg),
         }
     }
 
@@ -517,7 +534,9 @@ impl App {
             }
             Mode::Shop => {
                 match code {
+                    Key::Char(c @ '1'..='4') if self.shop_keep => self.buy_decor((c as u8 - b'1') as usize),
                     Key::Char(c @ '1'..='4') => self.buy(pet::Item::ALL[(c as u8 - b'1') as usize]),
+                    Key::Tab | Key::Left | Key::Right => self.shop_keep = !self.shop_keep,
                     Key::Esc | Key::Char('q') | Key::Char('b') => self.mode = Mode::Normal,
                     _ => {}
                 }
@@ -539,6 +558,12 @@ impl App {
                 return;
             }
             Mode::Keepsakes => {
+                if let Key::Char(c @ '1'..='6') = code {
+                    let id = profile::KEEPSAKES[(c as u8 - b'1') as usize].id;
+                    self.profile.place_keepsake(id);
+                    let _ = save::save_profile(&self.profile);
+                    return;
+                }
                 self.mode = match code {
                     Key::Left | Key::Char('a') => Mode::Awards,
                     Key::Right | Key::Char('b') => Mode::Badges,
@@ -552,6 +577,18 @@ impl App {
                     Key::Char('a') => Mode::Awards,
                     _ => Mode::Normal,
                 };
+                return;
+            }
+            Mode::Graveyard(entries) if code == Key::Char('p') => {
+                let result = self.profile.buy_plaque(entries);
+                self.mode = Mode::Normal;
+                match result {
+                    Ok(()) => {
+                        let _ = save::save_profile(&self.profile);
+                        self.say("A plaque on the wall.");
+                    }
+                    Err(msg) => self.say(msg),
+                }
                 return;
             }
             Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_) => {

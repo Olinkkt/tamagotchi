@@ -122,6 +122,22 @@ then `1` to `4`, or click an item; the shop closes so you can watch your pet enj
 | Salad | 8 | +1 hunger, lighter |
 | Vitamins | 25 | no sickness for 3 hours |
 
+**For the room.** Press `Tab` (or the arrow keys) in the shop for a second shelf of things you keep.
+They do nothing in play; they show up in the room and survive a pet dying. Each spot holds one
+thing, and buying another for the same spot swaps them.
+
+| Item | Price | Where |
+|---|---|---|
+| Star poster | 30 | the wall |
+| Potted fern | 40 | left of the rug |
+| Floor lamp | 60 | right of the rug |
+| Teddy bear | 45 | right of the rug (swaps with the lamp) |
+
+Two more things are not in the shop. In the graveyard (`g`), press `P` to hang a memorial plaque
+for the last pet you lost (20 coins, once per pet): a heart in the colour of its form and how long
+it lived. A new plaque replaces the old one. On the keepsakes page, press `1` to `6` to stand a
+keepsake you have found on the windowsill; press it again to take it down.
+
 `a` shows nine achievements (for example "Spotless": reach adulthood with no care mistakes) and
 the six adult species, in colour once you have raised one and as a silhouette until then. Coins, achievements and the collection belong
 to you, not to one pet, so they survive a pet dying; they live in `profile.json` next to the save.

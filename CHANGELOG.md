@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.0
+
+- The shop has a second shelf, "room" (press `Tab` or the arrow keys): a star poster, a potted fern,
+  a floor lamp and a teddy bear (30 to 60 coins). They appear in the room, one per spot, and buying
+  another for the same spot swaps them. They stay when a pet dies.
+- A memorial plaque: in the graveyard (`g`) press `P` to hang one on the wall for the last pet you
+  lost (20 coins, once per pet). It shows a heart in the colour of its form and how long it lived.
+- On the keepsakes page, press `1` to `6` to put a found keepsake on the windowsill.
+- Profiles from before load as before; nothing is owned at first.
+
 ## 2.3.0
 
 - Two new one-button mini-games, so there are six to pick from (keys 1 to 6): **Stop**, where you

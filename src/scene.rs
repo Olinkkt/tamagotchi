@@ -10,6 +10,7 @@ use crate::frame::Frame;
 use crate::icons;
 use crate::palette::Pal;
 use crate::pet::{Pet, Stage};
+use crate::profile::Profile;
 use crate::speech;
 use crate::toilet;
 
@@ -101,11 +102,13 @@ pub struct Moment<'a> {
     pub sub_ms: u64,
     /// What the pet is saying and how many milliseconds ago it started.
     pub speech: Option<(&'a str, u64)>,
+    /// What the player has put in the room.
+    pub decor: Option<&'a Profile>,
 }
 
 impl<'a> Moment<'a> {
     pub fn of(app: &'a App) -> Moment<'a> {
-        Moment { speech: app.speech(), pet: &app.pet, fx: app.current_fx(), ms: app.started.elapsed().as_millis() as u64, shell: app.shell_age(), sub_ms: app.sub_ms() }
+        Moment { speech: app.speech(), pet: &app.pet, fx: app.current_fx(), ms: app.started.elapsed().as_millis() as u64, shell: app.shell_age(), sub_ms: app.sub_ms(), decor: Some(&app.profile) }
     }
 
     /// The 350 ms beat most of the little animations step on.
@@ -490,6 +493,9 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
         f.set(CLOCK.0 + ox + dx, CLOCK.1 + oy + dy, ink);
     }
     f.set(CLOCK.0 + dx, CLOCK.1 + dy, if light == Light::Day { Pal::Red } else { Pal::Red.dark() });
+    if let Some(profile) = m.decor {
+        crate::decor::draw_room(&mut f, profile, dx, dy);
+    }
     if let Some(t) = m.shell {
         draw_shell(&mut f, t, s);
     }
@@ -530,7 +536,7 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
 }
 
 /// The colour of the form a pet leans towards (the body colour of that form).
-fn lean_colour(species: &str) -> Pal {
+pub(crate) fn lean_colour(species: &str) -> Pal {
     match species {
         "Hashitamatchi" => Pal::Violet,
         "Tarakotchi" => Pal::Orange,
@@ -592,7 +598,7 @@ mod tests {
     }
 
     fn look(p: &Pet, ms: u64) -> Frame {
-        room(&Moment { speech: None, pet: p, fx: None, ms, shell: None, sub_ms: 0 }, W, H)
+        room(&Moment { speech: None, pet: p, fx: None, ms, shell: None, sub_ms: 0, decor: None }, W, H)
     }
 
     #[test]
@@ -605,7 +611,7 @@ mod tests {
             for fx in fxs {
                 for t in [0.0, 0.4, 0.95] {
                     for ms in [0, 2_900, 7_000] {
-                        room(&Moment { speech: None, pet: &p, fx: fx.map(|f| (f, t)), ms, shell: None, sub_ms: 0 }, W, H);
+                        room(&Moment { speech: None, pet: &p, fx: fx.map(|f| (f, t)), ms, shell: None, sub_ms: 0, decor: None }, W, H);
                     }
                 }
             }
@@ -633,7 +639,7 @@ mod tests {
     #[test]
     fn a_bigger_room_keeps_the_pet_at_the_bottom_centre_and_draws_at_any_size() {
         let p = pet(Stage::Baby);
-        let m = Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms: 0 };
+        let m = Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms: 0, decor: None };
         for (w, h) in [(160, 116), (240, 116), (400, 200), (544, 244), (700, 300), (100, 60)] {
             let f = room(&m, w, h);
             assert_eq!((f.w, f.h), (w, h));
@@ -655,12 +661,12 @@ mod tests {
         let egg = egg_at(27);
         let shaking = (26..29u64).any(|age| {
             let p = egg_at(age);
-            (0..1000u64).step_by(10).any(|sub_ms| motion(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms }).0 != 0)
+            (0..1000u64).step_by(10).any(|sub_ms| motion(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms, decor: None }).0 != 0)
         });
         assert!(shaking, "an egg in its last seconds is shaking");
-        assert!(egg_at(1).stage_age == 1 && motion(&Moment { speech: None, pet: &egg_at(1), fx: None, ms: 99_999, shell: None, sub_ms: 0 }) == (0, 0));
+        assert!(egg_at(1).stage_age == 1 && motion(&Moment { speech: None, pet: &egg_at(1), fx: None, ms: 99_999, shell: None, sub_ms: 0, decor: None }) == (0, 0));
         // The animation clock plays no part: only the egg's own age does.
-        let at = |ms| motion(&Moment { speech: None, pet: &egg, fx: None, ms, shell: None, sub_ms: 300 });
+        let at = |ms| motion(&Moment { speech: None, pet: &egg, fx: None, ms, shell: None, sub_ms: 300, decor: None });
         assert_eq!(at(0), at(12_345));
     }
 
@@ -671,7 +677,7 @@ mod tests {
             for state in 0..3 {
                 p.sick = state == 1;
                 p.asleep = state == 2;
-                let xs: Vec<i32> = (0..40u64).map(|i| motion(&Moment { speech: None, pet: &p, fx: Some((Fx::Scold, 0.1)), ms: i * 350, shell: None, sub_ms: 0 }).0).collect();
+                let xs: Vec<i32> = (0..40u64).map(|i| motion(&Moment { speech: None, pet: &p, fx: Some((Fx::Scold, 0.1)), ms: i * 350, shell: None, sub_ms: 0, decor: None }).0).collect();
                 assert!(xs.iter().all(|&x| x == 0), "{stage:?} state {state}: {xs:?}");
             }
         }
@@ -680,7 +686,7 @@ mod tests {
     #[test]
     fn the_shell_lies_on_the_floor_after_hatching_and_blinks_out() {
         let p = pet(Stage::Baby);
-        let room_at = |shell: Option<f32>| room(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell, sub_ms: 0 }, W, H);
+        let room_at = |shell: Option<f32>| room(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell, sub_ms: 0, decor: None }, W, H);
         let none = room_at(None);
         assert!(none != room_at(Some(1.0)), "the halves are on the floor");
         assert!(room_at(Some(2.0)) == room_at(Some(3.0)), "and stay put once landed");
@@ -724,14 +730,14 @@ mod tests {
     }
 
     fn egg_frame(p: &Pet, sub_ms: u64) -> Sprite {
-        egg_sprite(&Moment { speech: None, pet: p, fx: None, ms: 0, shell: None, sub_ms }, &character(p))
+        egg_sprite(&Moment { speech: None, pet: p, fx: None, ms: 0, shell: None, sub_ms, decor: None }, &character(p))
     }
 
     #[test]
     fn the_split_egg_ends_exactly_where_the_burst_starts() {
         let mut p = pet(Stage::Egg);
         p.stage_age = 29;
-        let m = Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms: 800 };
+        let m = Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms: 800, decor: None };
         let (egg, s) = (egg_frame(&p, 800), Size { w: W, h: H });
         let at = place(&m, &character(&p), s);
         let ([top, bottom], [bowl, cap]) = ({ let (t, b) = egg.halves(egg::split_row); [t, b] }, shell_pieces(0.0, s));
@@ -764,7 +770,7 @@ mod tests {
     #[test]
     fn the_egg_bursts_then_the_baby_pops_out_and_the_shell_lands() {
         let p = pet(Stage::Baby);
-        let at = |t: f32| room(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: Some(t), sub_ms: 0 }, W, H);
+        let at = |t: f32| room(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: Some(t), sub_ms: 0, decor: None }, W, H);
         // The baby's pink body, above the rug.
         let pink = |f: &Frame| (66..88).flat_map(|y| (60..100).map(move |x| (x, y))).filter(|&(x, y)| f.get(x, y) == Some(Pal::Pink)).count();
         assert!(pink(&at(0.2)) > 100, "the baby is out");
@@ -784,12 +790,12 @@ mod tests {
         assert_eq!(light(&p), Light::Day);
         p.asleep = true;
         assert_eq!(light(&p), Light::Dark);
-        assert_eq!(expression(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms: 0 }), Expr::Sleeping);
+        assert_eq!(expression(&Moment { speech: None, pet: &p, fx: None, ms: 0, shell: None, sub_ms: 0, decor: None }), Expr::Sleeping);
     }
 
     #[test]
     fn moods_follow_the_needs() {
-        let face = |p: &Pet, fx: Option<(Fx, f32)>| expression(&Moment { speech: None, pet: p, fx, ms: 0, shell: None, sub_ms: 0 });
+        let face = |p: &Pet, fx: Option<(Fx, f32)>| expression(&Moment { speech: None, pet: p, fx, ms: 0, shell: None, sub_ms: 0, decor: None });
         let mut p = pet(Stage::Baby);
         assert_eq!(face(&p, None), Expr::Idle);
         p.happy = 4;
@@ -802,7 +808,7 @@ mod tests {
         p.hunger = 3;
         assert_eq!(face(&p, Some((Fx::Eat, 0.5))), Expr::Eating);
         assert_eq!(face(&p, Some((Fx::Snack, 0.5))), Expr::Eating);
-        assert_eq!(expression(&Moment { speech: None, pet: &p, fx: None, ms: 350 * 8, shell: None, sub_ms: 0 }), Expr::Blink);
+        assert_eq!(expression(&Moment { speech: None, pet: &p, fx: None, ms: 350 * 8, shell: None, sub_ms: 0, decor: None }), Expr::Blink);
     }
 
     #[test]

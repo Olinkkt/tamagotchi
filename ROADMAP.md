@@ -26,33 +26,15 @@ Three goals, in this order:
 - 1.25: the family tree screen (`e`).
 - 2.0: evolution by habit, personalities and the Plain form (Futsutchi); 2.0.3: the leaning tint.
 - 2.1: gifts while away and the keepsakes page; 2.2: care badges; 2.3: the Stop and Hop mini-games.
+- 2.4: shop collectibles, the memorial plaque and the keepsake windowsill.
 
 ## Next, in order
 
 Times are my own work time, plus your playtesting.
 
-1. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
-   for things you keep, hung or placed in the room.
-2. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
+1. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
    new prices.
-3. **macOS build in the release workflow (MINOR, about 30 minutes).**
-
-## Shop collectibles
-
-The shop gets a second tab for things you keep. They cost coins, do nothing in play, and show in
-the room, so a player learns them by seeing them. They are the main coin sink after treats.
-
-- **Memorial plaque.** A wall plaque of your last pet: its species, name or age, and how long it
-  lived. Bought once per pet from the graveyard, and it stays on the wall after a new egg
-  hatches. This is the first piece of "memory of past pets".
-- **Wall and floor pieces.** Posters, a second rug, a plant, a lamp. A few spots in the room,
-  one item per spot, swapped by buying another.
-- **Keepsakes from gifts** can also be placed, so the two systems feed each other.
-- Owned collectibles live in the profile, so they survive a pet's death. Old profiles load as
-  before (new fields have defaults).
-- Palette rule: only the 24 colours, drawn as pixel grids like the other icons, with a preview
-  checked at 8x.
-- First guess for prices: 20 to 60 coins, with the plaque cheap enough to buy after every pet.
+2. **macOS build in the release workflow (MINOR, about 30 minutes).**
 
 ## Later
 

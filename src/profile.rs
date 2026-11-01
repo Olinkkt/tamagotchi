@@ -2,6 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::decor;
 use crate::icons::{self, Grid};
 use crate::pet::{Care, Pet, Stage};
 
@@ -100,6 +101,14 @@ pub enum Gift {
     Keepsake(&'static str),
 }
 
+/// The memorial plaque on the wall: the last pet you lost, as the graveyard has it.
+#[derive(Serialize, Deserialize, Clone, Default, Debug, PartialEq)]
+pub struct Plaque {
+    pub species: String,
+    /// How long it lived, short ("3d", "5h").
+    pub lived: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Default, Debug)]
 #[serde(default)]
 pub struct Profile {
@@ -113,6 +122,13 @@ pub struct Profile {
     pub last_full_pay: u64,
     /// Keepsakes found (ids from `KEEPSAKES`).
     pub keepsakes: Vec<String>,
+    /// Room decorations bought and standing in the room (ids from `decor::DECOR`).
+    pub decor: Vec<String>,
+    /// The keepsake standing on the windowsill.
+    pub shelf: Option<String>,
+    pub plaque: Option<Plaque>,
+    /// How many graveyard entries there were when the plaque was bought: one plaque per pet.
+    pub plaque_pets: usize,
     /// How much care you have given in all, indexed by `Care as usize`.
     pub cared: [u32; 4],
     /// Unix time the game last ran; what gifts are counted from. 0 until the first run.
@@ -185,6 +201,52 @@ impl Profile {
     /// The badge closest to being earned, and how many more it takes.
     pub fn next_badge(&self) -> Option<(&'static Badge, u32)> {
         BADGES.iter().filter(|b| !self.has_badge(b)).map(|b| (b, b.goal - self.care_count(b.care))).min_by_key(|&(_, left)| left)
+    }
+
+    pub fn placed(&self, id: &str) -> bool {
+        self.decor.iter().any(|d| d == id)
+    }
+
+    /// Buy a decoration and put it in its spot, taking out whatever was there.
+    pub fn buy_decor(&mut self, d: &decor::Decor) -> Result<(), &'static str> {
+        if self.placed(d.id) {
+            return Err("It is already in the room.");
+        }
+        if self.coins < d.price {
+            return Err("Not enough coins.");
+        }
+        self.coins -= d.price;
+        self.decor.retain(|id| decor::by_id(id).is_some_and(|o| o.spot != d.spot));
+        self.decor.push(d.id.to_string());
+        Ok(())
+    }
+
+    /// Stand a found keepsake on the windowsill, or take it down if it is already there.
+    pub fn place_keepsake(&mut self, id: &str) -> bool {
+        if !self.found(id) {
+            return false;
+        }
+        self.shelf = if self.shelf.as_deref() == Some(id) { None } else { Some(id.to_string()) };
+        true
+    }
+
+    /// Hang a plaque for the newest graveyard entry (`entries` are newest first, as the
+    /// graveyard lists them). Once per pet.
+    pub fn buy_plaque(&mut self, entries: &[String]) -> Result<(), &'static str> {
+        let Some(last) = entries.first() else { return Err("No pet has passed away yet.") };
+        if self.plaque_pets >= entries.len() {
+            return Err("The last pet already has its plaque.");
+        }
+        if self.coins < decor::PLAQUE_PRICE {
+            return Err("Not enough coins.");
+        }
+        let parts: Vec<&str> = last.split(" | ").collect();
+        let species = parts.get(1).copied().unwrap_or("").to_string();
+        let lived = parts.get(2).and_then(|l| l.strip_prefix("lived ")).and_then(|l| l.split_whitespace().next()).unwrap_or("?").to_string();
+        self.coins -= decor::PLAQUE_PRICE;
+        self.plaque = Some(Plaque { species, lived });
+        self.plaque_pets = entries.len();
+        Ok(())
     }
 
     pub fn found(&self, id: &str) -> bool {
@@ -290,6 +352,44 @@ mod tests {
         assert_eq!(p.last_seen, 99_999);
         assert!(p.collect_gifts(99_999 + 10 * 3600, false, |_| 0).is_empty(), "an egg or a gone pet leaves none");
         assert_eq!(p.coins, 0);
+    }
+
+    #[test]
+    fn a_decoration_costs_coins_and_swaps_what_was_on_its_spot() {
+        let mut p = Profile { coins: 200, ..Profile::default() };
+        let (lamp, teddy, fern) = (decor::by_id("lamp").unwrap(), decor::by_id("teddy").unwrap(), decor::by_id("fern").unwrap());
+        assert!(p.buy_decor(lamp).is_ok());
+        assert_eq!(p.coins, 200 - lamp.price);
+        assert!(p.buy_decor(lamp).is_err(), "it is already there");
+        assert!(p.buy_decor(fern).is_ok());
+        assert!(p.buy_decor(teddy).is_ok());
+        assert!(p.placed("teddy") && !p.placed("lamp") && p.placed("fern"), "the teddy took the lamp's spot only");
+        let mut poor = Profile { coins: 5, ..Profile::default() };
+        assert!(poor.buy_decor(fern).is_err() && poor.decor.is_empty() && poor.coins == 5);
+    }
+
+    #[test]
+    fn the_plaque_records_the_last_pet_once_per_pet() {
+        let grave = |species: &str, lived: &str| format!("2026-11-01 | {species} | lived {lived} | 3 care mistakes | cause: old age");
+        let mut p = Profile { coins: 100, ..Profile::default() };
+        assert!(p.buy_plaque(&[]).is_err());
+        let one = [grave("Mametchi", "3d 4h")];
+        assert!(p.buy_plaque(&one).is_ok());
+        assert_eq!(p.plaque, Some(Plaque { species: "Mametchi".into(), lived: "3d".into() }));
+        assert_eq!(p.coins, 100 - decor::PLAQUE_PRICE);
+        assert!(p.buy_plaque(&one).is_err(), "once per pet");
+        let two = [grave("Ichigotchi", "5h 2m"), grave("Mametchi", "3d 4h")];
+        assert!(p.buy_plaque(&two).is_ok());
+        assert_eq!(p.plaque.as_ref().map(|q| q.lived.as_str()), Some("5h"), "the new plaque replaces the old one");
+    }
+
+    #[test]
+    fn a_keepsake_goes_on_the_sill_only_once_found_and_comes_down_again() {
+        let mut p = Profile::default();
+        assert!(!p.place_keepsake("acorn"));
+        p.keepsakes.push("acorn".into());
+        assert!(p.place_keepsake("acorn") && p.shelf.as_deref() == Some("acorn"));
+        assert!(p.place_keepsake("acorn") && p.shelf.is_none());
     }
 
     #[test]

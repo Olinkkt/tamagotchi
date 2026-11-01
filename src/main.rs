@@ -5,6 +5,7 @@ mod art;
 mod cast;
 mod cli;
 mod config;
+mod decor;
 mod egg;
 #[allow(dead_code)]
 mod faces;

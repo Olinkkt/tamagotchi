@@ -8,6 +8,7 @@ use crate::cast;
 use crate::faces::Expr;
 use crate::frame::Frame;
 use crate::hud::{Align, Label, Layout, ROOM_Y};
+use crate::decor;
 use crate::icons::{self, Grid};
 use crate::palette::Pal;
 use crate::pet::{self, Pet, Personality, Stage};
@@ -67,6 +68,22 @@ fn shop_row_y(i: usize) -> i32 {
 
 fn draw_shop(f: &mut Frame, app: &App) {
     f.grid(icons::COIN, ESC.0 - 10, ESC.1 + 3);
+    if app.shop_keep {
+        for (i, d) in decor::DECOR.iter().enumerate() {
+            let y = shop_row_y(i);
+            let can = app.profile.coins >= d.price && !app.profile.placed(d.id);
+            f.boxed(CARD.0 + 4, y, CARD.2 - 8, SHOP_ROW - 3, if can { Pal::Dusk } else { Pal::Ink }, Pal::Night);
+            keycap(f, CARD.0 + 8, y + 6, can);
+            let mut icon = Frame::new(16, 20, if can { Pal::Dusk } else { Pal::Ink });
+            icon.grid(d.icon, 0, 0);
+            if !can {
+                icon.tint(0, 0, 16, 20, |p| if p == Pal::Ink { p } else { p.dark() });
+            }
+            f.frame(&icon, CARD.0 + 20, y);
+            f.grid(icons::COIN, CARD.0 + CARD.2 - 14, y + 7);
+        }
+        return;
+    }
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i);
         let can = app.profile.coins >= item.price();
@@ -85,8 +102,23 @@ fn draw_shop(f: &mut Frame, app: &App) {
 fn shop_labels(app: &App) -> Vec<Label> {
     let mut v = vec![
         label("SHOP", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
+        label("care", CARD.0 as f32 + 40.0, TITLE_Y, if app.shop_keep { Pal::Slate } else { Pal::White }),
+        label("room", CARD.0 as f32 + 66.0, TITLE_Y, if app.shop_keep { Pal::White } else { Pal::Slate }),
         right(app.profile.coins.to_string(), (ESC.0 - 12) as f32, ESC.1 as f32 + 6.5, Pal::Yellow),
     ];
+    if app.shop_keep {
+        for (i, d) in decor::DECOR.iter().enumerate() {
+            let y = shop_row_y(i) as f32;
+            let placed = app.profile.placed(d.id);
+            let can = app.profile.coins >= d.price && !placed;
+            let (name, blurb, price) = if can { (Pal::White, Pal::Mist, Pal::Yellow) } else { (Pal::Slate, Pal::Dusk, Pal::Slate) };
+            v.push(centred((i + 1).to_string(), CARD.0 as f32 + 12.5, y + 10.5, Pal::White));
+            v.push(label(d.name, CARD.0 as f32 + 44.0, y + 6.5, name));
+            v.push(label(if placed { "in your room" } else { d.blurb }, CARD.0 as f32 + 44.0, y + 14.5, blurb));
+            v.push(right(d.price.to_string(), (CARD.0 + CARD.2 - 16) as f32, y + 10.5, price));
+        }
+        return v;
+    }
     for (i, item) in pet::Item::ALL.iter().enumerate() {
         let y = shop_row_y(i) as f32;
         let can = app.profile.coins >= item.price();
@@ -177,7 +209,9 @@ fn keepsakes_labels(app: &App) -> Vec<Label> {
     for (i, k) in profile::KEEPSAKES.iter().enumerate() {
         let (x, y) = keepsake_at(i);
         let found = app.profile.found(k.id);
-        v.push(centred(if found { k.name } else { "???" }, (x + 12) as f32, (y + 31) as f32, if found { Pal::Green } else { Pal::Mist }));
+        let on_sill = app.profile.shelf.as_deref() == Some(k.id);
+        let text = if found { format!("{} {}", i + 1, k.name) } else { "???".to_string() };
+        v.push(centred(text, (x + 12) as f32, (y + 31) as f32, if on_sill { Pal::Yellow } else if found { Pal::Green } else { Pal::Mist }));
     }
     v
 }
@@ -520,7 +554,8 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
 pub fn hint(app: &App) -> Option<(String, Pal)> {
     Some(match &app.mode {
         Mode::Chooser => ("PRESS 1 TO 6, OR CLICK A GAME".into(), Pal::Yellow),
-        Mode::Shop => ("PRESS 1-4 OR CLICK TO BUY".into(), Pal::Yellow),
+        Mode::Shop if app.shop_keep => ("PRESS 1-4 OR CLICK TO BUY  -  TAB: CARE ITEMS".into(), Pal::Yellow),
+        Mode::Shop => ("PRESS 1-4 OR CLICK TO BUY  -  TAB: FOR THE ROOM".into(), Pal::Yellow),
         Mode::Awards => match profile::ACHIEVEMENTS.iter().find(|a| !app.profile.has(a.id)) {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
             None => ("EVERY AWARD UNLOCKED!".into(), Pal::Yellow),
@@ -529,10 +564,12 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
             Some((b, left)) => (format!("NEXT: {} - {} MORE {}", b.name.to_uppercase(), left, profile::care_name(b.care).to_uppercase()), Pal::Mist),
             None => ("EVERY BADGE EARNED!".into(), Pal::Yellow),
         },
-        Mode::Keepsakes => ("THE PET BRINGS ONE EVERY 2 HOURS YOU ARE AWAY (UP TO 5)".into(), Pal::Mist),
+        Mode::Keepsakes => ("PRESS 1-6 TO PUT ONE ON THE WINDOWSILL".into(), Pal::Mist),
         Mode::Gifts(_) => ("ANY KEY TO CONTINUE".into(), Pal::Yellow),
         Mode::Tree => ("YELLOW: NOW  BLUE: NEXT  UNDER EACH: HABIT, PERSONALITY".into(), Pal::Mist),
-        Mode::Graveyard(_) => ("ANY KEY TO GO BACK".into(), Pal::Mist),
+        Mode::Graveyard(entries) if entries.is_empty() => ("ANY KEY TO GO BACK".into(), Pal::Mist),
+        Mode::Graveyard(entries) if app.profile.plaque_pets >= entries.len() => ("ANY KEY TO GO BACK  -  THE LAST PET HAS ITS PLAQUE".into(), Pal::Mist),
+        Mode::Graveyard(_) => (format!("P: HANG A PLAQUE FOR THE LAST PET ({} COINS)  -  ANY OTHER KEY: BACK", decor::PLAQUE_PRICE), Pal::Yellow),
         _ => return None,
     })
 }
@@ -694,7 +731,7 @@ mod tests {
         app.on_key(Key::Char('k'));
         assert!(matches!(app.mode, Mode::Keepsakes));
         let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
-        assert!(text.iter().any(|t| t == "KEEPSAKES 1/6") && text.iter().any(|t| t == "Pebble"), "{text:?}");
+        assert!(text.iter().any(|t| t == "KEEPSAKES 1/6") && text.iter().any(|t| t == "2 Pebble"), "{text:?}");
         assert_eq!(text.iter().filter(|t| *t == "???").count(), 5);
         app.on_key(Key::Left);
         assert!(matches!(app.mode, Mode::Awards));
@@ -720,6 +757,48 @@ mod tests {
         app.on_key(Key::Right);
         app.on_key(Key::Char('a'));
         assert!(matches!(app.mode, Mode::Awards));
+    }
+
+    #[test]
+    fn the_shop_has_a_second_shelf_for_the_room_and_tab_flips_between_them() {
+        crate::save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Adult, |_| {});
+            app.profile.coins = 50;
+            app.mode = Mode::Shop;
+            app.on_key(Key::Tab);
+            assert!(app.shop_keep);
+            let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
+            for want in ["Star poster", "Potted fern", "Floor lamp", "Teddy bear", "60"] {
+                assert!(text.iter().any(|t| t == want), "missing {want}: {text:?}");
+            }
+            assert!(hint(&app).unwrap().0.contains("TAB: CARE ITEMS"));
+            app.on_key(Key::Char('2'));
+            assert!(app.profile.placed("fern") && app.profile.coins == 10);
+            assert!(matches!(app.mode, Mode::Normal), "the shop closes so you can see the room");
+            app.mode = Mode::Shop;
+            app.on_key(Key::Char('2'));
+            assert_eq!(app.profile.coins, 10, "buying it again charges nothing");
+            app.on_key(Key::Left);
+            assert!(!app.shop_keep);
+    
+        });
+    }
+
+    #[test]
+    fn the_graveyard_offers_a_plaque_for_the_last_pet_once() {
+        crate::save::with_temp_dir(|| {
+            let entry = "2026-11-01 | Mametchi | lived 3d 4h | 1 care mistakes | cause: old age".to_string();
+            let mut app = app_with(Stage::Adult, |_| {});
+            app.profile.coins = 30;
+            app.mode = Mode::Graveyard(vec![entry.clone()]);
+            assert!(hint(&app).unwrap().0.starts_with("P: HANG A PLAQUE"));
+            app.on_key(Key::Char('p'));
+            assert_eq!(app.profile.plaque.as_ref().map(|p| p.lived.as_str()), Some("3d"));
+            assert_eq!(app.profile.coins, 10);
+            app.mode = Mode::Graveyard(vec![entry]);
+            assert!(hint(&app).unwrap().0.contains("HAS ITS PLAQUE"));
+    
+        });
     }
 
     #[test]
