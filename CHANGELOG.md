@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.0.2
+
+- The game chooser's hint now says "press 1 to 4", matching the four games.
+
 ## 2.0.1
 
 - The family tree's legend now says what is under each form (habit and personality) instead of the

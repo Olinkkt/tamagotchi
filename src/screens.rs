@@ -390,7 +390,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
 /// The line under a card.
 pub fn hint(app: &App) -> Option<(String, Pal)> {
     Some(match &app.mode {
-        Mode::Chooser => ("PRESS 1 OR 2, OR CLICK A GAME".into(), Pal::Yellow),
+        Mode::Chooser => ("PRESS 1 TO 4, OR CLICK A GAME".into(), Pal::Yellow),
         Mode::Shop => ("PRESS 1-4 OR CLICK TO BUY".into(), Pal::Yellow),
         Mode::Awards => match profile::ACHIEVEMENTS.iter().find(|a| !app.profile.has(a.id)) {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
