@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.6.2
+
+- Stop is harder: the green zone starts at 40 pixels instead of 48 and shrinks to 18 instead of 20,
+  and the marker starts at 110 pixels a second instead of 90 and ends at 200 instead of 170. You
+  still need three of five to win.
+
 ## 2.6.1
 
 - Pong is now a one-button game like Stop and Hop: the paddle glides up and down by itself and

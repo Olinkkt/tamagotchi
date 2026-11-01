@@ -11,8 +11,8 @@ const TRACK_Y: i32 = 82;
 const TRACK_H: i32 = 14;
 const MARK_W: i32 = 4;
 /// The width of the green zone and the marker's speed (pixels a second), by round.
-const ZONE_W: [i32; 5] = [48, 40, 32, 26, 20];
-const SPEED: [i64; 5] = [90, 110, 130, 150, 170];
+const ZONE_W: [i32; 5] = [40, 32, 26, 22, 18];
+const SPEED: [i64; 5] = [110, 135, 160, 185, 200];
 /// A marker left running this long counts as a miss, so a game never hangs.
 const TIMEOUT_MS: u64 = 7000;
 const RESULT_MS: u64 = 1100;
