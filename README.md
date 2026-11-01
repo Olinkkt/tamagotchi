@@ -103,7 +103,7 @@ seconds (any key skips it).
 3. **Shells**: your pet hides under one of three cups, then the cups swap places. Pick the cup it is under with keys 1 to 3 (or click it). Three rounds, with more and faster swaps each time.
 4. **RPS**: rock paper scissors against your pet. Pick with keys 1 to 3 or R/P/S (or click); both hands shake three times, then show. Win two of three rounds; a tie is played again.
 5. **Stop**: a marker slides back and forth along a track. Press space (or click anywhere) to stop it inside the green. Five rounds; the green shrinks and the marker speeds up each time, and a marker left running for 7 seconds counts as a miss.
-6. **Hop**: five crates slide towards your pet along the floor. Press space (or click) to jump over each one; you cannot jump again until it lands. About 15 seconds.
+6. **Hop**: an endless runner like the dinosaur game. Crates rush at your pet along a scrolling floor, faster and faster. Press space (or click) to jump; you cannot jump again until you land, and touching a crate ends the run. Every three crates you clear fills one of five boxes (all fifteen ends the run). About 30 seconds.
 
 ### The toilet
 

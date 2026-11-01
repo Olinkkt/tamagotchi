@@ -1,37 +1,65 @@
-//! Hop: crates slide towards the pet along the floor. Press space (or click) to jump over each
-//! one. Five crates, about 15 seconds in all; one button.
+//! Hop: an endless-runner like the dinosaur game. The floor scrolls and crates come at your pet,
+//! faster and faster. Press space (or click) to jump. Touch a crate and the run is over. Every
+//! three crates you clear fills one of five boxes; clear all fifteen and the run ends on its own.
 
 use super::*;
 
 pub const ROUNDS: u8 = 5;
+/// Crates cleared for each box.
+const PER_BOX: usize = 3;
+const OBSTACLES: usize = PER_BOX * ROUNDS as usize;
 const PET_X: i32 = 70;
+/// The pet's hit box is this wide either side of its centre.
+const PET_HALF: i32 = 6;
 const FLOOR: i32 = GH - 14;
-const CRATE: i32 = 16;
-/// Pixels a second, from the right edge to the pet.
-const SPEED: i64 = 100;
-const START_X: i32 = GW + 8;
-const JUMP_MS: u64 = 700;
+const CRATE_W: i32 = 14;
+const CRATE_H: i32 = 16;
+const TALL_H: i32 = 26;
+/// A crate only hurts if the pet's feet are lower than its top by more than this.
+const FORGIVE: i32 = 2;
+/// Pixels a second at the start, how much faster it gets each second, and the top speed.
+const START_SPEED: f64 = 130.0;
+const ACCEL: f64 = 4.0;
+const MAX_SPEED: f64 = 220.0;
+const JUMP_MS: u64 = 650;
 const JUMP_H: i32 = 34;
-/// Clear the crate by being at least this high as it passes.
-const CLEAR_H: i32 = CRATE - 2;
-/// How long after the last crate before the game ends.
-const END_MS: u64 = 1200;
+/// Where the first crate stands, and the smallest gap between two (pixels, from the pet's side).
+const FIRST_AT: i32 = 330;
+const MIN_GAP: i32 = 170;
+/// Collisions are checked this often, so a slow frame cannot skip over a crate.
+const STEP_MS: u64 = 10;
+/// How long the pet slumps after a crash, or runs on after the last crate.
+const CRASH_MS: u64 = 900;
+const FINISH_MS: u64 = 600;
+
+#[derive(Clone, Copy)]
+struct Crate {
+    /// Left edge, in pixels along the course (the pet is at 0 when the run starts).
+    at: i32,
+    w: i32,
+    h: i32,
+}
 
 pub struct Hop {
-    /// When each crate sets off from the right edge, in milliseconds on the game's clock.
-    spawn: Vec<u64>,
-    results: Vec<bool>,
+    crates: Vec<Crate>,
     /// When the current jump began.
     jump: Option<u64>,
-    /// When the last crate was resolved, and a stumble's end.
-    stumble_until: u64,
+    /// How far the game's clock has been checked for crashes.
+    checked: u64,
+    cleared: usize,
+    crashed: Option<u64>,
+    /// When the last crate was passed.
+    finished: Option<u64>,
     look: Box<Pet>,
     t0: Instant,
 }
 
-/// When a crate that set off at `spawn` is level with the pet.
-fn crosses(spawn: u64) -> u64 {
-    spawn + ((START_X - PET_X) as i64 * 1000 / SPEED) as u64
+/// How far the course has scrolled `ms` milliseconds in: it speeds up steadily to a top speed.
+fn course(ms: u64) -> i32 {
+    let t = ms as f64 / 1000.0;
+    let ramp = (MAX_SPEED - START_SPEED) / ACCEL;
+    let d = if t <= ramp { START_SPEED * t + ACCEL * t * t / 2.0 } else { START_SPEED * ramp + ACCEL * ramp * ramp / 2.0 + MAX_SPEED * (t - ramp) };
+    d as i32
 }
 
 /// How high the pet is `since` milliseconds after the jump began (a smooth arc).
@@ -45,15 +73,19 @@ fn jump_height(since: u64) -> i32 {
 
 impl Hop {
     pub fn new(pet: &mut Pet) -> Self {
-        let mut at = 900;
-        let spawn = (0..ROUNDS)
+        let mut at = FIRST_AT;
+        let crates = (0..OBSTACLES)
             .map(|_| {
-                let s = at;
-                at += 2300 + pet.rand(10) * 100;
-                s
+                let c = if pet.rand(4) == 0 {
+                    Crate { at, w: CRATE_W, h: TALL_H }
+                } else {
+                    Crate { at, w: CRATE_W * (1 + pet.rand(3) as i32), h: CRATE_H }
+                };
+                at += c.w + MIN_GAP + pet.rand(10) as i32 * 14;
+                c
             })
             .collect();
-        Hop { spawn, results: Vec::new(), jump: None, stumble_until: 0, look: Box::new(pet.clone()), t0: Instant::now() }
+        Hop { crates, jump: None, checked: 0, cleared: 0, crashed: None, finished: None, look: Box::new(pet.clone()), t0: Instant::now() }
     }
 
     fn now(&self) -> u64 {
@@ -68,7 +100,7 @@ impl Hop {
     }
 
     fn press(&mut self, now: u64) {
-        if self.jump.is_none_or(|j| now >= j + JUMP_MS) {
+        if self.crashed.is_none() && self.jump.is_none_or(|j| now >= j + JUMP_MS) {
             self.jump = Some(now);
         }
     }
@@ -77,38 +109,61 @@ impl Hop {
         self.jump.map_or(0, |j| jump_height(now.saturating_sub(j)))
     }
 
+    /// Where a crate's left edge is on screen at `ms`.
+    fn screen_x(c: &Crate, ms: u64) -> i32 {
+        PET_X + c.at - course(ms)
+    }
+
     pub fn tick(&mut self) -> Outcome {
         self.advance(self.now())
     }
 
-    /// Settle every crate that has reached the pet by `now`.
+    /// Run the game up to `now`, one small step at a time.
     fn advance(&mut self, now: u64) -> Outcome {
-        while let Some(&s) = self.spawn.get(self.results.len()) {
-            if now < crosses(s) {
+        while self.crashed.is_none() && self.finished.is_none() && self.checked < now {
+            self.checked = (self.checked + STEP_MS).min(now);
+            let t = self.checked;
+            let h = self.height(t);
+            while let Some(c) = self.crates.get(self.cleared) {
+                let x = Self::screen_x(c, t);
+                if x + c.w < PET_X - PET_HALF {
+                    self.cleared += 1;
+                    continue;
+                }
+                if x < PET_X + PET_HALF && h < c.h - FORGIVE {
+                    self.crashed = Some(t);
+                }
                 break;
             }
-            // The jump is judged at the moment the crate passes, using where the pet was then.
-            let cleared = self.height(crosses(s)) >= CLEAR_H;
-            self.results.push(cleared);
-            if !cleared {
-                self.stumble_until = now + 600;
+            if self.cleared == self.crates.len() && self.crashed.is_none() {
+                self.finished = Some(t);
             }
         }
-        if self.results.len() == self.spawn.len() && now >= crosses(*self.spawn.last().unwrap()) + END_MS {
-            return Outcome::Done { wins: self.results.iter().filter(|&&r| r).count() as u8, rounds: ROUNDS };
+        let end = self.crashed.map(|t| t + CRASH_MS).or(self.finished.map(|t| t + FINISH_MS));
+        if end.is_some_and(|e| now >= e) {
+            return Outcome::Done { wins: self.boxes(), rounds: ROUNDS };
         }
         Outcome::Continue
     }
 
+    fn boxes(&self) -> u8 {
+        (self.cleared / PER_BOX).min(ROUNDS as usize) as u8
+    }
+
     pub fn hint(&self) -> &'static str {
-        if self.now() < self.stumble_until { "OOF! KEEP GOING" } else { "PRESS SPACE (OR CLICK) TO JUMP OVER EACH CRATE" }
+        if self.crashed.is_some() { "OOF! YOU HIT A CRATE" } else { "SPACE OR CLICK TO JUMP. DON'T HIT A CRATE" }
     }
 
     pub fn draw(&self) -> Frame {
         let mut f = backdrop();
-        let now = self.now();
+        // The picture freezes where the pet crashed.
+        let now = self.crashed.map_or(self.now(), |c| c.min(self.now()));
         let h = self.height(now);
-        let mood = if now < self.stumble_until {
+        let d = course(now);
+        for i in 0..GW / 24 + 2 {
+            f.rect(i * 24 - d % 24, FLOOR + 5, 6, 1, Pal::Maroon);
+        }
+        let mood = if self.crashed.is_some() {
             Expr::Sad
         } else if h > 0 {
             Expr::Happy
@@ -116,21 +171,23 @@ impl Hop {
             Expr::Idle
         };
         draw_pet(&mut f, &self.look, mood, PET_X, FLOOR - h);
-        draw_rounds(&mut f, &self.results, self.results.len() as u8 + 1, ROUNDS);
-        for (i, &s) in self.spawn.iter().enumerate() {
-            if now < s || i < self.results.len() && now > crosses(s) + 700 {
+        let mut results = vec![true; self.boxes() as usize];
+        if self.crashed.is_some() && results.len() < ROUNDS as usize {
+            results.push(false);
+        }
+        draw_rounds(&mut f, &results, results.len() as u8 + 1, ROUNDS);
+        for c in &self.crates {
+            let x = Self::screen_x(c, now);
+            if x > GW || x + c.w < 0 {
                 continue;
             }
-            let x = START_X - (now.saturating_sub(s) as i64 * SPEED / 1000) as i32;
-            let top = FLOOR - CRATE;
-            let (fill, edge) = match self.results.get(i) {
-                Some(true) => (Pal::Green, Pal::Forest),
-                Some(false) => (Pal::Red, Pal::Maroon),
-                None => (Pal::Tan, Pal::Brown),
-            };
-            f.boxed(x - CRATE / 2, top, CRATE, CRATE, fill, Pal::Ink);
-            f.rect(x - CRATE / 2 + 2, top + 2, CRATE - 4, 2, edge);
-            f.rect(x - CRATE / 2 + 2, top + CRATE - 4, CRATE - 4, 2, edge);
+            let top = FLOOR - c.h;
+            f.boxed(x, top, c.w, c.h, Pal::Tan, Pal::Ink);
+            f.rect(x + 2, top + 2, c.w - 4, 2, Pal::Brown);
+            f.rect(x + 2, FLOOR - 4, c.w - 4, 2, Pal::Brown);
+            if c.h == TALL_H {
+                f.rect(x + 2, top + c.h / 2, c.w - 4, 2, Pal::Brown);
+            }
         }
         f
     }
@@ -146,39 +203,65 @@ mod tests {
         p
     }
 
+    /// The moment the middle of a crate is level with the pet.
+    fn level(c: &Crate) -> u64 {
+        (0..).step_by(5).find(|&t| PET_X + c.at + c.w / 2 - course(t) <= PET_X).unwrap()
+    }
+
+    /// Press so the top of the jump is over the crate.
+    fn jump_over(g: &mut Hop, i: usize) {
+        let c = g.crates[i];
+        g.press(level(&c) - JUMP_MS / 2);
+    }
+
+    #[test]
+    fn the_course_speeds_up_to_a_top_speed() {
+        assert_eq!(course(0), 0);
+        let (a, b) = (course(1000) - course(0), course(2000) - course(1000));
+        assert!(b > a, "faster each second");
+        let (x, y) = (course(41_000) - course(40_000), course(61_000) - course(60_000));
+        assert_eq!(x, y, "and then steady");
+        assert_eq!(y, MAX_SPEED as i32);
+    }
+
     #[test]
     fn a_jump_is_an_arc_that_peaks_in_the_middle_and_lands() {
         assert_eq!(jump_height(0), 0);
         assert_eq!(jump_height(JUMP_MS / 2), JUMP_H);
         assert_eq!(jump_height(JUMP_MS), 0);
-        assert!(jump_height(JUMP_MS / 4) > CLEAR_H / 2 && jump_height(JUMP_MS / 4) < JUMP_H);
     }
 
     #[test]
-    fn jumping_as_the_crate_arrives_clears_it_and_standing_still_does_not() {
+    fn standing_still_runs_into_the_first_crate() {
         let mut p = pet();
         let mut g = Hop::new(&mut p);
-        let first = crosses(g.spawn[0]);
-        g.press(first - JUMP_MS / 2);
-        g.advance(first);
-        assert_eq!(g.results, vec![true], "in the air at the right moment");
-        let second = crosses(g.spawn[1]);
-        g.advance(second);
-        assert_eq!(g.results, vec![true, false], "no jump, no clear");
+        let hit = level(&g.crates[0]);
+        assert!(matches!(g.advance(hit - 600), Outcome::Continue));
+        assert!(g.crashed.is_none());
+        g.advance(hit);
+        assert!(g.crashed.is_some());
+        assert!(matches!(g.advance(hit + CRASH_MS + 100), Outcome::Done { wins: 0, rounds: ROUNDS }));
     }
 
     #[test]
-    fn jumping_far_too_early_or_too_late_misses() {
+    fn jumping_over_a_crate_clears_it() {
         let mut p = pet();
         let mut g = Hop::new(&mut p);
-        let first = crosses(g.spawn[0]);
-        g.press(first - JUMP_MS - 50);
-        g.advance(first);
-        assert_eq!(g.results, vec![false], "already landed");
-        let second = crosses(g.spawn[1]);
-        g.press(second);
-        g.advance(second);
-        assert_eq!(g.results, vec![false, false], "just taking off is not high enough");
+        jump_over(&mut g, 0);
+        g.advance(level(&g.crates[0]) + 400);
+        assert!(g.crashed.is_none());
+        assert_eq!(g.cleared, 1);
+    }
+
+    #[test]
+    fn a_jump_that_is_too_early_or_too_late_crashes() {
+        for shift in [-(JUMP_MS as i64), JUMP_MS as i64 / 2 + 150] {
+            let mut p = pet();
+            let mut g = Hop::new(&mut p);
+            g.press((level(&g.crates[0]) as i64 + shift - JUMP_MS as i64 / 2) as u64);
+            g.advance(level(&g.crates[0]) + 400);
+            assert!(g.crashed.is_some(), "shift {shift}");
+        }
     }
 
     #[test]
@@ -193,26 +276,46 @@ mod tests {
     }
 
     #[test]
-    fn the_game_ends_after_the_fifth_crate_with_the_cleared_count() {
+    fn a_slow_frame_cannot_skip_a_crate() {
         let mut p = pet();
         let mut g = Hop::new(&mut p);
-        for i in 0..ROUNDS as usize {
-            if i % 2 == 0 {
-                g.press(crosses(g.spawn[i]) - JUMP_MS / 2);
-            }
-            let at = crosses(g.spawn[i]);
-            assert!(matches!(g.advance(at), Outcome::Continue));
-        }
-        let last = crosses(*g.spawn.last().unwrap());
-        assert!(matches!(g.advance(last + END_MS - 1), Outcome::Continue));
-        assert!(matches!(g.advance(last + END_MS), Outcome::Done { wins: 3, rounds: ROUNDS }));
+        g.advance(level(&g.crates[0]) + 5_000);
+        assert!(g.crashed.is_some(), "one huge step still checks every crate on the way");
     }
 
     #[test]
-    fn the_crates_are_spaced_so_the_whole_game_is_short() {
+    fn clearing_every_crate_ends_the_run_with_five_boxes() {
+        let mut p = pet();
+        let mut g = Hop::new(&mut p);
+        for i in 0..OBSTACLES {
+            jump_over(&mut g, i);
+            g.advance(level(&g.crates[i]) + JUMP_MS);
+        }
+        assert!(g.crashed.is_none(), "every crate cleared");
+        let end = g.finished.unwrap();
+        assert!(matches!(g.advance(end + FINISH_MS - 1), Outcome::Continue));
+        assert!(matches!(g.advance(end + FINISH_MS), Outcome::Done { wins: 5, rounds: ROUNDS }));
+    }
+
+    #[test]
+    fn crashing_midway_pays_for_the_boxes_filled_so_far() {
+        let mut p = pet();
+        let mut g = Hop::new(&mut p);
+        for i in 0..4 {
+            jump_over(&mut g, i);
+            g.advance(level(&g.crates[i]) + JUMP_MS);
+        }
+        let hit = level(&g.crates[4]);
+        g.advance(hit + CRASH_MS + 100);
+        assert!(matches!(g.advance(hit + 3_000), Outcome::Done { wins: 1, rounds: ROUNDS }), "four crates is one box");
+    }
+
+    #[test]
+    fn the_crates_are_spaced_so_every_one_can_be_jumped() {
         let mut p = pet();
         let g = Hop::new(&mut p);
-        assert!(g.spawn.windows(2).all(|w| w[1] - w[0] >= 2300 && w[1] - w[0] <= 3200));
-        assert!(crosses(*g.spawn.last().unwrap()) + END_MS < 30_000);
+        assert!(g.crates.windows(2).all(|w| w[1].at - (w[0].at + w[0].w) >= MIN_GAP));
+        assert!(g.crates.iter().all(|c| c.w <= CRATE_W * 3 && c.h <= TALL_H));
+        assert!(level(g.crates.last().unwrap()) < 45_000, "a whole run is well under a minute");
     }
 }

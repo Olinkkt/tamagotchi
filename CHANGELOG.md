@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.7.0
+
+- Hop is now an endless runner like the dinosaur game: the floor scrolls, crates rush at your pet
+  faster and faster, and touching one ends the run. Every three crates you clear fills one of the
+  five boxes, and crates come in wide clusters and tall stacks. Before, five crates came at a
+  steady pace and a miss only cost a box.
+
 ## 2.6.3
 
 - The coloured outline around your pet is gone. The status panel and the family tree still show
