@@ -506,7 +506,7 @@ impl App {
             }
             Mode::Chooser => {
                 match code {
-                    Key::Char(c @ '1'..='4') => {
+                    Key::Char(c @ '1'..='6') => {
                         let g = games::Game::new(c as u8 - b'0', &mut self.pet);
                         self.mode = Mode::Game(g);
                     }

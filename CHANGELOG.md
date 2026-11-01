@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.3.0
+
+- Two new one-button mini-games, so there are six to pick from (keys 1 to 6): **Stop**, where you
+  freeze a sliding marker inside a shrinking green zone, and **Hop**, where you jump the pet over
+  five crates. Both use the space bar or a click anywhere, and take about 15 to 25 seconds.
+- The game picker now shows six cards, and its hint says "press 1 to 6".
+
 ## 2.2.0
 
 - New care badges: give 100, 500 and 1000 meals, snacks, games and scolds over all your pets to

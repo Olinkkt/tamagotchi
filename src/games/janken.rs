@@ -191,7 +191,7 @@ impl Janken {
         draw_hand(&mut f, shown(mine), PLAYER_X, HAND_Y - bob.abs(), false, &tint);
         draw_hand(&mut f, shown(theirs), PET_X, HAND_Y - bob.abs(), true, &tint);
         draw_pet(&mut f, &self.look, mood, GW / 2, HAND_Y + 15 * HAND_K - 2);
-        draw_rounds(&mut f, &self.results, self.round);
+        draw_rounds(&mut f, &self.results, self.round, ROUNDS);
         // The three choices, while it is your turn.
         for i in 0..3 {
             let on = waiting;

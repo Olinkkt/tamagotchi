@@ -21,7 +21,7 @@ in Rust, drawn in 24 colours.
   a slower, safe pace. Come back to find out how it went.
 - **Five adults to raise.** How well you care for the pet decides what it grows into. Collect
   them all in the awards.
-- **Mini-games, coins and a shop.** Memory, Pong, Shells and RPS, played by keyboard or mouse. Win coins and
+- **Mini-games, coins and a shop.** Memory, Pong, Shells, RPS, Stop and Hop, played by keyboard or mouse. Win coins and
   spend them on treats.
 - **Mouse or keyboard.** Every action is a button and a key, and everything clickable lights up
   when you hover it.
@@ -97,6 +97,8 @@ seconds (any key skips it).
 2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle moves while you hold ↑/↓ (or W/S, K/J), or while you hold the mouse button, when it chases the pointer; it stops when you let go.
 3. **Shells**: your pet hides under one of three cups, then the cups swap places. Pick the cup it is under with keys 1 to 3 (or click it). Three rounds, with more and faster swaps each time.
 4. **RPS**: rock paper scissors against your pet. Pick with keys 1 to 3 or R/P/S (or click); both hands shake three times, then show. Win two of three rounds; a tie is played again.
+5. **Stop**: a marker slides back and forth along a track. Press space (or click anywhere) to stop it inside the green. Five rounds; the green shrinks and the marker speeds up each time, and a marker left running for 7 seconds counts as a miss.
+6. **Hop**: five crates slide towards your pet along the floor. Press space (or click) to jump over each one; you cannot jump again until it lands. About 15 seconds.
 
 ### The toilet
 

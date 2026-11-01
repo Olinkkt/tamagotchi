@@ -437,6 +437,20 @@ fn draw_chooser(f: &mut Frame) {
                 }
             }
             3 => f.grid_scaled(crate::games::RPS_ICON, x + (w - 30) / 2, y + 20, 2, |p| p),
+            4 => {
+                // A track with its green zone and the marker.
+                f.boxed(x + 3, y + 30, w - 6, 8, Pal::Night, Pal::Ink);
+                f.rect(x + 8, y + 31, 10, 6, Pal::Green);
+                f.boxed(x + 14, y + 26, 3, 16, Pal::Yellow, Pal::Ink);
+            }
+            5 => {
+                // A crate on the floor with the hop over it.
+                f.rect(x + 3, y + 44, w - 6, 2, Pal::Brown);
+                f.boxed(x + w - 14, y + 34, 9, 10, Pal::Tan, Pal::Ink);
+                for (dx, dy) in [(4, 30), (7, 26), (10, 25), (13, 26), (16, 30)] {
+                    f.rect(x + dx, y + dy - 6, 2, 2, Pal::Yellow);
+                }
+            }
             _ => {}
         }
     }
@@ -505,7 +519,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
 /// The line under a card.
 pub fn hint(app: &App) -> Option<(String, Pal)> {
     Some(match &app.mode {
-        Mode::Chooser => ("PRESS 1 TO 4, OR CLICK A GAME".into(), Pal::Yellow),
+        Mode::Chooser => ("PRESS 1 TO 6, OR CLICK A GAME".into(), Pal::Yellow),
         Mode::Shop => ("PRESS 1-4 OR CLICK TO BUY".into(), Pal::Yellow),
         Mode::Awards => match profile::ACHIEVEMENTS.iter().find(|a| !app.profile.has(a.id)) {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),

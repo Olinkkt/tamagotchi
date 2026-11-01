@@ -180,7 +180,7 @@ impl Shells {
             let lift = if self.lifted(cup) { LIFT } else { 0 };
             draw_cup(&mut f, x, CUP_TOP + hop - lift - wait);
         }
-        draw_rounds(&mut f, &self.results, self.round);
+        draw_rounds(&mut f, &self.results, self.round, ROUNDS);
         f
     }
 }

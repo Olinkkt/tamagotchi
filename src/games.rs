@@ -13,10 +13,14 @@ use crate::palette::Pal;
 use crate::pet::Pet;
 use crate::scene;
 
+mod hop;
 mod janken;
 mod shells;
+mod stop;
+use hop::Hop;
 use janken::Janken;
 use shells::Shells;
+use stop::Stop;
 
 /// A hand for the picker's card.
 pub const RPS_ICON: icons::Grid = janken::PAPER;
@@ -27,7 +31,7 @@ pub enum Outcome {
     Quit,
 }
 
-pub const CHOICES: [(&str, &str); 4] = [("1", "memory"), ("2", "pong"), ("3", "shells"), ("4", "rps")];
+pub const CHOICES: [(&str, &str); 6] = [("1", "memory"), ("2", "pong"), ("3", "shells"), ("4", "rps"), ("5", "stop"), ("6", "hop")];
 
 /// The size of the picture a game draws.
 pub const GW: i32 = 240;
@@ -38,6 +42,8 @@ pub enum Game {
     Pong(Pong),
     Shells(Shells),
     Janken(Janken),
+    Stop(Stop),
+    Hop(Hop),
 }
 
 impl Game {
@@ -46,6 +52,8 @@ impl Game {
             1 => Game::Memory(Memory::new(pet)),
             3 => Game::Shells(Shells::new(pet)),
             4 => Game::Janken(Janken::new(pet)),
+            5 => Game::Stop(Stop::new(pet)),
+            6 => Game::Hop(Hop::new(pet)),
             _ => Game::Pong(Pong::new(pet)),
         }
     }
@@ -59,6 +67,8 @@ impl Game {
             Game::Pong(_) => Outcome::Continue,
             Game::Shells(g) => g.key(code),
             Game::Janken(g) => g.key(code, pet),
+            Game::Stop(g) => g.key(code),
+            Game::Hop(g) => g.key(code),
         }
     }
 
@@ -69,6 +79,8 @@ impl Game {
             Game::Pong(_) => None,
             Game::Shells(g) => g.slot_at(x, y).map(|s| Key::Char((b'1' + s as u8) as char)),
             Game::Janken(g) => g.button_at(x, y).map(|i| Key::Char((b'1' + i as u8) as char)),
+            // One button: a click anywhere in the picture is the space bar.
+            Game::Stop(_) | Game::Hop(_) => Some(Key::Char(' ')),
         }
     }
 
@@ -79,6 +91,7 @@ impl Game {
             Game::Pong(_) => None,
             Game::Shells(g) => g.hover_rect(x, y),
             Game::Janken(g) => g.hover_rect(x, y),
+            Game::Stop(_) | Game::Hop(_) => None,
         }
     }
 
@@ -103,6 +116,8 @@ impl Game {
             Game::Pong(g) => g.tick(),
             Game::Shells(g) => g.tick(pet),
             Game::Janken(g) => g.tick(),
+            Game::Stop(g) => g.tick(pet),
+            Game::Hop(g) => g.tick(),
         }
     }
 
@@ -112,6 +127,8 @@ impl Game {
             Game::Pong(g) => g.draw(),
             Game::Shells(g) => g.draw(),
             Game::Janken(g) => g.draw(),
+            Game::Stop(g) => g.draw(),
+            Game::Hop(g) => g.draw(),
         }
     }
 
@@ -128,6 +145,8 @@ impl Game {
             },
             Game::Shells(g) => g.hint(),
             Game::Janken(g) => g.hint(),
+            Game::Stop(g) => g.hint(),
+            Game::Hop(g) => g.hint(),
             Game::Pong(_) => "HOLD W/S OR THE MOUSE TO MOVE - RETURN IT 5 TIMES",
         }
     }
@@ -158,8 +177,8 @@ fn draw_pet(f: &mut Frame, pet: &Pet, e: Expr, cx: i32, floor: i32) {
 }
 
 /// Rounds, top left: green for a win, red for a miss, white for the one being played.
-fn draw_rounds(f: &mut Frame, results: &[bool], round: u8) {
-    for r in 0..MEMORY_ROUNDS as usize {
+fn draw_rounds(f: &mut Frame, results: &[bool], round: u8, total: u8) {
+    for r in 0..total as usize {
         let col = match results.get(r) {
             Some(true) => Pal::Green,
             Some(false) => Pal::Red,
@@ -343,7 +362,7 @@ impl Memory {
         for n in 1..=4u8 {
             Memory::draw_pad(&mut f, n, lit == Some(n), shake, wrong == Some(n));
         }
-        draw_rounds(&mut f, &self.results, self.round);
+        draw_rounds(&mut f, &self.results, self.round, MEMORY_ROUNDS);
         // Your progress through the pattern, as pips on the floor once it is your turn.
         if let MPhase::Input(pos) = self.phase {
             let n = self.seq.len() as i32;
@@ -737,8 +756,8 @@ mod tests {
 
     #[test]
     fn the_picker_offers_every_game_and_each_one_draws() {
-        assert_eq!(CHOICES.len(), 4);
-        for kind in 1..=4 {
+        assert_eq!(CHOICES.len(), 6);
+        for kind in 1..=6 {
             let mut p = pet();
             let g = Game::new(kind, &mut p);
             let f = g.draw();
