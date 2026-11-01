@@ -446,3 +446,20 @@ pub const CLOVER: Grid = &[
     ".....kn.....",
     "............",
 ];
+
+/// A medal for a care badge: yellow body, orange shade, cream shine. The badges page recolours it
+/// to bronze, silver or gold.
+pub const MEDAL: Grid = &[
+    "....kkkk....",
+    "..kkyyyykk..",
+    ".kyccyyyyyk.",
+    ".kcyyyyyyyk.",
+    "kyyyyyyyyyok",
+    "kyyyyyyyyyok",
+    "kyyyyyyyyyok",
+    "kyyyyyyyyook",
+    ".kyyyyyyook.",
+    "..kkyyyokk..",
+    "....kkkk....",
+    "............",
+];

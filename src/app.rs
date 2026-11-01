@@ -34,6 +34,8 @@ pub enum Mode {
     Awards,
     /// The keepsakes found so far, next to the awards.
     Keepsakes,
+    /// The care badges: meals, snacks, games and scolds over all your pets.
+    Badges,
     /// The welcome-back card: what the pet left while you were away.
     Gifts(Vec<profile::Gift>),
     /// The family tree: every form and what it takes to get there.
@@ -389,6 +391,12 @@ impl App {
         if matches!(&self.mode, Mode::Finish(f) if f.expired()) {
             self.mode = Mode::Normal;
         }
+        for care in std::mem::take(&mut self.pet.cared) {
+            if let Some(b) = self.profile.record(care) {
+                self.log.push(format!("Badge earned: {} - {} {}", b.name, b.goal, profile::care_name(b.care)));
+                let _ = save::save_profile(&self.profile);
+            }
+        }
         for a in self.profile.check(&self.pet) {
             let note = format!("Achievement unlocked: {} - {}", a.name, a.how);
             self.log.push(note);
@@ -521,12 +529,29 @@ impl App {
                 }
                 return;
             }
+            // The awards, keepsakes and badges pages sit side by side; anything else closes them.
             Mode::Awards => {
-                self.mode = if matches!(code, Key::Right | Key::Char('k')) { Mode::Keepsakes } else { Mode::Normal };
+                self.mode = match code {
+                    Key::Right | Key::Char('k') => Mode::Keepsakes,
+                    Key::Char('b') => Mode::Badges,
+                    _ => Mode::Normal,
+                };
                 return;
             }
             Mode::Keepsakes => {
-                self.mode = if matches!(code, Key::Left | Key::Char('a')) { Mode::Awards } else { Mode::Normal };
+                self.mode = match code {
+                    Key::Left | Key::Char('a') => Mode::Awards,
+                    Key::Right | Key::Char('b') => Mode::Badges,
+                    _ => Mode::Normal,
+                };
+                return;
+            }
+            Mode::Badges => {
+                self.mode = match code {
+                    Key::Left | Key::Char('k') => Mode::Keepsakes,
+                    Key::Char('a') => Mode::Awards,
+                    _ => Mode::Normal,
+                };
                 return;
             }
             Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_) => {
@@ -779,6 +804,20 @@ pub(crate) mod tests {
         assert!(matches!(app.mode, Mode::Finish(_)), "a finished game shows the result screen");
         app.handle_outcome(games::Outcome::Done { wins: 1, rounds: 5 });
         assert_eq!((app.profile.coins, app.profile.games_won), (profile::COINS_PERFECT, 1));
+    }
+
+    #[test]
+    fn care_adds_up_in_the_profile_and_the_hundredth_earns_a_badge() {
+        save::with_temp_dir(|| {
+            let mut app = tests::app_with(Stage::Adult, |p| p.hunger = 0);
+            app.profile.cared[pet::Care::Meal as usize] = 99;
+            app.on_key(Key::Char('f'));
+            app.update();
+            assert_eq!(app.profile.care_count(pet::Care::Meal), 100);
+            assert!(app.log.iter().any(|l| l.contains("Badge earned: Caring cook")), "{:?}", app.log);
+            assert!(app.pet.cared.is_empty(), "the queue was handed over");
+    
+        });
     }
 
     #[test]

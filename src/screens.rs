@@ -39,7 +39,7 @@ fn centred(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
 
 /// Whether one of the cards is up, hiding the room and the panel.
 pub fn showing(app: &App) -> bool {
-    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Keepsakes | Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_))
+    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Keepsakes | Mode::Badges | Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_))
 }
 
 fn card(f: &mut Frame) {
@@ -146,7 +146,7 @@ fn awards_labels(app: &App) -> Vec<Label> {
     let p = &app.profile;
     let mut v = vec![
         label(format!("AWARDS {}/{}", p.achievements.len(), profile::ACHIEVEMENTS.len()), CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
-        label(format!("k: keepsakes {}/{}", p.keepsakes.len(), profile::KEEPSAKES.len()), (CARD.0 + 120) as f32, BODY_Y as f32 + 5.5 + 4.0 * AWARD_ROW, Pal::Mist),
+        label(format!("k keepsakes {}/{}  b badges {}/{}", p.keepsakes.len(), profile::KEEPSAKES.len(), p.badges_earned(), profile::BADGES.len()), (CARD.0 + 120) as f32, BODY_Y as f32 + 5.5 + 4.0 * AWARD_ROW, Pal::Mist),
         label(format!("adults raised {}/{}", p.adults.len(), profile::ADULT_SPECIES.len()), (CARD.0 + 120) as f32, TITLE_Y, Pal::Mist),
     ];
     for (i, a) in profile::ACHIEVEMENTS.iter().enumerate() {
@@ -172,12 +172,58 @@ fn draw_keepsakes(f: &mut Frame, app: &App) {
 fn keepsakes_labels(app: &App) -> Vec<Label> {
     let mut v = vec![
         label(format!("KEEPSAKES {}/{}", app.profile.keepsakes.len(), profile::KEEPSAKES.len()), CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
-        label("left: awards", (CARD.0 + 120) as f32, TITLE_Y, Pal::Mist),
+        label("left: awards  right: badges", (CARD.0 + 90) as f32, TITLE_Y, Pal::Mist),
     ];
     for (i, k) in profile::KEEPSAKES.iter().enumerate() {
         let (x, y) = keepsake_at(i);
         let found = app.profile.found(k.id);
         v.push(centred(if found { k.name } else { "???" }, (x + 12) as f32, (y + 31) as f32, if found { Pal::Green } else { Pal::Mist }));
+    }
+    v
+}
+
+const BADGE_ROW: i32 = 24;
+const BADGE_KINDS: [pet::Care; 4] = [pet::Care::Meal, pet::Care::Snack, pet::Care::Game, pet::Care::Scold];
+
+fn badge_y(row: usize) -> i32 {
+    BODY_Y + 3 + row as i32 * BADGE_ROW
+}
+
+/// Where tier `t` (0 to 2) of a row's medals sits.
+fn medal_x(t: usize) -> i32 {
+    CARD.0 + 88 + t as i32 * 52
+}
+
+fn draw_badges(f: &mut Frame, app: &App) {
+    for (row, care) in BADGE_KINDS.iter().enumerate() {
+        for (t, b) in profile::BADGES.iter().filter(|b| b.care == *care).enumerate() {
+            let tier = [Pal::Tan, Pal::Mist, Pal::Yellow][t];
+            let earned = app.profile.has_badge(b);
+            f.grid_scaled(icons::MEDAL, medal_x(t), badge_y(row), 1, |c| match c {
+                Pal::Ink => Pal::Ink,
+                _ if !earned => Pal::Dusk,
+                Pal::Yellow => tier,
+                Pal::Orange => tier.shadow(),
+                Pal::Cream => tier.highlight(),
+                other => other,
+            });
+        }
+    }
+}
+
+fn badges_labels(app: &App) -> Vec<Label> {
+    let mut v = vec![
+        label(format!("BADGES {}/{}", app.profile.badges_earned(), profile::BADGES.len()), CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
+        label("left: keepsakes", (CARD.0 + 120) as f32, TITLE_Y, Pal::Mist),
+    ];
+    for (row, care) in BADGE_KINDS.iter().enumerate() {
+        let y = badge_y(row) as f32;
+        v.push(label(profile::care_name(*care), CARD.0 as f32 + 10.0, y + 4.0, Pal::White));
+        v.push(label(app.profile.care_count(*care).to_string(), CARD.0 as f32 + 10.0, y + 11.0, Pal::Yellow));
+        for (t, b) in profile::BADGES.iter().filter(|b| b.care == *care).enumerate() {
+            let earned = app.profile.has_badge(b);
+            v.push(centred(if earned { b.name.to_string() } else { b.goal.to_string() }, (medal_x(t) + 6) as f32, y + 16.0, if earned { Pal::Green } else { Pal::Mist }));
+        }
     }
     v
 }
@@ -423,6 +469,7 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
         Mode::Shop => draw_shop(&mut local, app),
         Mode::Awards => draw_awards(&mut local, app),
         Mode::Keepsakes => draw_keepsakes(&mut local, app),
+        Mode::Badges => draw_badges(&mut local, app),
         Mode::Gifts(gifts) => draw_gifts(&mut local, gifts),
         Mode::Tree => draw_tree(&mut local, app),
         Mode::Graveyard(entries) => draw_graveyard(&mut local, entries),
@@ -438,6 +485,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         Mode::Shop => shop_labels(app),
         Mode::Awards => awards_labels(app),
         Mode::Keepsakes => keepsakes_labels(app),
+        Mode::Badges => badges_labels(app),
         Mode::Gifts(gifts) => gifts_labels(gifts),
         Mode::Tree => tree_labels(app),
         Mode::Graveyard(entries) => graveyard_labels(entries),
@@ -462,6 +510,10 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
         Mode::Awards => match profile::ACHIEVEMENTS.iter().find(|a| !app.profile.has(a.id)) {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
             None => ("EVERY AWARD UNLOCKED!".into(), Pal::Yellow),
+        },
+        Mode::Badges => match app.profile.next_badge() {
+            Some((b, left)) => (format!("NEXT: {} - {} MORE {}", b.name.to_uppercase(), left, profile::care_name(b.care).to_uppercase()), Pal::Mist),
+            None => ("EVERY BADGE EARNED!".into(), Pal::Yellow),
         },
         Mode::Keepsakes => ("THE PET BRINGS ONE EVERY 2 HOURS YOU ARE AWAY (UP TO 5)".into(), Pal::Mist),
         Mode::Gifts(_) => ("ANY KEY TO CONTINUE".into(), Pal::Yellow),
@@ -635,6 +687,25 @@ mod tests {
         app.on_key(Key::Right);
         app.on_key(Key::Char('x'));
         assert!(matches!(app.mode, Mode::Normal));
+    }
+
+    #[test]
+    fn the_badges_page_shows_the_counts_and_the_next_goal() {
+        let mut app = app_with(Stage::Adult, |_| {});
+        app.profile.cared = [120, 40, 0, 0];
+        app.mode = Mode::Awards;
+        app.on_key(Key::Char('b'));
+        assert!(matches!(app.mode, Mode::Badges));
+        let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
+        for want in ["BADGES 1/12", "meals", "120", "Caring cook", "500", "1000"] {
+            assert!(text.iter().any(|t| t == want), "missing {want}: {text:?}");
+        }
+        assert_eq!(hint(&app).unwrap().0, "NEXT: SWEET TOOTH - 60 MORE SNACKS");
+        app.on_key(Key::Left);
+        assert!(matches!(app.mode, Mode::Keepsakes));
+        app.on_key(Key::Right);
+        app.on_key(Key::Char('a'));
+        assert!(matches!(app.mode, Mode::Awards));
     }
 
     #[test]

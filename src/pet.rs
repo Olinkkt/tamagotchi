@@ -24,6 +24,16 @@ impl Stage {
     }
 }
 
+/// Something the player did for the pet that counts towards the care badges for good (the profile
+/// keeps the totals across pets).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Care {
+    Meal,
+    Snack,
+    Game,
+    Scold,
+}
+
 /// A per-pet personality, picked at random when the egg is laid.
 #[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum Quirk {
@@ -263,6 +273,9 @@ pub struct Pet {
     rng: u64,
     #[serde(skip)]
     pub events: Vec<String>,
+    /// Care given since the game last looked; it adds it to the profile's totals.
+    #[serde(skip)]
+    pub cared: Vec<Care>,
 }
 
 impl Pet {
@@ -300,6 +313,7 @@ impl Pet {
             sick_t: 0,
             rng: seed | 1,
             events: Vec::new(),
+            cared: Vec::new(),
         };
         let n = pet.rand(5);
         pet.quirk = Quirk::pick(n);
@@ -774,6 +788,7 @@ impl Pet {
         }
         self.hunger += 1;
         self.weight = self.weight.saturating_add(1).min(99);
+        self.cared.push(Care::Meal);
         self.ate_meal();
         if self.quirk == Quirk::Greedy { "Gobbles it up! Hunger +1.".into() } else { "Nom nom! Hunger +1.".into() }
     }
@@ -786,6 +801,7 @@ impl Pet {
             return "Too happy to snack.".into();
         }
         self.happy += 1;
+        self.cared.push(Care::Snack);
         self.note(Habit::Snacks);
         self.weight = self.weight.saturating_add(2).min(99);
         if self.rand(10) == 0 {
@@ -799,6 +815,7 @@ impl Pet {
     }
 
     pub fn finish_game(&mut self, wins: u8, rounds: u8) -> String {
+        self.cared.push(Care::Game);
         self.weight = self.weight.saturating_sub(1).max(1);
         if wins * 2 > rounds {
             let mut bonus = if self.quirk == Quirk::Playful { 2 } else { 1 };
@@ -833,6 +850,7 @@ impl Pet {
                 self.hunger = (self.hunger + 2).min(MAX_HEARTS);
                 self.weight = self.weight.saturating_add(1).min(99);
                 self.note(Habit::ShopFood);
+                self.cared.push(Care::Meal);
                 self.ate_meal();
                 Ok("A fancy meal! Hunger +2.".into())
             }
@@ -846,6 +864,7 @@ impl Pet {
                 self.hunger += 1;
                 self.weight = self.weight.saturating_sub(2).max(1);
                 self.note(Habit::ShopFood);
+                self.cared.push(Care::Meal);
                 self.ate_meal();
                 Ok("A light salad. Hunger +1, a little lighter.".into())
             }
@@ -901,6 +920,7 @@ impl Pet {
         if self.disc_call.take().is_some() {
             self.discipline = self.discipline.saturating_add(25).min(100);
             self.note(Habit::Scolds);
+            self.cared.push(Care::Scold);
             "Lesson learned. Discipline up.".into()
         } else {
             self.happy = self.happy.saturating_sub(1);

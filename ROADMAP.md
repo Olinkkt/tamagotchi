@@ -25,21 +25,19 @@ Three goals, in this order:
 - 1.23 to 1.24: the shell hook and the CPU, RAM and battery reactions were removed.
 - 1.25: the family tree screen (`e`).
 - 2.0: evolution by habit, personalities and the Plain form (Futsutchi); 2.0.3: the leaning tint.
-- 2.1: gifts while away and the keepsakes page.
+- 2.1: gifts while away and the keepsakes page; 2.2: care badges.
 
 ## Next, in order
 
 Times are my own work time, plus your playtesting.
 
-1. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
-   (100, 500, 1000). No fail state.
-2. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
+1. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
    seconds a round.
-3. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
+2. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
    for things you keep, hung or placed in the room.
-4. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
+3. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
    new prices.
-5. **macOS build in the release workflow (MINOR, about 30 minutes).**
+4. **macOS build in the release workflow (MINOR, about 30 minutes).**
 
 ## Shop collectibles
 

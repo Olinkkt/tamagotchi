@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::icons::{self, Grid};
-use crate::pet::{Pet, Stage};
+use crate::pet::{Care, Pet, Stage};
 
 pub const ADULT_SPECIES: [&str; 6] = ["Mametchi", "Kuchipatchi", "Tarakotchi", "Ichigotchi", "Nyorotchi", "Futsutchi"];
 
@@ -57,6 +57,38 @@ pub const KEEPSAKES: [Keepsake; 6] = [
     Keepsake { id: "clover", name: "Clover", icon: icons::CLOVER },
 ];
 
+/// A care badge: do something this many times, over all your pets, to earn it.
+pub struct Badge {
+    pub care: Care,
+    pub goal: u32,
+    pub name: &'static str,
+}
+
+/// Three tiers (bronze, silver, gold) for each kind of care.
+pub const BADGES: [Badge; 12] = [
+    Badge { care: Care::Meal, goal: 100, name: "Caring cook" },
+    Badge { care: Care::Meal, goal: 500, name: "Head chef" },
+    Badge { care: Care::Meal, goal: 1000, name: "Master chef" },
+    Badge { care: Care::Snack, goal: 100, name: "Sweet tooth" },
+    Badge { care: Care::Snack, goal: 500, name: "Candy fan" },
+    Badge { care: Care::Snack, goal: 1000, name: "Candy king" },
+    Badge { care: Care::Game, goal: 100, name: "Playmate" },
+    Badge { care: Care::Game, goal: 500, name: "Game night" },
+    Badge { care: Care::Game, goal: 1000, name: "Arcade star" },
+    Badge { care: Care::Scold, goal: 100, name: "Firm friend" },
+    Badge { care: Care::Scold, goal: 500, name: "Strict teacher" },
+    Badge { care: Care::Scold, goal: 1000, name: "Headmaster" },
+];
+
+pub fn care_name(c: Care) -> &'static str {
+    match c {
+        Care::Meal => "meals",
+        Care::Snack => "snacks",
+        Care::Game => "games",
+        Care::Scold => "scolds",
+    }
+}
+
 /// One gift for every this many seconds away, up to `MAX_GIFTS` when you come back.
 pub const GIFT_EVERY_SECS: u64 = 2 * 3600;
 pub const MAX_GIFTS: u64 = 5;
@@ -81,6 +113,8 @@ pub struct Profile {
     pub last_full_pay: u64,
     /// Keepsakes found (ids from `KEEPSAKES`).
     pub keepsakes: Vec<String>,
+    /// How much care you have given in all, indexed by `Care as usize`.
+    pub cared: [u32; 4],
     /// Unix time the game last ran; what gifts are counted from. 0 until the first run.
     pub last_seen: u64,
 }
@@ -126,6 +160,31 @@ impl Profile {
             }
         }
         gifts
+    }
+
+    /// Add one piece of care to the totals. Returns the badge it earned, if it just did.
+    pub fn record(&mut self, care: Care) -> Option<&'static Badge> {
+        let n = &mut self.cared[care as usize];
+        *n = n.saturating_add(1);
+        let n = *n;
+        BADGES.iter().find(|b| b.care == care && b.goal == n)
+    }
+
+    pub fn care_count(&self, care: Care) -> u32 {
+        self.cared[care as usize]
+    }
+
+    pub fn has_badge(&self, b: &Badge) -> bool {
+        self.care_count(b.care) >= b.goal
+    }
+
+    pub fn badges_earned(&self) -> usize {
+        BADGES.iter().filter(|b| self.has_badge(b)).count()
+    }
+
+    /// The badge closest to being earned, and how many more it takes.
+    pub fn next_badge(&self) -> Option<(&'static Badge, u32)> {
+        BADGES.iter().filter(|b| !self.has_badge(b)).map(|b| (b, b.goal - self.care_count(b.care))).min_by_key(|&(_, left)| left)
     }
 
     pub fn found(&self, id: &str) -> bool {
@@ -231,6 +290,24 @@ mod tests {
         assert_eq!(p.last_seen, 99_999);
         assert!(p.collect_gifts(99_999 + 10 * 3600, false, |_| 0).is_empty(), "an egg or a gone pet leaves none");
         assert_eq!(p.coins, 0);
+    }
+
+    #[test]
+    fn badges_come_at_100_500_and_1000_of_each_kind_of_care() {
+        let mut p = Profile::default();
+        let mut earned = Vec::new();
+        for _ in 0..1000 {
+            if let Some(b) = p.record(Care::Snack) {
+                earned.push(b.name);
+            }
+        }
+        assert_eq!(earned, ["Sweet tooth", "Candy fan", "Candy king"]);
+        assert_eq!(p.badges_earned(), 3);
+        assert_eq!(p.care_count(Care::Meal), 0, "kinds of care are counted apart");
+        let (next, left) = p.next_badge().unwrap();
+        assert_eq!((next.care, left), (Care::Meal, 100));
+        p.cared[Care::Game as usize] = 90;
+        assert_eq!(p.next_badge().map(|(b, l)| (b.name, l)), Some(("Playmate", 10)));
     }
 
     #[test]

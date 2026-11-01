@@ -125,6 +125,12 @@ the six adult species, in colour once you have raised one and as a silhouette un
 to you, not to one pet, so they survive a pet dying; they live in `profile.json` next to the save.
 Prices and rewards are first guesses.
 
+**Care badges.** Over all your pets, 100, 500 and 1000 meals (including shop food), snacks, games
+played and real scolds earn bronze, silver and gold medals (twelve badges). Press `b` on the awards
+screen for your totals and the next goal. The awards, keepsakes and badges pages sit side by side:
+use the left and right arrows, or `a`, `k` and `b`. Totals start counting from version 2.2.0, and
+care given from the terminal (`tama feed`) does not count.
+
 **Gifts while away.** While the game is closed, your pet leaves a gift for every 2 hours (up to 5
 waiting): 2 to 5 coins, or a keepsake it has not found yet. A "welcome back" card shows them when
 you open the game. Press `k` on the awards screen (or the right arrow) for the keepsakes page: six

@@ -387,7 +387,7 @@ mod tests {
         let mut app = app_with(Stage::Adult, |_| {});
         let normal = bar_w(&app, lay);
         assert_eq!(normal, lay.panel_x());
-        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Keepsakes, Mode::Gifts(vec![crate::profile::Gift::Coins(3)]), Mode::Tree, Mode::Graveyard(Vec::new())] {
+        for mode in [Mode::Chooser, Mode::Shop, Mode::Awards, Mode::Keepsakes, Mode::Badges, Mode::Gifts(vec![crate::profile::Gift::Coins(3)]), Mode::Tree, Mode::Graveyard(Vec::new())] {
             app.mode = mode;
             assert_eq!(bar_w(&app, lay), lay.w);
             let text: Vec<String> = labels(&app, lay, 0.5).into_iter().map(|l| l.text).collect();

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.2.0
+
+- New care badges: give 100, 500 and 1000 meals, snacks, games and scolds over all your pets to
+  earn bronze, silver and gold medals (twelve in all). Press `b` on the awards screen (`a`) to see
+  your totals and the next goal; the awards, keepsakes and badges pages sit side by side with the
+  arrow keys. Badges are earned, never lost, and a pet dying does not reset them.
+- Badges start counting from this version, so your totals begin at 0. Old saves and profiles load
+  as before.
+
 ## 2.1.0
 
 - Your pet now leaves gifts while the game is closed: one for every 2 hours away, up to 5 waiting
