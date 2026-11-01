@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::pet::{Pet, Stage};
 
-pub const ADULT_SPECIES: [&str; 5] = ["Mametchi", "Kuchipatchi", "Tarakotchi", "Ichigotchi", "Nyorotchi"];
+pub const ADULT_SPECIES: [&str; 6] = ["Mametchi", "Kuchipatchi", "Tarakotchi", "Ichigotchi", "Nyorotchi", "Futsutchi"];
 
 /// Coins for finishing a mini-game: nothing for a loss, a few for a win, more for a perfect game.
 pub const COINS_WIN: u32 = 4;

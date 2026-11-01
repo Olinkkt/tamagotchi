@@ -24,64 +24,24 @@ Three goals, in this order:
 - 1.21 to 1.22: one-line install, in-game updates, shop prices, mini-game payout cooldown.
 - 1.23 to 1.24: the shell hook and the CPU, RAM and battery reactions were removed.
 - 1.25: the family tree screen (`e`).
+- 2.0: evolution by habit, personalities and the Plain form (Futsutchi).
 
 ## Next, in order
 
 Times are my own work time, plus your playtesting.
 
-1. **Evolution by habit (MAJOR 2.0.0, about 1 hour 20 minutes).** Details below, including the new
-   Plain form. Changes the save format.
-2. **Leaning tint (PATCH, about 15 minutes).** A small tint or accent on the pet that shifts
+1. **Leaning tint (PATCH, about 15 minutes).** A small tint or accent on the pet that shifts
    towards the form it is heading for. No meter to read.
-3. **Gifts while away (MINOR, about 30 minutes).** Details below.
-4. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
+2. **Gifts while away (MINOR, about 30 minutes).** Details below.
+3. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
    (100, 500, 1000). No fail state.
-5. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
+4. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
    seconds a round.
-6. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
+5. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
    for things you keep, hung or placed in the room.
-7. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
+6. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
    new prices.
-8. **macOS build in the release workflow (MINOR, about 30 minutes).**
-
-## Evolution by habit
-
-Care mistakes no longer pick a form. What you choose to do during a stage does, and each teen and
-adult form brings its own personality. The birth trait (random) stays for life; a form's
-personality replaces the previous form's, so a pet has at most two traits at once.
-
-| Stage | Form | Habit that earns it | Personality |
-|---|---|---|---|
-| Teen | Tonmarutchi | child stage: snacks and shop buys (the default) | Calm: happiness falls 25% slower |
-| Teen | Hashitamatchi | child stage: games | Spirited: +1 coin per game win |
-| Adult | Tarakotchi | teen stage: games | Sporty: +1 extra happy per win |
-| Adult | Ichigotchi | teen stage: snacks | Cuddly: happiness falls 40% slower |
-| Adult | Mametchi | teen stage: scolds | Disciplined: acts up half as often |
-| Adult | Kuchipatchi | teen stage: food bought in the shop | Gourmet: hunger falls 25% slower |
-| Adult | Nyorotchi | teen stage: care items bought (vitamins, toys) | Sturdy: gets sick half as often |
-| Adult | Futsutchi (new, Plain) | teen stage: no habit reached its target | Easygoing: no perk, no downside |
-
-- **Choices count, forced things do not.** Meals do not count at all: every pet has to be fed, so
-  they show no preference. Only actions that helped count: a snack or a game win when the pet was
-  missing happy hearts, a scold on a real naughty call, a shop buy that had an effect.
-- **Each habit has a target per stage** (first guesses: games 6, snacks 6, shop food 3, shop care
-  items 3, scolds 2; about an hour of normal play should reach one). Reach a target to unlock its
-  form; if several are reached, the one most over its target wins. Reach none and the pet becomes
-  Plain. Teens have no Plain: with no target reached they are Tonmarutchi.
-- **Counters are hidden and reset each stage.** Players learn the paths by playing and by reading
-  the family tree, not a wiki. Playing randomly gives different forms between pets.
-- **Snacks and games compete** to refill happiness, which is the choice behind Ichigotchi or
-  Tarakotchi. Playing endlessly still earns coins but does not push the form.
-- **Personality as a visible moment.** Each effect is small and clear, with a line of speech
-  when it shows, so it feels earned and not like a hidden percentage.
-- **Showing the lean.** The panel says what the pet is heading for, the family tree shows each
-  form's habit and personality, and the tint (step 2) shows it on the pet itself.
-- **Save impact.** New counters with defaults, so old saves load. Pets already past teen keep
-  their form and get its personality. Mistakes no longer pick a form but still affect health and
-  the "Spotless" award.
-- **New art:** Futsutchi needs a sprite (spritegen shapes, `cargo art`, 8x preview checked).
-
-Numbers are first guesses, like the rest of the balance.
+7. **macOS build in the release workflow (MINOR, about 30 minutes).**
 
 ## Gifts while away
 

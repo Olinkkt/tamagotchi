@@ -12,7 +12,7 @@ use std::{
 };
 
 /// Bump when the save format changes in a way old code cannot read.
-const SAVE_VERSION: u32 = 1;
+const SAVE_VERSION: u32 = 2;
 
 #[derive(Serialize, Deserialize)]
 struct SaveFile {

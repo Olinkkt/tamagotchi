@@ -205,6 +205,14 @@ pub fn nyorotchi(c: &Character) -> Vec<Img> {
     cells
 }
 
+/// The Plain form: a soft round body with nothing extra, so it reads as "just a pet".
+pub fn futsutchi(c: &Character) -> Vec<Img> {
+    let mut body = Sketch::new(SRC, SRC);
+    body.ellipse(64.0, 76.0, 45.0, 41.0, Tan);
+    body.ellipse(64.0, 97.0, 26.0, 15.0, Cream);
+    vec![stack(&[feet(c, 117.0, 24.0, 16.0, Brown), finish(c, &body)])]
+}
+
 pub fn poop(c: &Character) -> Vec<Img> {
     // Three coils, each its own layer so the outline separates them.
     let coils = [(64.0, 100.0, 48.0, 20.0), (62.0, 74.0, 36.0, 17.0), (66.0, 50.0, 24.0, 14.0)].map(|(x, y, rx, ry)| {
@@ -290,6 +298,7 @@ pub fn cells(c: &Character) -> Vec<Img> {
         "tarakotchi" => tarakotchi(c),
         "ichigotchi" => ichigotchi(c),
         "nyorotchi" => nyorotchi(c),
+        "futsutchi" => futsutchi(c),
         "poop" => poop(c),
         "grave" => grave(c),
         "ghost" => ghost(c),

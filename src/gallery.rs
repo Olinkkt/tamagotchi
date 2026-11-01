@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn the_sheet_has_a_row_per_form_and_a_column_per_expression() {
         let f = sheet(&Config::default());
-        assert_eq!((f.w, f.h), (NAMES + CELL * 7, TOP + CELL * 11));
+        assert_eq!((f.w, f.h), (NAMES + CELL * 7, TOP + CELL * 12));
         assert_eq!(row(Stage::Egg, "Egg", &Config::default()).len(), 7, "the egg shows every crack stage");
     }
 

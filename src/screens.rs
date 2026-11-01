@@ -10,7 +10,7 @@ use crate::frame::Frame;
 use crate::hud::{Align, Label, Layout, ROOM_Y};
 use crate::icons::{self, Grid};
 use crate::palette::Pal;
-use crate::pet::{self, Pet, Stage};
+use crate::pet::{self, Pet, Personality, Stage};
 use crate::profile;
 use crate::scene;
 
@@ -138,7 +138,7 @@ fn draw_awards(f: &mut Frame, app: &App) {
     f.rect(CARD.0 + 1, floor, CARD.2 - 2, 1, Pal::Dusk);
     for (i, species) in profile::ADULT_SPECIES.iter().enumerate() {
         let s = collection_sprite(species, app.profile.raised(species));
-        f.sprite(&s, CARD.0 + 8 + i as i32 * 42, floor - s.bottom());
+        f.sprite(&s, CARD.0 + 2 + i as i32 * 36, floor - s.bottom());
     }
 }
 
@@ -161,26 +161,28 @@ struct Node {
     stage: Stage,
     x: i32,
     floor: i32,
+    /// The habit that earns the form.
     needs: &'static str,
 }
 
 const TREE_TOP_FLOOR: i32 = 54;
 const TREE_ADULT_FLOOR: i32 = CARD.1 + CARD.3 - 4;
-const TREE_NEEDS_Y: f32 = 72.0;
+const TREE_NEEDS_Y: f32 = 69.5;
 
 fn tree_nodes() -> Vec<Node> {
     let top = |species, stage, x, needs| Node { species, stage, x, floor: TREE_TOP_FLOOR, needs };
-    let adult = |i: i32, species, needs| Node { species, stage: Stage::Adult, x: 36 + 42 * i, floor: TREE_ADULT_FLOOR, needs };
+    let adult = |i: i32, species, needs| Node { species, stage: Stage::Adult, x: 30 + 36 * i, floor: TREE_ADULT_FLOOR, needs };
     vec![
         top("Babytchi", Stage::Baby, 36, ""),
         top("Marutchi", Stage::Child, 80, ""),
-        top("Tonmarutchi", Stage::Teen, 140, "0-2 mistakes"),
-        top("Hashitamatchi", Stage::Teen, 196, "3+ mistakes"),
-        adult(0, "Mametchi", "0-1*"),
-        adult(1, "Kuchipatchi", "0-2"),
-        adult(2, "Tarakotchi", "3-4"),
-        adult(3, "Ichigotchi", "5-6"),
-        adult(4, "Nyorotchi", "7+"),
+        top("Tonmarutchi", Stage::Teen, 140, "default"),
+        top("Hashitamatchi", Stage::Teen, 196, "games"),
+        adult(0, "Mametchi", "scolds"),
+        adult(1, "Kuchipatchi", "treats"),
+        adult(2, "Tarakotchi", "games"),
+        adult(3, "Ichigotchi", "snacks"),
+        adult(4, "Nyorotchi", "care"),
+        adult(5, "Futsutchi", "none"),
     ]
 }
 
@@ -230,10 +232,12 @@ fn tree_labels(app: &App) -> Vec<Label> {
         let tint = if is_now(app, &n) { Pal::Yellow } else if is_on_track(app, &n) { Pal::Sky } else { Pal::Mist };
         if n.stage == Stage::Adult {
             v.push(centred(n.needs, n.x as f32, TREE_NEEDS_Y, tint));
+            v.push(centred(Personality::of(n.species).label(), n.x as f32, TREE_NEEDS_Y + 6.0, Pal::Slate));
         } else {
             v.push(centred(n.species, n.x as f32, (TREE_TOP_FLOOR + 5) as f32, tint));
             if !n.needs.is_empty() {
-                v.push(centred(n.needs, n.x as f32, (TREE_TOP_FLOOR + 11) as f32, Pal::Slate));
+                let line = format!("{}, {}", n.needs, Personality::of(n.species).label());
+                v.push(centred(line, n.x as f32, (TREE_TOP_FLOOR + 11) as f32, Pal::Slate));
             }
         }
     }
@@ -520,18 +524,18 @@ mod tests {
     fn the_tree_names_every_stage_and_marks_where_the_pet_is() {
         let mut app = app_with(Stage::Teen, |p| {
             p.species = "Tonmarutchi".into();
-            p.mistakes = 4;
+            p.habits = [6, 0, 0, 0, 0];
         });
         app.mode = Mode::Tree;
         let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
-        for want in ["Babytchi", "Marutchi", "Tonmarutchi", "Hashitamatchi", "0-1*", "7+"] {
+        for want in ["Babytchi", "Marutchi", "Tonmarutchi", "Hashitamatchi", "scolds", "none", "strict"] {
             assert!(text.iter().any(|t| t == want), "the tree is missing {want}: {text:?}");
         }
         let forms = tree_nodes();
         let now: Vec<&str> = forms.iter().filter(|n| is_now(&app, n)).map(|n| n.species).collect();
         assert_eq!(now, ["Tonmarutchi"]);
         let next: Vec<&str> = forms.iter().filter(|n| is_on_track(&app, n)).map(|n| n.species).collect();
-        assert_eq!(next, ["Tarakotchi"], "four mistakes lead to Tarakotchi");
+        assert_eq!(next, ["Tarakotchi"], "six games lead to Tarakotchi");
     }
 
     #[test]
@@ -540,7 +544,7 @@ mod tests {
         app.mode = Mode::Awards;
         let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
         assert!(text.iter().any(|t| t == "First steps") && text.iter().any(|t| t == "Collector"), "{text:?}");
-        assert!(text.iter().any(|t| t.contains("adults raised 0/5")));
+        assert!(text.iter().any(|t| t.contains("adults raised 0/6")));
         assert!(hint(&app).unwrap().0.starts_with("NEXT:"));
     }
 

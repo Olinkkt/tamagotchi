@@ -99,6 +99,9 @@ pub fn labels(app: &App, ratio: f32, lay: Layout) -> Vec<Label> {
     for line in p.evolution_preview().iter().take(2) {
         add(line, Pal::White, false);
     }
+    if has_stats(p) && p.personality() != crate::pet::Personality::None {
+        add(&format!("{}: {}", p.personality().label(), p.personality().blurb()), Pal::Pink, false);
+    }
     if has_stats(p) {
         add(&format!("weight {}, mistakes {}", p.weight, p.mistakes), Pal::Slate, false);
     }
@@ -121,8 +124,7 @@ mod tests {
     #[test]
     fn the_growth_section_says_what_it_is_on_track_for() {
         let app = app_with(Stage::Teen, |p| {
-            p.mistakes = 0;
-            p.discipline = 80;
+            p.habits = [0, 0, 0, 0, 2];
         });
         let text = panel_text(&app, 0.5);
         assert!(text.contains("On track") && text.contains("Mametchi"), "{text}");

@@ -137,6 +137,7 @@ fn sheet_bytes(name: &str) -> &'static [u8] {
         "tarakotchi" => include_bytes!("../assets/sprites/tarakotchi.png"),
         "ichigotchi" => include_bytes!("../assets/sprites/ichigotchi.png"),
         "nyorotchi" => include_bytes!("../assets/sprites/nyorotchi.png"),
+        "futsutchi" => include_bytes!("../assets/sprites/futsutchi.png"),
         "grave" => include_bytes!("../assets/sprites/grave.png"),
         "ghost" => include_bytes!("../assets/sprites/ghost.png"),
         "shell" => include_bytes!("../assets/sprites/shell.png"),

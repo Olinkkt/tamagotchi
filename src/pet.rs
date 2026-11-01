@@ -57,6 +57,103 @@ impl Quirk {
     }
 }
 
+/// What the player chooses to do with a pet. Counted per life stage, hidden from the player, and
+/// the biggest one decides which form the pet grows into.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Habit {
+    Games,
+    Snacks,
+    ShopFood,
+    ShopCare,
+    Scolds,
+}
+
+impl Habit {
+    pub const ALL: [Habit; 5] = [Habit::Games, Habit::Snacks, Habit::ShopFood, Habit::ShopCare, Habit::Scolds];
+
+    /// How many times in one stage earns the form (first guesses; about an hour of play).
+    pub fn target(self) -> u32 {
+        match self {
+            Habit::Games | Habit::Snacks => 6,
+            Habit::ShopFood | Habit::ShopCare => 3,
+            Habit::Scolds => 2,
+        }
+    }
+
+    /// The adult form this habit leads to.
+    pub fn adult(self) -> &'static str {
+        match self {
+            Habit::Games => "Tarakotchi",
+            Habit::Snacks => "Ichigotchi",
+            Habit::ShopFood => "Kuchipatchi",
+            Habit::ShopCare => "Nyorotchi",
+            Habit::Scolds => "Mametchi",
+        }
+    }
+}
+
+/// How often each habit happened in the current stage (indexed by `Habit as usize`).
+pub type Habits = [u32; 5];
+
+/// A form's personality. It follows from the species, so it replaces the previous form's and
+/// old saves get theirs without any stored field.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Personality {
+    None,
+    Calm,
+    Spirited,
+    Sporty,
+    Cuddly,
+    Disciplined,
+    Gourmet,
+    Sturdy,
+    Easygoing,
+}
+
+impl Personality {
+    pub fn of(species: &str) -> Personality {
+        match species {
+            "Tonmarutchi" => Personality::Calm,
+            "Hashitamatchi" => Personality::Spirited,
+            "Tarakotchi" => Personality::Sporty,
+            "Ichigotchi" => Personality::Cuddly,
+            "Mametchi" => Personality::Disciplined,
+            "Kuchipatchi" => Personality::Gourmet,
+            "Nyorotchi" => Personality::Sturdy,
+            "Futsutchi" => Personality::Easygoing,
+            _ => Personality::None,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Personality::None => "",
+            Personality::Calm => "calm",
+            Personality::Spirited => "spirited",
+            Personality::Sporty => "sporty",
+            Personality::Cuddly => "cuddly",
+            Personality::Disciplined => "strict",
+            Personality::Gourmet => "gourmet",
+            Personality::Sturdy => "sturdy",
+            Personality::Easygoing => "easygoing",
+        }
+    }
+
+    pub fn blurb(self) -> &'static str {
+        match self {
+            Personality::None => "",
+            Personality::Calm => "happiness falls 25% slower",
+            Personality::Spirited => "+1 coin per game win",
+            Personality::Sporty => "+1 extra happy per win",
+            Personality::Cuddly => "happiness falls 40% slower",
+            Personality::Disciplined => "acts up half as often",
+            Personality::Gourmet => "hunger falls 25% slower",
+            Personality::Sturdy => "gets sick half as often",
+            Personality::Easygoing => "no perk, no downside",
+        }
+    }
+}
+
 /// Something that can be bought in the shop.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Item {
@@ -132,6 +229,9 @@ pub struct Pet {
     pub doses: u8,
     pub asleep: bool,
     pub mistakes: u32,
+    /// Helpful choices made in the current stage; they pick the next form.
+    #[serde(default)]
+    pub habits: Habits,
     pub disc_call: Option<u64>,
     pub cause_of_death: Option<String>,
     pub buried: bool,
@@ -182,6 +282,7 @@ impl Pet {
             doses: 0,
             asleep: false,
             mistakes: 0,
+            habits: [0; 5],
             disc_call: None,
             cause_of_death: None,
             buried: false,
@@ -295,6 +396,20 @@ impl Pet {
         }
     }
 
+    fn note(&mut self, habit: Habit) {
+        let n = &mut self.habits[habit as usize];
+        *n = n.saturating_add(1);
+    }
+
+    pub fn personality(&self) -> Personality {
+        Personality::of(&self.species)
+    }
+
+    /// Extra coins a won game pays (Spirited).
+    pub fn win_coin_bonus(&self) -> u32 {
+        u32::from(self.personality() == Personality::Spirited)
+    }
+
     fn mistake(&mut self, why: &str) {
         self.mistakes += 1;
         self.events.push(format!("Care mistake: {why}"));
@@ -377,26 +492,38 @@ impl Pet {
         self.stage_age = 0;
         self.weight = self.weight.saturating_add(5).min(99);
         self.species = self.species_for(next).into();
+        self.habits = [0; 5];
         self.events.push(format!("Grew into a {} ({})!", next.label(), self.species));
     }
 
     fn species_for(&self, stage: Stage) -> &'static str {
-        Self::species_of(stage, self.mistakes, self.discipline)
+        Self::species_of(stage, &self.habits)
     }
 
-    fn species_of(stage: Stage, mistakes: u32, discipline: u8) -> &'static str {
+    /// The form a stage grows into, from what the player did during the stage before it.
+    /// The habit most over its target wins; no target reached means the Plain form
+    /// (teens have no Plain form and stay Tonmarutchi).
+    fn species_of(stage: Stage, habits: &Habits) -> &'static str {
         match stage {
             Stage::Baby => "Babytchi",
             Stage::Child => "Marutchi",
-            Stage::Teen if mistakes <= 2 => "Tonmarutchi",
-            Stage::Teen => "Hashitamatchi",
-            Stage::Adult => match (mistakes, discipline) {
-                (0..=1, 75..) => "Mametchi",
-                (0..=2, _) => "Kuchipatchi",
-                (3..=4, _) => "Tarakotchi",
-                (5..=6, _) => "Ichigotchi",
-                _ => "Nyorotchi",
-            },
+            Stage::Teen => {
+                let games = habits[Habit::Games as usize];
+                if games >= Habit::Games.target() && games >= habits[Habit::Snacks as usize] {
+                    "Hashitamatchi"
+                } else {
+                    "Tonmarutchi"
+                }
+            }
+            Stage::Adult => Habit::ALL
+                .into_iter()
+                .filter(|h| habits[*h as usize] >= h.target())
+                // Most over its target, comparing count / target by cross-multiplying;
+                // the first habit in the list wins a tie.
+                .reduce(|best, h| {
+                    if habits[h as usize] * best.target() > habits[best as usize] * h.target() { h } else { best }
+                })
+                .map_or("Futsutchi", Habit::adult),
             _ => "Egg",
         }
     }
@@ -421,7 +548,7 @@ impl Pet {
             return None;
         }
         let (_, next) = self.next_stage()?;
-        matches!(next, Stage::Teen | Stage::Adult).then(|| Self::species_of(next, self.mistakes, self.discipline))
+        matches!(next, Stage::Teen | Stage::Adult).then(|| Self::species_of(next, &self.habits))
     }
 
     /// Short lines describing what growth is coming and how care changes the outcome.
@@ -435,19 +562,7 @@ impl Pet {
         };
         let mut out = vec![format!("Next: {} in {}", next.label(), crate::fmt_age(limit.saturating_sub(self.stage_age)))];
         if matches!(next, Stage::Teen | Stage::Adult) {
-            let now = Self::species_of(next, self.mistakes, self.discipline);
-            out.push(format!("On track: {now}"));
-            if let Some((k, worse)) = (1..=3u32)
-                .map(|k| (k, Self::species_of(next, self.mistakes + k, self.discipline)))
-                .find(|(_, s)| *s != now)
-            {
-                let s = if k == 1 { "" } else { "s" };
-                out.push(format!("{k} more mistake{s} -> {worse}"));
-            }
-            let better = Self::species_of(next, self.mistakes, 100);
-            if better != now {
-                out.push(format!("75%+ discipline -> {better}"));
-            }
+            out.push(format!("On track: {}", Self::species_of(next, &self.habits)));
         }
         out
     }
@@ -470,7 +585,10 @@ impl Pet {
         if self.skip_slow_tick() {
             return;
         }
-        let hi = self.hunger_interval();
+        let mut hi = self.hunger_interval();
+        if self.personality() == Personality::Gourmet {
+            hi = hi * 4 / 3;
+        }
         self.hunger_t += 1;
         if self.hunger_t >= hi {
             self.hunger_t = 0;
@@ -479,6 +597,11 @@ impl Pet {
         self.happy_t += 1;
         let happy_secs = (hi as f64 * self.cfg.happy_decay_factor) as u64;
         let happy_secs = if self.quirk == Quirk::Playful { happy_secs * 3 / 4 } else { happy_secs };
+        let happy_secs = match self.personality() {
+            Personality::Calm => happy_secs * 4 / 3,
+            Personality::Cuddly => happy_secs * 5 / 3,
+            _ => happy_secs,
+        };
         if self.happy_t >= happy_secs {
             self.happy_t = 0;
             self.happy = self.happy.saturating_sub(1);
@@ -562,6 +685,9 @@ impl Pet {
             if self.quirk == Quirk::Hardy {
                 odds *= 2;
             }
+            if self.personality() == Personality::Sturdy {
+                odds *= 2;
+            }
             if self.overweight() {
                 odds = (odds / self.cfg.overweight_sick_factor.max(1)).max(1);
             }
@@ -585,7 +711,10 @@ impl Pet {
         }
         match self.disc_call {
             None => {
-                let odds = if self.quirk == Quirk::Mischievous { self.cfg.naughty_odds / 2 } else { self.cfg.naughty_odds };
+                let mut odds = if self.quirk == Quirk::Mischievous { self.cfg.naughty_odds / 2 } else { self.cfg.naughty_odds };
+                if self.personality() == Personality::Disciplined {
+                    odds *= 2;
+                }
                 if self.rand(odds.max(1)) == 0 {
                     self.disc_call = Some(0);
                     self.events.push(format!("{} is being naughty!", self.species));
@@ -633,6 +762,7 @@ impl Pet {
             return "Too happy to snack.".into();
         }
         self.happy += 1;
+        self.note(Habit::Snacks);
         self.weight = self.weight.saturating_add(2).min(99);
         if self.rand(10) == 0 {
             self.get_sick();
@@ -647,13 +777,20 @@ impl Pet {
     pub fn finish_game(&mut self, wins: u8, rounds: u8) -> String {
         self.weight = self.weight.saturating_sub(1).max(1);
         if wins * 2 > rounds {
-            let bonus = if self.quirk == Quirk::Playful { 2 } else { 1 };
+            let mut bonus = if self.quirk == Quirk::Playful { 2 } else { 1 };
+            if self.personality() == Personality::Sporty {
+                bonus += 1;
+            }
+            // Only a win that filled missing hearts counts; endless play earns coins, not a form.
+            if self.happy < MAX_HEARTS {
+                self.note(Habit::Games);
+            }
             self.happy = (self.happy + bonus).min(MAX_HEARTS);
             if wins == rounds && self.mistakes > 0 {
                 self.mistakes -= 1;
-                return "Perfect game! Happy +1 and a care mistake forgiven.".into();
+                return format!("Perfect game! Happy +{bonus} and a care mistake forgiven.");
             }
-            if self.quirk == Quirk::Playful { "You won! It loves games: Happy +2.".into() } else { "You won! Happy +1.".into() }
+            format!("You won! Happy +{bonus}.")
         } else {
             "You lost... no happiness gained.".into()
         }
@@ -671,22 +808,26 @@ impl Pet {
             Item::FancyMeal => {
                 self.hunger = (self.hunger + 2).min(MAX_HEARTS);
                 self.weight = self.weight.saturating_add(1).min(99);
+                self.note(Habit::ShopFood);
                 self.ate_meal();
                 Ok("A fancy meal! Hunger +2.".into())
             }
             Item::Toy => {
                 self.happy = (self.happy + 2).min(MAX_HEARTS);
                 self.weight = self.weight.saturating_sub(1).max(1);
+                self.note(Habit::ShopCare);
                 Ok("It loves the toy! Happy +2.".into())
             }
             Item::Salad => {
                 self.hunger += 1;
                 self.weight = self.weight.saturating_sub(2).max(1);
+                self.note(Habit::ShopFood);
                 self.ate_meal();
                 Ok("A light salad. Hunger +1, a little lighter.".into())
             }
             Item::Vitamins => {
                 self.immune_until = self.age + VITAMIN_SECS;
+                self.note(Habit::ShopCare);
                 Ok("Vitamins! No sickness for 3 hours.".into())
             }
         }
@@ -735,6 +876,7 @@ impl Pet {
         }
         if self.disc_call.take().is_some() {
             self.discipline = self.discipline.saturating_add(25).min(100);
+            self.note(Habit::Scolds);
             "Lesson learned. Discipline up.".into()
         } else {
             self.happy = self.happy.saturating_sub(1);
@@ -756,24 +898,86 @@ mod tests {
         assert_eq!(p.stage, Stage::Baby);
     }
 
-    #[test]
-    fn teens_split_on_mistakes() {
-        assert_eq!(Pet::species_of(Stage::Teen, 0, 0), "Tonmarutchi");
-        assert_eq!(Pet::species_of(Stage::Teen, 2, 0), "Tonmarutchi");
-        assert_eq!(Pet::species_of(Stage::Teen, 3, 100), "Hashitamatchi");
+    fn habits(games: u32, snacks: u32, food: u32, care: u32, scolds: u32) -> Habits {
+        [games, snacks, food, care, scolds]
     }
 
     #[test]
-    fn adults_depend_on_mistakes_and_discipline() {
-        assert_eq!(Pet::species_of(Stage::Adult, 0, 75), "Mametchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 1, 100), "Mametchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 0, 74), "Kuchipatchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 2, 100), "Kuchipatchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 3, 100), "Tarakotchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 4, 0), "Tarakotchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 5, 100), "Ichigotchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 6, 0), "Ichigotchi");
-        assert_eq!(Pet::species_of(Stage::Adult, 7, 100), "Nyorotchi");
+    fn teens_follow_games_against_snacks() {
+        assert_eq!(Pet::species_of(Stage::Teen, &habits(0, 0, 0, 0, 0)), "Tonmarutchi");
+        assert_eq!(Pet::species_of(Stage::Teen, &habits(5, 0, 0, 0, 0)), "Tonmarutchi", "below the target");
+        assert_eq!(Pet::species_of(Stage::Teen, &habits(6, 0, 0, 0, 0)), "Hashitamatchi");
+        assert_eq!(Pet::species_of(Stage::Teen, &habits(6, 9, 0, 0, 0)), "Tonmarutchi", "snacks win the tie-break");
+    }
+
+    #[test]
+    fn adults_follow_the_habit_most_over_its_target() {
+        let adult = |h| Pet::species_of(Stage::Adult, &h);
+        assert_eq!(adult(habits(6, 0, 0, 0, 0)), "Tarakotchi");
+        assert_eq!(adult(habits(0, 6, 0, 0, 0)), "Ichigotchi");
+        assert_eq!(adult(habits(0, 0, 3, 0, 0)), "Kuchipatchi");
+        assert_eq!(adult(habits(0, 0, 0, 3, 0)), "Nyorotchi");
+        assert_eq!(adult(habits(0, 0, 0, 0, 2)), "Mametchi");
+        assert_eq!(adult(habits(6, 5, 2, 2, 1)), "Tarakotchi", "only reached targets count");
+        assert_eq!(adult(habits(7, 0, 0, 0, 4)), "Mametchi", "4/2 is further over than 7/6");
+        assert_eq!(adult(habits(5, 5, 2, 2, 1)), "Futsutchi", "no target reached is Plain");
+    }
+
+    #[test]
+    fn only_helpful_actions_count() {
+        let mut p = awake_adult();
+        p.happy = MAX_HEARTS;
+        p.feed_snack();
+        p.finish_game(3, 3);
+        p.scold();
+        assert_eq!(p.habits, [0; 5], "nothing helped, nothing counted");
+        p.happy = 1;
+        p.feed_snack();
+        p.happy = 1;
+        p.finish_game(3, 3);
+        p.disc_call = Some(0);
+        p.scold();
+        p.hunger = 1;
+        p.use_item(Item::Salad).unwrap();
+        p.use_item(Item::Vitamins).unwrap();
+        assert_eq!(p.habits, habits(1, 1, 1, 1, 1));
+        p.feed_meal();
+        assert_eq!(p.habits, habits(1, 1, 1, 1, 1), "meals show no preference");
+    }
+
+    #[test]
+    fn growing_up_uses_the_stage_just_finished_and_resets_the_counters() {
+        let mut p = Pet::new(1);
+        p.stage = Stage::Child;
+        p.habits = habits(6, 0, 0, 0, 0);
+        p.stage_age = p.cfg.child_secs;
+        p.grow();
+        assert_eq!(p.species, "Hashitamatchi");
+        assert_eq!(p.habits, [0; 5]);
+    }
+
+    #[test]
+    fn each_form_has_its_personality_and_they_change_the_rates() {
+        assert_eq!(Personality::of("Marutchi"), Personality::None);
+        assert_eq!(Personality::of("Futsutchi"), Personality::Easygoing);
+        let hunger_after = |species: &str| {
+            let mut p = awake_adult();
+            p.species = species.into();
+            p.hunger = 4;
+            for _ in 0..p.hunger_interval() * 4 / 3 - 1 {
+                p.decay();
+            }
+            p.hunger
+        };
+        assert_eq!(hunger_after("Futsutchi"), 3);
+        assert_eq!(hunger_after("Kuchipatchi"), 4, "gourmets get hungry 25% slower");
+        let mut p = awake_adult();
+        p.species = "Tarakotchi".into();
+        p.happy = 1;
+        p.finish_game(3, 3);
+        assert_eq!(p.happy, 3, "sporty: +1 extra on a win");
+        p.species = "Hashitamatchi".into();
+        assert_eq!(p.win_coin_bonus(), 1);
     }
 
     #[test]
@@ -794,12 +998,11 @@ mod tests {
     fn grow_picks_the_adult_from_the_care_record() {
         let mut p = Pet::new(1);
         p.stage = Stage::Teen;
-        p.mistakes = 4;
-        p.discipline = 100;
+        p.habits = habits(0, 6, 0, 0, 0);
         p.stage_age = p.cfg.teen_secs;
         p.grow();
         assert_eq!(p.stage, Stage::Adult);
-        assert_eq!(p.species, "Tarakotchi");
+        assert_eq!(p.species, "Ichigotchi");
     }
 
     #[test]
@@ -807,22 +1010,21 @@ mod tests {
         let mut p = Pet::new(1);
         assert_eq!(p.on_track(), None, "an egg has no track");
         p.stage = Stage::Teen;
-        p.mistakes = 4;
+        assert_eq!(p.on_track(), Some("Futsutchi"));
+        p.habits = habits(6, 0, 0, 0, 0);
         assert_eq!(p.on_track(), Some("Tarakotchi"));
         p.stage = Stage::Adult;
         assert_eq!(p.on_track(), None, "an adult has nothing left to grow into");
     }
 
     #[test]
-    fn the_preview_names_the_current_track_and_the_next_one_down() {
+    fn the_preview_names_the_form_it_is_heading_for() {
         let mut p = Pet::new(1);
         p.stage = Stage::Teen;
         p.species = "Tonmarutchi".into();
-        p.mistakes = 0;
-        p.discipline = 80;
+        p.habits = habits(0, 0, 3, 0, 0);
         let text = p.evolution_preview().join("\n");
-        assert!(text.contains("On track: Mametchi"), "{text}");
-        assert!(text.contains("2 more mistakes -> Kuchipatchi"), "{text}");
+        assert!(text.contains("On track: Kuchipatchi"), "{text}");
     }
 
     fn awake_adult() -> Pet {
@@ -955,18 +1157,6 @@ mod tests {
         assert_eq!(p.top_need().map(|n| n.0), Some('p'));
         p.weight = 5;
         assert!(!p.overweight());
-    }
-
-    #[test]
-    fn preview_warns_about_mistakes_and_discipline() {
-        let mut p = Pet::new(4);
-        p.stage = Stage::Teen;
-        p.mistakes = 1;
-        p.discipline = 50;
-        let text = p.evolution_preview().join(" | ");
-        assert!(text.contains("On track: Kuchipatchi"), "{text}");
-        assert!(text.contains("1 more mistake -> Kuchipatchi") || text.contains("more mistake"), "{text}");
-        assert!(text.contains("75%+ discipline -> Mametchi"), "{text}");
     }
 
     #[test]

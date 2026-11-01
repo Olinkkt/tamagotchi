@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0
+
+- What you do now picks the form, not care mistakes. Winning games leads to Tarakotchi, snacks to
+  Ichigotchi, scolding naughty calls to Mametchi, shop food to Kuchipatchi, toys and vitamins to
+  Nyorotchi. Reach none and your pet becomes the new Futsutchi. The counters are hidden and reset
+  each stage; the status panel shows what it is heading for.
+- Every teen and adult form has a personality (calmer, sportier, hungrier slowly, harder to get
+  sick, and more) that replaces the last form's. The family tree shows each form's habit and
+  personality, and the collection has a sixth adult.
+- Saves from before 2.0.0 load as before: pets that have grown keep their form and gain its
+  personality. Mistakes still affect health and the "Spotless" award.
+
 ## 1.25.0
 
 - New family tree: press `e` (or click the new button) to see every form from Baby to the five adults,

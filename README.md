@@ -121,7 +121,7 @@ then `1` to `4`, or click an item; the shop closes so you can watch your pet enj
 | Vitamins | 25 | no sickness for 3 hours |
 
 `a` shows nine achievements (for example "Spotless": reach adulthood with no care mistakes) and
-the five adult species, in colour once you have raised one and as a silhouette until then. Coins, achievements and the collection belong
+the six adult species, in colour once you have raised one and as a silhouette until then. Coins, achievements and the collection belong
 to you, not to one pet, so they survive a pet dying; they live in `profile.json` next to the save.
 Prices and rewards are first guesses.
 
@@ -138,24 +138,31 @@ done by 28 seconds). Once it runs all the way across, the top half lifts and roc
 half and bits of shell fly off the crack. One last strong shake at 29 seconds, a held breath, a white flash, and it bursts: the baby pops out, the cap flies
 off in an arc, and the two halves of the shell stay on the floor for a few seconds.
 
-Care mistakes (counted over its whole life) decide what it grows into:
+What you choose to do decides what it grows into. Each stage counts a few helpful choices (hidden,
+and reset when the pet grows up); the one most over its target picks the next form:
 
-- Ignoring hunger, unhappiness or sickness for 15 minutes, ignoring a naughty call for
-  10 minutes each add one mistake.
+| Becoming | Habit during the stage before | Personality |
+|---|---|---|
+| Teen: Tonmarutchi | snacks and shop buys (the default) | calm: happiness falls 25% slower |
+| Teen: Hashitamatchi | 6 game wins | spirited: +1 coin per game win |
+| Adult: Tarakotchi | 6 game wins | sporty: +1 extra happy per win |
+| Adult: Ichigotchi | 6 snacks | cuddly: happiness falls 40% slower |
+| Adult: Mametchi | 2 scolds of a real naughty call | strict: acts up half as often |
+| Adult: Kuchipatchi | 3 shop meals (fancy meal, salad) | gourmet: hunger falls 25% slower |
+| Adult: Nyorotchi | 3 shop care items (toy, vitamins) | sturdy: gets sick half as often |
+| Adult: Futsutchi | no target reached | easygoing: no perk, no downside |
 
-| Becoming | Needs |
-|---|---|
-| Teen: Tonmarutchi | 0 to 2 mistakes |
-| Teen: Hashitamatchi | 3 or more |
-| Adult: Mametchi | 0 to 1 mistakes **and** 75% discipline |
-| Adult: Kuchipatchi | 0 to 2 mistakes |
-| Adult: Tarakotchi | 3 to 4 |
-| Adult: Ichigotchi | 5 to 6 |
-| Adult: Nyorotchi | 7 or more |
+- Only choices that helped count: a snack or a game win while the pet was missing happy hearts, a
+  scold on a real naughty call, a shop buy that had an effect. Meals never count.
+- A teen turns Hashitamatchi at 6 game wins if it had no more snacks than wins.
+- A form's personality replaces the previous form's; the random trait below stays for life.
+- Care mistakes (ignoring hunger, unhappiness or sickness for 15 minutes, a naughty call for 10
+  minutes) no longer pick a form. They still hurt health and cost the "Spotless" award.
 
 Discipline starts at 50% and rises 25 points each time you scold a real naughty call.
-The status panel shows what it is on track for, and `e` opens the family tree: the same table as a
-picture, with your pet outlined in yellow and the form it is heading for in blue.
+The status panel says what it is on track for and its personality, and `e` opens the family tree:
+every form with its habit and personality, your pet outlined in yellow and the form it is heading
+for in blue.
 
 Each pet also gets a random trait: *greedy* (hungry faster), *playful* (bored faster, +2
 happiness from a win), *hardy* (rarely sick), *mischievous* (acts up more) or *easygoing*.

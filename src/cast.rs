@@ -67,14 +67,18 @@ pub const TARAKOTCHI: Character = Character { name: "tarakotchi", size: 48, face
 pub const ICHIGOTCHI: Character = Character { name: "ichigotchi", size: 48, face: large_face(48, 19), parts: &[part("leaves", true)] };
 pub const NYOROTCHI: Character = Character { name: "nyorotchi", size: 48, face: large_face(48, 18), parts: &[part("tail", false)] };
 
+pub const FUTSUTCHI: Character = Character { name: "futsutchi", size: 48, face: large_face(48, 19), parts: &[] };
+
 pub const GRAVE: Character = Character { name: "grave", size: 32, face: None, parts: &[] };
 pub const GHOST: Character = Character { name: "ghost", size: 24, face: None, parts: &[] };
 
 /// What an egg leaves behind: the bowl is the body, the cap is its one part frame.
 pub const SHELL: Character = Character { name: "shell", size: 24, face: None, parts: &[Part { name: "cap", frames: 1, front: false }] };
 
-pub const ALL: [Character; 13] =
-    [EGG, BABY, CHILD, TONMARUTCHI, HASHITAMATCHI, MAMETCHI, KUCHIPATCHI, TARAKOTCHI, ICHIGOTCHI, NYOROTCHI, GRAVE, GHOST, SHELL];
+pub const ALL: [Character; 14] = [
+    EGG, BABY, CHILD, TONMARUTCHI, HASHITAMATCHI, MAMETCHI, KUCHIPATCHI, TARAKOTCHI, ICHIGOTCHI, NYOROTCHI, FUTSUTCHI, GRAVE, GHOST,
+    SHELL,
+];
 
 /// The sprite set for a species, if it has one.
 pub fn for_species(species: &str) -> Option<Character> {

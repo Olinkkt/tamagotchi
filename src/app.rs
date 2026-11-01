@@ -76,7 +76,7 @@ pub struct App {
 type Snapshot = (u8, u8, u8, bool, bool);
 
 /// Every form the pet can take, in the order the dev panel steps through them.
-pub const FORMS: [(Stage, &str); 11] = [
+pub const FORMS: [(Stage, &str); 12] = [
     (Stage::Egg, "Egg"),
     (Stage::Baby, "Babytchi"),
     (Stage::Child, "Marutchi"),
@@ -87,6 +87,7 @@ pub const FORMS: [(Stage, &str); 11] = [
     (Stage::Adult, "Tarakotchi"),
     (Stage::Adult, "Ichigotchi"),
     (Stage::Adult, "Nyorotchi"),
+    (Stage::Adult, "Futsutchi"),
     (Stage::Dead, "Departed"),
 ];
 
@@ -433,7 +434,9 @@ impl App {
             games::Outcome::Done { wins, rounds } => {
                 let before = self.snapshot();
                 let msg = self.pet.finish_game(wins, rounds);
-                let coins = self.profile.pay_for(profile::game_reward(wins, rounds), save::now());
+                let reward = profile::game_reward(wins, rounds);
+                let reward = if reward > 0 { reward + self.pet.win_coin_bonus() } else { 0 };
+                let coins = self.profile.pay_for(reward, save::now());
                 if coins > 0 {
                     self.profile.add_coins(coins);
                     self.profile.games_won += 1;
