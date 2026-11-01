@@ -64,7 +64,7 @@ impl Game {
         }
         match self {
             Game::Memory(g) => g.key(code),
-            Game::Pong(_) => Outcome::Continue,
+            Game::Pong(g) => g.key(code),
             Game::Shells(g) => g.key(code),
             Game::Janken(g) => g.key(code, pet),
             Game::Stop(g) => g.key(code),
@@ -76,7 +76,8 @@ impl Game {
     pub fn click(&self, x: i32, y: i32) -> Option<Key> {
         match self {
             Game::Memory(_) => Memory::pad_at(x, y).map(|n| Key::Char((b'0' + n) as char)),
-            Game::Pong(_) => None,
+            // One button: a click anywhere in the picture flips the paddle.
+            Game::Pong(_) => Some(Key::Char(' ')),
             Game::Shells(g) => g.slot_at(x, y).map(|s| Key::Char((b'1' + s as u8) as char)),
             Game::Janken(g) => g.button_at(x, y).map(|i| Key::Char((b'1' + i as u8) as char)),
             // One button: a click anywhere in the picture is the space bar.
@@ -92,20 +93,6 @@ impl Game {
             Game::Shells(g) => g.hover_rect(x, y),
             Game::Janken(g) => g.hover_rect(x, y),
             Game::Stop(_) | Game::Hop(_) => None,
-        }
-    }
-
-    /// Where the mouse is held down (a row of the game's own picture): Pong's paddle follows it.
-    pub fn aim(&mut self, y: Option<f32>) {
-        if let Game::Pong(g) = self {
-            g.aim = y;
-        }
-    }
-
-    /// Which direction keys are held down right now.
-    pub fn hold(&mut self, up: bool, down: bool) {
-        if let Game::Pong(g) = self {
-            g.dir = down as i32 - up as i32;
         }
     }
 
@@ -147,7 +134,7 @@ impl Game {
             Game::Janken(g) => g.hint(),
             Game::Stop(g) => g.hint(),
             Game::Hop(g) => g.hint(),
-            Game::Pong(_) => "HOLD W/S OR THE MOUSE TO MOVE - RETURN IT 5 TIMES",
+            Game::Pong(_) => "TAP ANY KEY OR CLICK TO FLIP THE PADDLE - RETURN IT 5 TIMES",
         }
     }
 }
@@ -390,7 +377,8 @@ const PADDLE_H: f32 = 30.0;
 const SLACK: f32 = 3.0;
 /// The ball bounces off the pet keeper here.
 const KEEPER_X: f32 = GW as f32 - 44.0;
-const PADDLE_SPEED: f32 = 160.0;
+/// The paddle glides by itself at this speed and turns round at the rails or when you tap.
+const PADDLE_SPEED: f32 = 100.0;
 const BALL_SPEED: f32 = 80.0;
 /// Each return makes the ball this much faster, up to `MAX_SPEEDUP` times the start.
 const SPEEDUP: f32 = 1.06;
@@ -400,10 +388,8 @@ const STEP: f32 = 1.0 / 120.0;
 pub struct Pong {
     /// Top of the paddle.
     py: f32,
-    /// -1 up, 1 down, 0 still: set every frame from the keys held.
+    /// -1 up or 1 down: the way the paddle is gliding.
     dir: i32,
-    /// A row the mouse holds the paddle towards, when the button is down.
-    aim: Option<f32>,
     /// Top-left corner of the ball, and its velocity in pixels per second.
     bx: f32,
     by: f32,
@@ -429,8 +415,7 @@ impl Pong {
         let down = pet.rand(2) == 0;
         Pong {
             py: (GH as f32 - PADDLE_H) / 2.0,
-            dir: 0,
-            aim: None,
+            dir: if down { 1 } else { -1 },
             bx: KEEPER_X - 20.0,
             by,
             vx: -BALL_SPEED,
@@ -448,6 +433,15 @@ impl Pong {
         }
     }
 
+    /// Any key but the way out flips the paddle's direction.
+    fn key(&mut self, code: Key) -> Outcome {
+        let flips = matches!(code, Key::Up | Key::Down | Key::Left | Key::Right | Key::Tab | Key::Char(_));
+        if flips && !self.missed {
+            self.dir = -self.dir;
+        }
+        Outcome::Continue
+    }
+
     /// Advance by real time, in fixed small steps so the result does not depend on frame rate.
     fn tick(&mut self) -> Outcome {
         self.left += self.last.elapsed().as_secs_f32().min(0.1);
@@ -463,11 +457,13 @@ impl Pong {
 
     fn step(&mut self, dt: f32) -> Outcome {
         let lowest = COURT_BOTTOM + BALL + 2.0 - PADDLE_H;
-        if let Some(y) = self.aim {
-            let mid = self.py + PADDLE_H / 2.0;
-            self.dir = if y > mid + 2.0 { 1 } else if y < mid - 2.0 { -1 } else { 0 };
+        let top = COURT_TOP - 2.0;
+        self.py += self.dir as f32 * PADDLE_SPEED * dt;
+        if self.py <= top || self.py >= lowest {
+            self.py = self.py.clamp(top, lowest);
+            // At a rail it turns round by itself.
+            self.dir = if self.py <= top { 1 } else { -1 };
         }
-        self.py = (self.py + self.dir as f32 * PADDLE_SPEED * dt).clamp(COURT_TOP - 2.0, lowest);
         if self.trail.first().is_none_or(|&(x, y)| (x - self.bx).abs() + (y - self.by).abs() >= 4.0) {
             self.trail.insert(0, (self.bx, self.by));
             self.trail.truncate(3);
@@ -723,26 +719,46 @@ mod tests {
     }
 
     #[test]
-    fn pong_paddle_moves_only_while_a_key_is_held_and_stays_in_the_court() {
+    fn pong_paddle_glides_by_itself_turns_at_the_rails_and_flips_on_a_tap() {
         let mut p = pet();
         let mut g = Game::new(2, &mut p);
-        g.hold(true, false);
         let Game::Pong(pong) = &mut g else { panic!("game 2 is pong") };
         (pong.vx, pong.vy) = (0.0, 0.0);
-        let start = pong.py;
+        pong.py = 50.0;
+        pong.dir = 1;
         run(pong, 0.1);
-        assert!(pong.py < start, "holding up moves the paddle up");
-        run(pong, 5.0);
-        assert_eq!(pong.py, COURT_TOP - 2.0, "it stops at the top rail");
-        g.hold(false, false);
-        let Game::Pong(pong) = &mut g else { unreachable!() };
+        assert!(pong.py > 50.0, "it moves with no key held");
+
         let at = pong.py;
-        run(pong, 0.5);
-        assert_eq!(pong.py, at, "letting go stops it");
-        g.hold(false, true);
+        g.key(Key::Char('w'), &mut p);
         let Game::Pong(pong) = &mut g else { unreachable!() };
-        run(pong, 5.0);
-        assert_eq!(pong.py + PADDLE_H, COURT_BOTTOM + BALL + 2.0, "and at the bottom rail");
+        assert_eq!(pong.dir, -1, "a tap flips it");
+        run(pong, 0.1);
+        assert!(pong.py < at);
+
+        let lowest = COURT_BOTTOM + BALL + 2.0 - PADDLE_H;
+        let mut seen = (false, false);
+        for _ in 0..(6.0 / STEP) as usize {
+            pong.step(STEP);
+            assert!(pong.py >= COURT_TOP - 2.0 && pong.py <= lowest, "it never leaves the court");
+            seen.0 |= pong.py <= COURT_TOP - 2.0;
+            seen.1 |= pong.py >= lowest;
+        }
+        assert_eq!(seen, (true, true), "left alone it bounces between both rails");
+    }
+
+    #[test]
+    fn pong_a_click_anywhere_or_any_key_flips_but_the_way_out_still_quits() {
+        let mut p = pet();
+        let mut g = Game::new(2, &mut p);
+        assert_eq!(g.click(100, 60), Some(Key::Char(' ')));
+        assert!(matches!(g.key(Key::Esc, &mut p), Outcome::Quit));
+        assert!(matches!(g.key(Key::Char('q'), &mut p), Outcome::Quit));
+        let Game::Pong(pong) = &mut g else { unreachable!() };
+        let before = pong.dir;
+        g.key(Key::Up, &mut p);
+        let Game::Pong(pong) = &mut g else { unreachable!() };
+        assert_eq!(pong.dir, -before);
     }
 
     #[test]

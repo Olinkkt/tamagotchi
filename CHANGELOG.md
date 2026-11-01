@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.6.1
+
+- Pong is now a one-button game like Stop and Hop: the paddle glides up and down by itself and
+  turns at the edges, and any key or click flips its direction. Holding keys or the mouse no
+  longer steers it, and the paddle is a little slower (100 instead of 160 pixels a second).
+
 ## 2.6.0
 
 - macOS is now supported by the release: every new version also comes as a download for Apple

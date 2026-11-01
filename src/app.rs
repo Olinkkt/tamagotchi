@@ -499,20 +499,6 @@ impl App {
         self.handle(code, true);
     }
 
-    /// The direction keys (or buttons) held down this frame; only Pong cares.
-    pub fn hold(&mut self, up: bool, down: bool) {
-        if let Mode::Game(g) = &mut self.mode {
-            g.hold(up, down);
-        }
-    }
-
-    /// The mouse held down at this row of the game's picture, or let go; only Pong cares.
-    pub fn aim(&mut self, y: Option<f32>) {
-        if let Mode::Game(g) = &mut self.mode {
-            g.aim(y);
-        }
-    }
-
     /// A button clicked with the mouse: always the action itself, never a dev key.
     pub fn press(&mut self, code: Key) {
         self.handle(code, false);

@@ -99,7 +99,7 @@ screen shows a star per round won, the coins earned and the pet cheering or sulk
 seconds (any key skips it).
 
 1. **Memory**: four coloured pads light up in a pattern of 3, 4 and 5; repeat it with keys 1 to 4 (or click the pads). Your pet watches and cheers or sulks.
-2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle moves while you hold ↑/↓ (or W/S, K/J), or while you hold the mouse button, when it chases the pointer; it stops when you let go.
+2. **Pong**: return the ball five times; one miss ends it. Your pet keeps goal on the other side. The paddle glides up and down by itself and turns round at the edges; tap any key (or click anywhere) to flip its direction at the right moment.
 3. **Shells**: your pet hides under one of three cups, then the cups swap places. Pick the cup it is under with keys 1 to 3 (or click it). Three rounds, with more and faster swaps each time.
 4. **RPS**: rock paper scissors against your pet. Pick with keys 1 to 3 or R/P/S (or click); both hands shake three times, then show. Win two of three rounds; a tie is played again.
 5. **Stop**: a marker slides back and forth along a track. Press space (or click anywhere) to stop it inside the green. Five rounds; the green shrinks and the marker speeds up each time, and a marker left running for 7 seconds counts as a miss.

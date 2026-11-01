@@ -411,7 +411,7 @@ mod tests {
         let mut app = app_with(Stage::Baby, |_| {});
         app.mode = Mode::Game(Game::new(2, &mut app.pet));
         let text: Vec<String> = labels(&app, Layout::MIN, 0.5).into_iter().map(|l| l.text).collect();
-        assert!(text.iter().any(|t| t.starts_with("HOLD W/S")), "{text:?}");
+        assert!(text.iter().any(|t| t.starts_with("TAP ANY KEY")), "{text:?}");
         assert!(text.iter().any(|t| t == "esc"), "a game has a way out: {text:?}");
         assert!(!text.iter().any(|t| t == "STATUS"), "the panel makes way for the game");
         assert!(buttons(&app, Layout::MIN).is_empty(), "no button bar in a game");

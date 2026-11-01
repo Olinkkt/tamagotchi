@@ -907,7 +907,8 @@ mod tests {
         let (ex, ey, _, _) = game_esc(lay);
         assert_eq!(click(&app, lay, (ex + 3) as f32, (ey + 3) as f32), Some(Key::Esc));
         app.mode = Mode::Game(crate::games::Game::new(2, &mut app.pet));
-        assert_eq!(click(&app, lay, (ox + 20 + 52 + 5) as f32, (oy + 72 + 5) as f32), None);
+        assert_eq!(click(&app, lay, (ox + 20 + 52 + 5) as f32, (oy + 72 + 5) as f32), Some(Key::Char(' ')), "in Pong a click flips the paddle");
+        assert_eq!(click(&app, lay, (ex + 3) as f32, (ey + 3) as f32), Some(Key::Esc), "the close button still closes");
     }
 
     #[test]
