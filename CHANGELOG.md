@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.3
+
+- Your pet's outline now takes on the colour of the form it is heading for: a dotted rim once a
+  habit is half way to its target, a solid rim when it is reached. A pet heading for the Plain form
+  has no tint.
+
 ## 2.0.2
 
 - The game chooser's hint now says "press 1 to 4", matching the four games.

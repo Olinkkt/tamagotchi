@@ -160,7 +160,8 @@ and reset when the pet grows up); the one most over its target picks the next fo
   minutes) no longer pick a form. They still hurt health and cost the "Spotless" award.
 
 Discipline starts at 50% and rises 25 points each time you scold a real naughty call.
-The status panel says what it is on track for and its personality, and `e` opens the family tree:
+While a child or teen leans towards a form, its outline turns that form's colour (dotted at half way,
+solid once the habit's target is reached). The status panel says what it is on track for and its personality, and `e` opens the family tree:
 every form with its habit and personality, your pet outlined in yellow and the form it is heading
 for in blue.
 

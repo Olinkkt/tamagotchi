@@ -24,24 +24,22 @@ Three goals, in this order:
 - 1.21 to 1.22: one-line install, in-game updates, shop prices, mini-game payout cooldown.
 - 1.23 to 1.24: the shell hook and the CPU, RAM and battery reactions were removed.
 - 1.25: the family tree screen (`e`).
-- 2.0: evolution by habit, personalities and the Plain form (Futsutchi).
+- 2.0: evolution by habit, personalities and the Plain form (Futsutchi); 2.0.3: the leaning tint.
 
 ## Next, in order
 
 Times are my own work time, plus your playtesting.
 
-1. **Leaning tint (PATCH, about 15 minutes).** A small tint or accent on the pet that shifts
-   towards the form it is heading for. No meter to read.
-2. **Gifts while away (MINOR, about 30 minutes).** Details below.
-3. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
+1. **Gifts while away (MINOR, about 30 minutes).** Details below.
+2. **Care badges (MINOR, about 20 minutes).** Achievements for meals, snacks, games and scolds
    (100, 500, 1000). No fail state.
-4. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
+3. **Two new mini-games (MINOR each, about 40 minutes each).** One key or one button, under 30
    seconds a round.
-5. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
+4. **Shop collectibles (MINOR, about 45 minutes).** Details below. A second shelf in the shop
    for things you keep, hung or placed in the room.
-6. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
+5. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
    new prices.
-7. **macOS build in the release workflow (MINOR, about 30 minutes).**
+6. **macOS build in the release workflow (MINOR, about 30 minutes).**
 
 ## Gifts while away
 

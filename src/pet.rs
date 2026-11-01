@@ -551,6 +551,30 @@ impl Pet {
         matches!(next, Stage::Teen | Stage::Adult).then(|| Self::species_of(next, &self.habits))
     }
 
+    /// The form the pet is visibly leaning towards, and how far: 1 once a habit is half way to
+    /// its target, 2 once the target is reached. Only children and teens lean.
+    pub fn leaning(&self) -> Option<(&'static str, u8)> {
+        let level = |h: Habit| {
+            let n = self.habits[h as usize];
+            if n >= h.target() { 2 } else { 1 }
+        };
+        let half = |h: Habit| self.habits[h as usize] * 2 >= h.target();
+        match self.stage {
+            Stage::Child => {
+                let games = self.habits[Habit::Games as usize];
+                (half(Habit::Games) && games >= self.habits[Habit::Snacks as usize]).then(|| ("Hashitamatchi", level(Habit::Games)))
+            }
+            Stage::Teen => Habit::ALL
+                .into_iter()
+                .filter(|h| half(*h))
+                .reduce(|best, h| {
+                    if self.habits[h as usize] * best.target() > self.habits[best as usize] * h.target() { h } else { best }
+                })
+                .map(|h| (h.adult(), level(h))),
+            _ => None,
+        }
+    }
+
     /// Short lines describing what growth is coming and how care changes the outcome.
     pub fn evolution_preview(&self) -> Vec<String> {
         if !self.alive() || self.stage == Stage::Egg {
@@ -921,6 +945,30 @@ mod tests {
         assert_eq!(adult(habits(6, 5, 2, 2, 1)), "Tarakotchi", "only reached targets count");
         assert_eq!(adult(habits(7, 0, 0, 0, 4)), "Mametchi", "4/2 is further over than 7/6");
         assert_eq!(adult(habits(5, 5, 2, 2, 1)), "Futsutchi", "no target reached is Plain");
+    }
+
+    #[test]
+    fn a_pet_leans_towards_its_form_once_a_habit_is_half_way() {
+        let mut p = Pet::new(1);
+        p.stage = Stage::Teen;
+        assert_eq!(p.leaning(), None);
+        p.habits = habits(0, 2, 0, 0, 0);
+        assert_eq!(p.leaning(), None, "2 of 6 is not half way");
+        p.habits = habits(0, 3, 0, 0, 0);
+        assert_eq!(p.leaning(), Some(("Ichigotchi", 1)));
+        p.habits = habits(0, 3, 0, 0, 1);
+        assert_eq!(p.leaning(), Some(("Ichigotchi", 1)), "1/2 ties with 3/6; the first habit wins");
+        p.habits = habits(0, 3, 0, 0, 2);
+        assert_eq!(p.leaning(), Some(("Mametchi", 2)), "2/2 is further along than 3/6");
+        p.habits = habits(0, 6, 0, 0, 0);
+        assert_eq!(p.leaning(), Some(("Ichigotchi", 2)));
+        p.stage = Stage::Child;
+        p.habits = habits(3, 0, 0, 0, 0);
+        assert_eq!(p.leaning(), Some(("Hashitamatchi", 1)));
+        p.habits = habits(3, 4, 0, 0, 0);
+        assert_eq!(p.leaning(), None, "snacks hold it back");
+        p.stage = Stage::Adult;
+        assert_eq!(p.leaning(), None);
     }
 
     #[test]
