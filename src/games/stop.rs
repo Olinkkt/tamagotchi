@@ -25,6 +25,7 @@ enum Phase {
 }
 
 pub struct Stop {
+    level: Level,
     round: u8,
     wins: u8,
     results: Vec<bool>,
@@ -44,15 +45,25 @@ fn marker_x(elapsed: u64, speed: i64) -> i32 {
 }
 
 impl Stop {
-    pub fn new(pet: &mut Pet) -> Self {
-        let mut g = Stop { round: 1, wins: 0, results: Vec::new(), phase: Phase::Slide(0), zone_x: 0, look: Box::new(pet.clone()), t0: Instant::now() };
+    pub fn new(pet: &mut Pet, level: Level) -> Self {
+        let mut g = Stop { level, round: 1, wins: 0, results: Vec::new(), phase: Phase::Slide(0), zone_x: 0, look: Box::new(pet.clone()), t0: Instant::now() };
         g.zone_x = g.pick_zone(pet);
         g
     }
 
     fn pick_zone(&self, pet: &mut Pet) -> i32 {
-        let w = ZONE_W[self.round as usize - 1];
+        let w = self.zone_w(self.round as usize - 1);
         pet.rand((TRACK_W - w) as u64) as i32
+    }
+
+    /// The green zone's width in a round: wider on easy, narrower on hard.
+    fn zone_w(&self, round: usize) -> i32 {
+        (ZONE_W[round] as f32 * [1.3, 1.0, 0.8][self.level.idx()]) as i32
+    }
+
+    /// The marker's speed in a round: slower on easy, faster on hard.
+    fn speed(&self, round: usize) -> i64 {
+        (SPEED[round] as f32 * [0.85, 1.0, 1.2][self.level.idx()]) as i64
     }
 
     fn now(&self) -> u64 {
@@ -69,8 +80,8 @@ impl Stop {
     /// Stop the marker where it is `now`.
     fn press(&mut self, now: u64) {
         let Phase::Slide(since) = self.phase else { return };
-        let x = marker_x(now - since, SPEED[self.round as usize - 1]);
-        let w = ZONE_W[self.round as usize - 1];
+        let x = marker_x(now - since, self.speed(self.round as usize - 1));
+        let w = self.zone_w(self.round as usize - 1);
         let middle = x + MARK_W / 2;
         let hit = (self.zone_x..self.zone_x + w).contains(&middle);
         self.score(hit);
@@ -118,13 +129,13 @@ impl Stop {
         let mut f = backdrop();
         let round = self.round as usize - 1;
         let (x, mood, hit) = match self.phase {
-            Phase::Slide(since) => (marker_x(self.now() - since, SPEED[round]), Expr::Idle, None),
+            Phase::Slide(since) => (marker_x(self.now() - since, self.speed(round)), Expr::Idle, None),
             Phase::Stopped(x, hit, _) => (x.unwrap_or(0), if hit { Expr::Happy } else { Expr::Sad }, Some(hit)),
         };
         draw_pet(&mut f, &self.look, mood, GW / 2, 66);
         draw_rounds(&mut f, &self.results, self.round, ROUNDS);
         f.boxed(TRACK_X - 2, TRACK_Y - 2, TRACK_W + 4, TRACK_H + 4, Pal::Night, Pal::Ink);
-        let zone = ZONE_W[round];
+        let zone = self.zone_w(round);
         f.rect(TRACK_X + self.zone_x, TRACK_Y, zone, TRACK_H, Pal::Green);
         f.rect(TRACK_X + self.zone_x, TRACK_Y, zone, 2, Pal::Lime);
         let colour = match hit {
@@ -160,7 +171,7 @@ mod tests {
     #[test]
     fn stopping_inside_the_green_wins_and_outside_loses() {
         let mut p = pet();
-        let mut g = Stop::new(&mut p);
+        let mut g = Stop::new(&mut p, Level::Normal);
         // Park the green right where the marker is after half a second.
         let x = marker_x(500, SPEED[0]);
         g.zone_x = x - 10;
@@ -179,7 +190,7 @@ mod tests {
     #[test]
     fn a_marker_left_running_is_a_miss_and_five_rounds_end_the_game() {
         let mut p = pet();
-        let mut g = Stop::new(&mut p);
+        let mut g = Stop::new(&mut p, Level::Normal);
         let mut now = 0;
         loop {
             now += TIMEOUT_MS;
@@ -197,7 +208,7 @@ mod tests {
     #[test]
     fn the_green_always_fits_on_the_track_and_shrinks() {
         let mut p = pet();
-        let mut g = Stop::new(&mut p);
+        let mut g = Stop::new(&mut p, Level::Normal);
         for round in 1..=ROUNDS {
             g.round = round;
             for _ in 0..200 {

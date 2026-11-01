@@ -36,12 +36,13 @@ pub struct Shells {
     hides: usize,
     swaps: Vec<(usize, usize)>,
     swap_ms: u128,
+    level: Level,
     look: Box<Pet>,
     born: Instant,
 }
 
 impl Shells {
-    pub fn new(pet: &mut Pet) -> Self {
+    pub fn new(pet: &mut Pet, level: Level) -> Self {
         let mut g = Shells {
             round: 1,
             wins: 0,
@@ -51,6 +52,7 @@ impl Shells {
             hides: 0,
             swaps: Vec::new(),
             swap_ms: 400,
+            level,
             look: Box::new(pet.clone()),
             born: Instant::now(),
         };
@@ -61,8 +63,9 @@ impl Shells {
     }
 
     fn start_round(&mut self, pet: &mut Pet) {
-        let count = 3 + 2 * self.round as usize;
-        self.swap_ms = [420, 320, 240][self.round as usize - 1];
+        let count = 3 + 2 * self.round as usize + [0, 0, 2][self.level.idx()];
+        let base = [420.0, 320.0, 240.0][self.round as usize - 1] * [1.4, 1.0, 0.75][self.level.idx()];
+        self.swap_ms = base as u128;
         self.swaps = (0..count)
             .map(|_| {
                 let a = pet.rand(3) as usize;
@@ -216,7 +219,7 @@ mod tests {
     #[test]
     fn picking_the_cup_the_pet_is_under_wins_the_round_and_any_other_loses_it() {
         let mut p = pet();
-        let mut g = Shells::new(&mut p);
+        let mut g = Shells::new(&mut p, Level::Normal);
         g.key(Key::Char('1'));
         assert!(g.results.is_empty(), "keys do nothing while the cups are moving");
         let under = g.cup_slot[g.hides];
@@ -224,7 +227,7 @@ mod tests {
         g.key(Key::Char((b'1' + under as u8) as char));
         assert_eq!((g.wins, g.results.clone()), (1, vec![true]));
 
-        let mut g = Shells::new(&mut p);
+        let mut g = Shells::new(&mut p, Level::Normal);
         let under = g.cup_slot[g.hides];
         g.phase = Phase::Pick;
         g.key(Key::Char((b'1' + ((under + 1) % 3) as u8) as char));
@@ -234,7 +237,7 @@ mod tests {
     #[test]
     fn swaps_keep_the_cups_in_three_different_slots_and_the_game_ends_after_three_rounds() {
         let mut p = pet();
-        let mut g = Shells::new(&mut p);
+        let mut g = Shells::new(&mut p, Level::Normal);
         for round in 1..=ROUNDS {
             assert_eq!(g.swaps.len(), 3 + 2 * round as usize);
             g.phase = Phase::Peek(Instant::now());
@@ -258,7 +261,7 @@ mod tests {
     #[test]
     fn the_pet_stays_under_the_same_cup_when_the_next_round_starts() {
         let mut p = pet();
-        let mut g = Shells::new(&mut p);
+        let mut g = Shells::new(&mut p, Level::Normal);
         let cup = g.hides;
         g.phase = Phase::Reveal(0, Instant::now());
         g.tick(&mut p);

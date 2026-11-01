@@ -93,6 +93,11 @@ right now are dimmed.
 Any game makes the pet a little lighter, and winning makes it happier. A perfect game forgives
 one care mistake.
 
+In the picker, `Tab` (or the arrow keys, `l`, or a click on the level button) switches between
+**Easy**, **Normal** and **Hard**. Harder levels make every game tougher (longer Memory patterns,
+faster Pong, Shells and Hop, a narrower Stop zone, 1/3/5 rounds of RPS). Easy pays half the coins
+and Hard pays double; Normal is the original game.
+
 All of them are drawn in the same pixel art as the pet, scores included, and take the full width of
 the window while you play (the status panel comes back afterwards). When a game ends, a result
 screen shows a star per round won, the coins earned and the pet cheering or sulking for three

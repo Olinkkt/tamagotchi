@@ -37,6 +37,47 @@ pub const CHOICES: [(&str, &str); 6] = [("1", "memory"), ("2", "pong"), ("3", "s
 pub const GW: i32 = 240;
 pub const GH: i32 = 128;
 
+/// How hard a game is. Normal is the original game; harder levels pay more coins.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum Level {
+    Easy,
+    #[default]
+    Normal,
+    Hard,
+}
+
+impl Level {
+    pub fn name(self) -> &'static str {
+        match self {
+            Level::Easy => "EASY",
+            Level::Normal => "NORMAL",
+            Level::Hard => "HARD",
+        }
+    }
+
+    pub fn next(self) -> Level {
+        match self {
+            Level::Easy => Level::Normal,
+            Level::Normal => Level::Hard,
+            Level::Hard => Level::Easy,
+        }
+    }
+
+    /// 0, 1 or 2: for picking from a small table.
+    pub fn idx(self) -> usize {
+        self as usize
+    }
+
+    /// Coins for a win at this level: half on Easy, double on Hard.
+    pub fn pay(self, coins: u32) -> u32 {
+        match self {
+            Level::Easy => coins.div_ceil(2),
+            Level::Normal => coins,
+            Level::Hard => coins * 2,
+        }
+    }
+}
+
 pub enum Game {
     Memory(Memory),
     Pong(Pong),
@@ -47,14 +88,19 @@ pub enum Game {
 }
 
 impl Game {
+    #[cfg(test)]
     pub fn new(kind: u8, pet: &mut Pet) -> Game {
+        Game::with_level(kind, Level::Normal, pet)
+    }
+
+    pub fn with_level(kind: u8, level: Level, pet: &mut Pet) -> Game {
         match kind {
-            1 => Game::Memory(Memory::new(pet)),
-            3 => Game::Shells(Shells::new(pet)),
-            4 => Game::Janken(Janken::new(pet)),
-            5 => Game::Stop(Stop::new(pet)),
-            6 => Game::Hop(Hop::new(pet)),
-            _ => Game::Pong(Pong::new(pet)),
+            1 => Game::Memory(Memory::new(pet, level)),
+            3 => Game::Shells(Shells::new(pet, level)),
+            4 => Game::Janken(Janken::new(pet, level)),
+            5 => Game::Stop(Stop::new(pet, level)),
+            6 => Game::Hop(Hop::new(pet, level)),
+            _ => Game::Pong(Pong::new(pet, level)),
         }
     }
 
@@ -213,10 +259,12 @@ pub struct Memory {
     miss: Option<(u8, u8, Instant)>,
     look: Box<Pet>,
     born: Instant,
+    /// Steps in the first round's pattern, less two: -1 easy, 0 normal, 1 hard.
+    longer: usize,
 }
 
 impl Memory {
-    fn new(pet: &mut Pet) -> Self {
+    fn new(pet: &mut Pet, level: Level) -> Self {
         let mut m = Memory {
             round: 1,
             wins: 0,
@@ -227,13 +275,14 @@ impl Memory {
             miss: None,
             look: Box::new(pet.clone()),
             born: Instant::now(),
+            longer: level.idx(),
         };
         m.start_round(pet);
         m
     }
 
     fn start_round(&mut self, pet: &mut Pet) {
-        let len = self.round as usize + 2;
+        let len = self.round as usize + 1 + self.longer;
         self.miss = None;
         self.seq = (0..len).map(|_| pet.rand(4) as u8 + 1).collect();
         self.phase = MPhase::Show { idx: 0, lit: false, until: after_ms(600) };
@@ -407,10 +456,13 @@ pub struct Pong {
     speed: f32,
     last: Instant,
     left: f32,
+    /// The ball's starting speed: slower on easy, faster on hard.
+    base: f32,
 }
 
 impl Pong {
-    fn new(pet: &mut Pet) -> Self {
+    fn new(pet: &mut Pet, level: Level) -> Self {
+        let base = BALL_SPEED * [0.8, 1.0, 1.25][level.idx()];
         let by = COURT_TOP + pet.rand((COURT_BOTTOM - COURT_TOP) as u64) as f32;
         let down = pet.rand(2) == 0;
         Pong {
@@ -418,8 +470,8 @@ impl Pong {
             dir: if down { 1 } else { -1 },
             bx: KEEPER_X - 20.0,
             by,
-            vx: -BALL_SPEED,
-            vy: if down { BALL_SPEED } else { -BALL_SPEED },
+            vx: -base,
+            vy: if down { base } else { -base },
             trail: Vec::new(),
             ky: by,
             keeper_h: scene::posed(pet, Expr::Idle).h as f32,
@@ -430,6 +482,7 @@ impl Pong {
             speed: 1.0,
             last: Instant::now(),
             left: 0.0,
+            base,
         }
     }
 
@@ -495,8 +548,8 @@ impl Pong {
                 }
                 self.bx = face;
                 self.speed = (self.speed * SPEEDUP).min(MAX_SPEEDUP);
-                self.vx = BALL_SPEED * self.speed;
-                self.vy = self.vy.signum() * BALL_SPEED * self.speed;
+                self.vx = self.base * self.speed;
+                self.vy = self.vy.signum() * self.base * self.speed;
                 self.spark = Some((face, self.by, after_ms(150)));
             } else {
                 self.missed = true;
@@ -619,6 +672,19 @@ mod tests {
     }
 
     #[test]
+    fn every_game_draws_at_every_level_and_hard_pays_double() {
+        for level in [Level::Easy, Level::Normal, Level::Hard] {
+            for kind in 1..=6 {
+                let mut p = pet();
+                let g = Game::with_level(kind, level, &mut p);
+                assert_eq!((g.draw().w, g.draw().h), (GW, GH), "game {kind} at {level:?}");
+            }
+        }
+        assert_eq!((Level::Easy.pay(4), Level::Normal.pay(4), Level::Hard.pay(4)), (2, 4, 8));
+        assert_eq!(Level::Hard.next().next(), Level::Normal);
+    }
+
+    #[test]
     fn escape_quits_every_game() {
         for kind in 1..=4 {
             let mut p = pet();
@@ -630,7 +696,7 @@ mod tests {
     #[test]
     fn memory_repeating_the_pattern_wins_the_round_and_a_wrong_key_loses_it() {
         let mut p = pet();
-        let mut m = Memory::new(&mut p);
+        let mut m = Memory::new(&mut p, Level::Normal);
         m.phase = MPhase::Input(0);
         for n in m.seq.clone() {
             m.key(Key::Char((b'0' + n) as char));
@@ -639,7 +705,7 @@ mod tests {
         assert_eq!(m.results, [true]);
         assert!(m.lit().is_some(), "the last pad pressed glows");
 
-        let mut m = Memory::new(&mut p);
+        let mut m = Memory::new(&mut p, Level::Normal);
         m.phase = MPhase::Input(0);
         let wrong = (m.seq[0] % 4) + 1;
         m.key(Key::Char((b'0' + wrong) as char));
@@ -653,7 +719,7 @@ mod tests {
     #[test]
     fn memory_ignores_keys_while_the_pattern_is_showing() {
         let mut p = pet();
-        let mut m = Memory::new(&mut p);
+        let mut m = Memory::new(&mut p, Level::Normal);
         m.key(Key::Char('1'));
         assert_eq!(m.wins, 0);
         assert!(matches!(m.phase, MPhase::Show { .. }));
@@ -662,7 +728,7 @@ mod tests {
     #[test]
     fn memory_patterns_are_three_four_then_five_long() {
         let mut p = pet();
-        let mut m = Memory::new(&mut p);
+        let mut m = Memory::new(&mut p, Level::Normal);
         let mut lengths = vec![m.seq.len()];
         for _ in 0..2 {
             m.phase = MPhase::Pause(Instant::now());
@@ -684,7 +750,7 @@ mod tests {
     #[test]
     fn pong_always_ends_and_never_reports_more_than_the_goal() {
         let mut p = pet();
-        let mut pong = Pong::new(&mut p);
+        let mut pong = Pong::new(&mut p, Level::Normal);
         let (wins, rounds) = run(&mut pong, 120.0).expect("pong never ended");
         assert_eq!(rounds, PONG_GOAL);
         assert!(wins <= PONG_GOAL);
@@ -693,14 +759,14 @@ mod tests {
     #[test]
     fn pong_a_ball_touching_the_paddle_is_returned_and_one_beside_it_rolls_past() {
         let mut p = pet();
-        let mut g = Pong::new(&mut p);
+        let mut g = Pong::new(&mut p, Level::Normal);
         g.py = 50.0;
         (g.bx, g.by, g.vx, g.vy) = (PADDLE_X + PADDLE_W + 1.0, 50.0 - BALL - 1.0, -BALL_SPEED, 0.0);
         run(&mut g, 0.1);
         assert_eq!(g.hits, 1, "a ball just grazing the top of the paddle is returned");
         assert!(g.vx > 0.0);
 
-        let mut g = Pong::new(&mut p);
+        let mut g = Pong::new(&mut p, Level::Normal);
         g.py = 80.0;
         (g.bx, g.by, g.vx, g.vy) = (PADDLE_X + PADDLE_W + 1.0, 40.0, -BALL_SPEED, 0.0);
         assert_eq!(run(&mut g, 0.05), None, "a miss is not over until the ball is off screen");
