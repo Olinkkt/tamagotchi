@@ -81,8 +81,6 @@ enum Phase {
 }
 
 pub struct Janken {
-    /// Rounds to play: 1 easy, 3 normal, 5 hard.
-    rounds: u8,
     round: u8,
     wins: u8,
     results: Vec<bool>,
@@ -98,8 +96,8 @@ fn beats(a: usize, b: usize) -> bool {
 }
 
 impl Janken {
-    pub fn new(pet: &mut Pet, level: Level) -> Self {
-        Janken { rounds: [1, ROUNDS, 5][level.idx()], round: 1, wins: 0, results: Vec::new(), phase: Phase::Choose, mine: 0, theirs: 0, look: Box::new(pet.clone()) }
+    pub fn new(pet: &mut Pet) -> Self {
+        Janken { round: 1, wins: 0, results: Vec::new(), phase: Phase::Choose, mine: 0, theirs: 0, look: Box::new(pet.clone()) }
     }
 
     /// Pick a hand with 1-3 or R, P, S.
@@ -133,8 +131,8 @@ impl Janken {
             }
             Phase::Reveal(result, until) if now >= until => {
                 if result.is_some() {
-                    if self.round >= self.rounds {
-                        return Outcome::Done { wins: self.wins, rounds: self.rounds };
+                    if self.round >= ROUNDS {
+                        return Outcome::Done { wins: self.wins, rounds: ROUNDS };
                     }
                     self.round += 1;
                 }
@@ -193,7 +191,7 @@ impl Janken {
         draw_hand(&mut f, shown(mine), PLAYER_X, HAND_Y - bob.abs(), false, &tint);
         draw_hand(&mut f, shown(theirs), PET_X, HAND_Y - bob.abs(), true, &tint);
         draw_pet(&mut f, &self.look, mood, GW / 2, HAND_Y + 15 * HAND_K - 2);
-        draw_rounds(&mut f, &self.results, self.round, self.rounds);
+        draw_rounds(&mut f, &self.results, self.round, ROUNDS);
         // The three choices, while it is your turn.
         for i in 0..3 {
             let on = waiting;
@@ -243,7 +241,7 @@ mod tests {
     #[test]
     fn a_pick_shakes_then_scores_the_round_and_a_tie_is_played_again() {
         let mut p = pet();
-        let mut g = Janken::new(&mut p, Level::Normal);
+        let mut g = Janken::new(&mut p);
         g.key(Key::Char('x'), &mut p);
         assert!(matches!(g.phase, Phase::Choose), "other keys do nothing");
         g.key(Key::Char('r'), &mut p);
@@ -266,7 +264,7 @@ mod tests {
     #[test]
     fn the_game_ends_after_the_third_scored_round() {
         let mut p = pet();
-        let mut g = Janken::new(&mut p, Level::Normal);
+        let mut g = Janken::new(&mut p);
         g.round = ROUNDS;
         g.wins = 1;
         g.results = vec![true, false];
@@ -277,7 +275,7 @@ mod tests {
     #[test]
     fn buttons_only_answer_to_clicks_on_your_turn() {
         let mut p = pet();
-        let mut g = Janken::new(&mut p, Level::Normal);
+        let mut g = Janken::new(&mut p);
         assert_eq!(g.button_at(BTN_X[1] + 3, BTN_Y + 3), Some(1));
         assert_eq!(g.button_at(2, 2), None);
         g.phase = Phase::Shake(0, 0, Instant::now());

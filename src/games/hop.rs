@@ -41,7 +41,6 @@ struct Crate {
 }
 
 pub struct Hop {
-    scale: f64,
     crates: Vec<Crate>,
     /// When the current jump began.
     jump: Option<u64>,
@@ -56,17 +55,10 @@ pub struct Hop {
 }
 
 /// How far the course has scrolled `ms` milliseconds in: it speeds up steadily to a top speed.
-#[cfg(test)]
 fn course(ms: u64) -> i32 {
-    course_at(ms, 1.0)
-}
-
-/// `course` with every speed multiplied by `scale` (slower on easy, faster on hard).
-fn course_at(ms: u64, scale: f64) -> i32 {
     let t = ms as f64 / 1000.0;
-    let (start, max) = (START_SPEED * scale, MAX_SPEED * scale);
-    let ramp = (max - start) / ACCEL;
-    let d = if t <= ramp { start * t + ACCEL * t * t / 2.0 } else { start * ramp + ACCEL * ramp * ramp / 2.0 + max * (t - ramp) };
+    let ramp = (MAX_SPEED - START_SPEED) / ACCEL;
+    let d = if t <= ramp { START_SPEED * t + ACCEL * t * t / 2.0 } else { START_SPEED * ramp + ACCEL * ramp * ramp / 2.0 + MAX_SPEED * (t - ramp) };
     d as i32
 }
 
@@ -80,7 +72,7 @@ fn jump_height(since: u64) -> i32 {
 }
 
 impl Hop {
-    pub fn new(pet: &mut Pet, level: Level) -> Self {
+    pub fn new(pet: &mut Pet) -> Self {
         let mut at = FIRST_AT;
         let crates = (0..OBSTACLES)
             .map(|_| {
@@ -93,7 +85,7 @@ impl Hop {
                 c
             })
             .collect();
-        Hop { scale: [0.8, 1.0, 1.2][level.idx()], crates, jump: None, checked: 0, cleared: 0, crashed: None, finished: None, look: Box::new(pet.clone()), t0: Instant::now() }
+        Hop { crates, jump: None, checked: 0, cleared: 0, crashed: None, finished: None, look: Box::new(pet.clone()), t0: Instant::now() }
     }
 
     fn now(&self) -> u64 {
@@ -118,8 +110,8 @@ impl Hop {
     }
 
     /// Where a crate's left edge is on screen at `ms`.
-    fn screen_x(&self, c: &Crate, ms: u64) -> i32 {
-        PET_X + c.at - course_at(ms, self.scale)
+    fn screen_x(c: &Crate, ms: u64) -> i32 {
+        PET_X + c.at - course(ms)
     }
 
     pub fn tick(&mut self) -> Outcome {
@@ -133,7 +125,7 @@ impl Hop {
             let t = self.checked;
             let h = self.height(t);
             while let Some(c) = self.crates.get(self.cleared) {
-                let x = self.screen_x(c, t);
+                let x = Self::screen_x(c, t);
                 if x + c.w < PET_X - PET_HALF {
                     self.cleared += 1;
                     continue;
@@ -167,7 +159,7 @@ impl Hop {
         // The picture freezes where the pet crashed.
         let now = self.crashed.map_or(self.now(), |c| c.min(self.now()));
         let h = self.height(now);
-        let d = course_at(now, self.scale);
+        let d = course(now);
         for i in 0..GW / 24 + 2 {
             f.rect(i * 24 - d % 24, FLOOR + 5, 6, 1, Pal::Maroon);
         }
@@ -185,7 +177,7 @@ impl Hop {
         }
         draw_rounds(&mut f, &results, results.len() as u8 + 1, ROUNDS);
         for c in &self.crates {
-            let x = self.screen_x(c, now);
+            let x = Self::screen_x(c, now);
             if x > GW || x + c.w < 0 {
                 continue;
             }
@@ -242,7 +234,7 @@ mod tests {
     #[test]
     fn standing_still_runs_into_the_first_crate() {
         let mut p = pet();
-        let mut g = Hop::new(&mut p, Level::Normal);
+        let mut g = Hop::new(&mut p);
         let hit = level(&g.crates[0]);
         assert!(matches!(g.advance(hit - 600), Outcome::Continue));
         assert!(g.crashed.is_none());
@@ -254,7 +246,7 @@ mod tests {
     #[test]
     fn jumping_over_a_crate_clears_it() {
         let mut p = pet();
-        let mut g = Hop::new(&mut p, Level::Normal);
+        let mut g = Hop::new(&mut p);
         jump_over(&mut g, 0);
         g.advance(level(&g.crates[0]) + 400);
         assert!(g.crashed.is_none());
@@ -265,7 +257,7 @@ mod tests {
     fn a_jump_that_is_too_early_or_too_late_crashes() {
         for shift in [-(JUMP_MS as i64), JUMP_MS as i64 / 2 + 150] {
             let mut p = pet();
-            let mut g = Hop::new(&mut p, Level::Normal);
+            let mut g = Hop::new(&mut p);
             g.press((level(&g.crates[0]) as i64 + shift - JUMP_MS as i64 / 2) as u64);
             g.advance(level(&g.crates[0]) + 400);
             assert!(g.crashed.is_some(), "shift {shift}");
@@ -275,7 +267,7 @@ mod tests {
     #[test]
     fn you_cannot_start_a_second_jump_in_mid_air() {
         let mut p = pet();
-        let mut g = Hop::new(&mut p, Level::Normal);
+        let mut g = Hop::new(&mut p);
         g.press(1000);
         g.press(1200);
         assert_eq!(g.jump, Some(1000));
@@ -286,7 +278,7 @@ mod tests {
     #[test]
     fn a_slow_frame_cannot_skip_a_crate() {
         let mut p = pet();
-        let mut g = Hop::new(&mut p, Level::Normal);
+        let mut g = Hop::new(&mut p);
         g.advance(level(&g.crates[0]) + 5_000);
         assert!(g.crashed.is_some(), "one huge step still checks every crate on the way");
     }
@@ -294,7 +286,7 @@ mod tests {
     #[test]
     fn clearing_every_crate_ends_the_run_with_five_boxes() {
         let mut p = pet();
-        let mut g = Hop::new(&mut p, Level::Normal);
+        let mut g = Hop::new(&mut p);
         for i in 0..OBSTACLES {
             jump_over(&mut g, i);
             g.advance(level(&g.crates[i]) + JUMP_MS);
@@ -308,7 +300,7 @@ mod tests {
     #[test]
     fn crashing_midway_pays_for_the_boxes_filled_so_far() {
         let mut p = pet();
-        let mut g = Hop::new(&mut p, Level::Normal);
+        let mut g = Hop::new(&mut p);
         for i in 0..4 {
             jump_over(&mut g, i);
             g.advance(level(&g.crates[i]) + JUMP_MS);
@@ -321,7 +313,7 @@ mod tests {
     #[test]
     fn the_crates_are_spaced_so_every_one_can_be_jumped() {
         let mut p = pet();
-        let g = Hop::new(&mut p, Level::Normal);
+        let g = Hop::new(&mut p);
         assert!(g.crates.windows(2).all(|w| w[1].at - (w[0].at + w[0].w) >= MIN_GAP));
         assert!(g.crates.iter().all(|c| c.w <= CRATE_W * 3 && c.h <= TALL_H));
         assert!(level(g.crates.last().unwrap()) < 45_000, "a whole run is well under a minute");

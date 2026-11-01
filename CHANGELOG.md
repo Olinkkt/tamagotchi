@@ -1,12 +1,5 @@
 # Changelog
 
-## 2.8.0
-
-- The game picker has a level button (Tab, the arrow keys or a click): Easy, Normal and Hard. Every
-  game changes with it: longer Memory patterns, faster Pong balls and Shells cups, a narrower
-  Stop zone, a faster Hop course, and 1, 3 or 5 rounds of RPS.
-- Easy pays half the coins and Hard pays double. Normal is the game as before. No save impact.
-
 ## 2.7.0
 
 - Hop is now an endless runner like the dinosaur game: the floor scrolls, crates rush at your pet

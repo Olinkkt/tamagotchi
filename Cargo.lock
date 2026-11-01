@@ -559,7 +559,7 @@ dependencies = [
 
 [[package]]
 name = "tamagotchi"
-version = "2.8.0"
+version = "2.7.0"
 dependencies = [
  "chrono",
  "dirs",

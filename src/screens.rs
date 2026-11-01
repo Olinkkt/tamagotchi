@@ -23,8 +23,6 @@ const SHOP_ROW: i32 = 24;
 const GAME_CARD: (i32, i32) = (14, 34);
 const GAME_CARD_H: i32 = 70;
 const GAME_CARD_GAP: i32 = 6;
-/// The button under the game cards that changes the level.
-const LEVEL_BTN: (i32, i32, i32, i32) = (70, 107, 100, 12);
 /// The close button in a card's top-right corner.
 const ESC: (i32, i32, i32, i32) = (CARD.0 + CARD.2 - 19, CARD.1 + 2, 15, 11);
 
@@ -453,8 +451,6 @@ fn game_card_x(i: i32) -> i32 {
 }
 
 fn draw_chooser(f: &mut Frame) {
-    let (bx, by, bw, bh) = LEVEL_BTN;
-    f.boxed(bx, by, bw, bh, Pal::Dusk, Pal::Slate);
     let (y, w) = (GAME_CARD.1, game_card_w());
     for i in 0..crate::games::CHOICES.len() as i32 {
         let x = game_card_x(i);
@@ -505,15 +501,14 @@ fn draw_chooser(f: &mut Frame) {
     }
 }
 
-fn chooser_labels(level: crate::games::Level) -> Vec<Label> {
+fn chooser_labels() -> Vec<Label> {
     let mut v = vec![label("PICK A GAME", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink)];
     for (i, (key, name)) in crate::games::CHOICES.iter().enumerate() {
         let x = game_card_x(i as i32) as f32;
         v.push(centred(*key, x + 8.5, GAME_CARD.1 as f32 + 8.5, Pal::White));
         v.push(centred(name.to_uppercase(), x + game_card_w() as f32 / 2.0, GAME_CARD.1 as f32 + 60.0, Pal::White));
     }
-    let (bx, by, bw, bh) = LEVEL_BTN;
-    v.push(centred(format!("LEVEL: {}  (TAB)", level.name()), (bx + bw / 2) as f32, by as f32 + bh as f32 / 2.0, Pal::Yellow));
+    v.push(centred("Any game burns a little weight; winning makes it happier.", 120.0, 114.0, Pal::Mist));
     v
 }
 
@@ -545,7 +540,7 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
 
 pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
     let mut v = match &app.mode {
-        Mode::Chooser => chooser_labels(app.game_level),
+        Mode::Chooser => chooser_labels(),
         Mode::Shop => shop_labels(app),
         Mode::Awards => awards_labels(app),
         Mode::Keepsakes => keepsakes_labels(app),
@@ -569,7 +564,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
 /// The line under a card.
 pub fn hint(app: &App) -> Option<(String, Pal)> {
     Some(match &app.mode {
-        Mode::Chooser => ("PRESS 1 TO 6 OR CLICK A GAME - TAB: LEVEL".into(), Pal::Yellow),
+        Mode::Chooser => ("PRESS 1 TO 6, OR CLICK A GAME".into(), Pal::Yellow),
         Mode::Shop => (format!("PRESS 1-4 OR CLICK TO BUY  -  TAB: {}", ["TREATS", "FOR THE ROOM", "CARE ITEMS"][app.shop_tab]), Pal::Yellow),
         Mode::Awards => match profile::ACHIEVEMENTS.iter().find(|a| !app.profile.has(a.id)) {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
@@ -620,7 +615,6 @@ pub fn click(app: &App, lay: Layout, x: f32, y: f32) -> Option<Key> {
     }
     match app.mode {
         Mode::Shop => (0..4).find(|&i| (shop_row_y(i)..shop_row_y(i) + SHOP_ROW - 3).contains(&y) && (CARD.0..CARD.0 + CARD.2).contains(&x)).map(|i| Key::Char((b'1' + i as u8) as char)),
-        Mode::Chooser if inside(LEVEL_BTN) => Some(Key::Tab),
         Mode::Chooser => (0..crate::games::CHOICES.len() as i32).find(|&i| (game_card_x(i)..game_card_x(i) + game_card_w()).contains(&x) && (GAME_CARD.1..GAME_CARD.1 + GAME_CARD_H).contains(&y)).map(|i| Key::Char((b'1' + i as u8) as char)),
         _ => None,
     }
@@ -645,7 +639,6 @@ pub fn hover_rect(app: &App, lay: Layout, x: f32, y: f32) -> Option<(i32, i32, i
     }
     match app.mode {
         Mode::Shop => (0..4).find(|&i| in_rect((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3), x, y)).map(|i| moved((CARD.0 + 4, shop_row_y(i), CARD.2 - 8, SHOP_ROW - 3))),
-        Mode::Chooser if in_rect(LEVEL_BTN, x, y) => Some(moved(LEVEL_BTN)),
         Mode::Chooser => (0..crate::games::CHOICES.len() as i32).find(|&i| in_rect((game_card_x(i), GAME_CARD.1, game_card_w(), GAME_CARD_H), x, y)).map(|i| moved((game_card_x(i), GAME_CARD.1, game_card_w(), GAME_CARD_H))),
         _ => None,
     }

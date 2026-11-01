@@ -62,8 +62,6 @@ pub struct App {
     pub profile: Profile,
     /// Which shelf of the shop is showing: 0 care items, 1 treats, 2 things for the room.
     pub shop_tab: usize,
-    /// The level the game picker starts games at; Tab changes it. The reward follows it.
-    pub game_level: games::Level,
     pub tz: i64,
     pub speed: f64,
     tick_acc: f64,
@@ -218,7 +216,6 @@ impl App {
             cfg,
             profile: Profile::default(),
             shop_tab: 0,
-            game_level: games::Level::default(),
             tz,
             speed,
             tick_acc: 0.0,
@@ -484,7 +481,7 @@ impl App {
                 let before = self.snapshot();
                 let msg = self.pet.finish_game(wins, rounds);
                 let reward = profile::game_reward(wins, rounds);
-                let reward = if reward > 0 { self.game_level.pay(reward + self.pet.win_coin_bonus()) } else { 0 };
+                let reward = if reward > 0 { reward + self.pet.win_coin_bonus() } else { 0 };
                 let coins = self.profile.pay_for(reward, save::now());
                 if coins > 0 {
                     self.profile.add_coins(coins);
@@ -520,10 +517,9 @@ impl App {
             Mode::Chooser => {
                 match code {
                     Key::Char(c @ '1'..='6') => {
-                        let g = games::Game::with_level(c as u8 - b'0', self.game_level, &mut self.pet);
+                        let g = games::Game::new(c as u8 - b'0', &mut self.pet);
                         self.mode = Mode::Game(g);
                     }
-                    Key::Tab | Key::Right | Key::Left | Key::Char('l') => self.game_level = self.game_level.next(),
                     Key::Esc | Key::Char('q') => self.mode = Mode::Normal,
                     _ => {}
                 }
