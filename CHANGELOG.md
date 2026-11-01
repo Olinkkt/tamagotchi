@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.6.3
+
+- The coloured outline around your pet is gone. The status panel and the family tree still show
+  which form it is heading for. Saves and config are unchanged.
+
 ## 2.6.2
 
 - Stop is harder: the green zone starts at 40 pixels instead of 48 and shrinks to 18 instead of 20,

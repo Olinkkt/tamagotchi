@@ -514,9 +514,6 @@ pub fn room(m: &Moment, w: i32, h: i32) -> Frame {
     let egg_flash = p.stage == Stage::Egg && m.egg_pose().flash;
     let flash = egg_flash || m.fx_is(Fx::Evolve).is_some_and(|t| t < 0.6 && (t * 14.0) as i32 % 2 == 0);
     f.sprite_with(&sprite, at.x, at.y, |c| if flash { Pal::White } else { c });
-    if !flash && !p.asleep {
-        draw_lean(&mut f, p, &sprite, at.x, at.y);
-    }
     if p.stage == Stage::Egg {
         draw_chips(&mut f, m, at);
     }
@@ -545,22 +542,6 @@ pub(crate) fn lean_colour(species: &str) -> Pal {
         "Kuchipatchi" => Pal::Yellow,
         "Nyorotchi" => Pal::Teal,
         _ => Pal::Tan,
-    }
-}
-
-/// The leaning tint: the outer outline of the pet takes the colour of the form it is heading
-/// for, every other pixel at first and all of it once the habit's target is reached.
-fn draw_lean(f: &mut Frame, p: &Pet, sprite: &Sprite, x: i32, y: i32) {
-    let Some((species, level)) = p.leaning() else { return };
-    let colour = lean_colour(species);
-    for sy in 0..sprite.h {
-        for sx in 0..sprite.w {
-            let edge = sprite.get(sx, sy) == Some(Pal::Ink)
-                && [(1, 0), (-1, 0), (0, 1), (0, -1)].iter().any(|(dx, dy)| sprite.get(sx + dx, sy + dy).is_none());
-            if edge && (level >= 2 || (sx + sy) % 2 == 0) {
-                f.set(x + sx, y + sy, colour);
-            }
-        }
     }
 }
 
