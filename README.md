@@ -121,8 +121,16 @@ then `1` to `4`, or click an item; the shop closes so you can watch your pet enj
 | Toy | 10 | +2 happy, burns weight |
 | Salad | 8 | +1 hunger, lighter |
 | Vitamins | 25 | no sickness for 3 hours |
+| Cupcake | 20 | +1 hunger and +1 happy, heavy (a shop meal for habits) |
+| Dumbbell | 18 | burns 5 weight |
+| Potty charm | 22 | no toilet calls for 3 hours |
+| Medicine kit | 20 | cures sickness at once |
 
-**For the room.** Press `Tab` (or the arrow keys) in the shop for a second shelf of things you keep.
+The shop has three shelves, flipped with `Tab` or the arrow keys: care, treats and room. The last four
+items above are on the treats shelf. Like the others, an item that would do nothing right now (a
+cupcake for a full and happy pet, a medicine kit for a healthy one) is refused and costs nothing.
+
+**For the room.** The last shelf holds things you keep.
 They do nothing in play; they show up in the room and survive a pet dying. Each spot holds one
 thing, and buying another for the same spot swaps them.
 

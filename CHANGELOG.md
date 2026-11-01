@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.5.0
+
+- Four new treats on a new "treats" shelf in the shop (press `Tab`): a cupcake (+1 hunger and +1
+  happy, but heavy), a dumbbell (burns 5 weight), a potty charm (no toilet calls for 3 hours) and a
+  medicine kit (cures sickness at once), for 18 to 22 coins. The shop now has three shelves: care,
+  treats and room.
+- Like the other items, a treat that would do nothing is refused and costs nothing. Old saves load
+  as before.
+
 ## 2.4.0
 
 - The shop has a second shelf, "room" (press `Tab` or the arrow keys): a star poster, a potted fern,

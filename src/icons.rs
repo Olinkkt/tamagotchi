@@ -463,3 +463,64 @@ pub const MEDAL: Grid = &[
     "....kkkk....",
     "............",
 ];
+
+/// Shop treats, 12x12.
+pub const CUPCAKE: Grid = &[
+    "......k.....",
+    "...kkkrkk...",
+    "..kpbbpppk..",
+    ".kpbbbbpppk.",
+    ".kppppppppk.",
+    ".kppppppppk.",
+    ".koppppppok.",
+    ".kyoyoyoyyk.",
+    ".kyoyoyoyyk.",
+    ".kyoyoyoyyk.",
+    "..kkkkkkkk..",
+    "............",
+];
+
+pub const DUMBBELL: Grid = &[
+    "............",
+    "............",
+    "...kk..kk...",
+    ".kkhakkhakk.",
+    "khahakkhahak",
+    "khahahhhahak",
+    "khahahhhahak",
+    "khahakkhahak",
+    ".kkhakkhakk.",
+    "...kk..kk...",
+    "............",
+    "............",
+];
+
+pub const CHARM: Grid = &[
+    "......k.....",
+    ".....kyk....",
+    "....kykyk...",
+    "...kykkkyk..",
+    "..kyeeeekyk.",
+    "..keiieeek..",
+    ".keeiieeeek.",
+    ".keeeeeeeek.",
+    "..keeeeeek..",
+    "..keededek..",
+    "...kkedkk...",
+    ".....kk.....",
+];
+
+pub const MEDKIT: Grid = &[
+    "....kkkk....",
+    "...kaaaak...",
+    ".kkkaaaakkk.",
+    "khhhhhhhhhhk",
+    "kwwwwrrwwwwk",
+    "kwwwwrrwwwwk",
+    "kwwrrrrrrwwk",
+    "kwwrrrrrrwwk",
+    "kwwwwrrwwwwk",
+    "kwwwwrrwwwwk",
+    "kwwwwwwwwwwk",
+    ".kkkkkkkkkk.",
+];

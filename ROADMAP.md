@@ -27,14 +27,13 @@ Three goals, in this order:
 - 2.0: evolution by habit, personalities and the Plain form (Futsutchi); 2.0.3: the leaning tint.
 - 2.1: gifts while away and the keepsakes page; 2.2: care badges; 2.3: the Stop and Hop mini-games.
 - 2.4: shop collectibles, the memorial plaque and the keepsake windowsill.
+- 2.5: four new shop treats.
 
 ## Next, in order
 
 Times are my own work time, plus your playtesting.
 
-1. **More shop items (MINOR, about 30 minutes).** Treats with a clear effect, to go with the
-   new prices.
-2. **macOS build in the release workflow (MINOR, about 30 minutes).**
+1. **macOS build in the release workflow (MINOR, about 30 minutes).**
 
 ## Later
 

@@ -171,13 +171,22 @@ pub enum Item {
     Toy,
     Salad,
     Vitamins,
+    Cupcake,
+    Dumbbell,
+    PottyCharm,
+    MedKit,
 }
 
 /// How long vitamins keep the pet from falling sick.
 const VITAMIN_SECS: u64 = 3 * 3600;
+/// How long a potty charm keeps the toilet calls away.
+const CHARM_SECS: u64 = 3 * 3600;
+/// How much weight a dumbbell burns.
+const DUMBBELL_WEIGHT: u8 = 5;
 
 impl Item {
-    pub const ALL: [Item; 4] = [Item::FancyMeal, Item::Toy, Item::Salad, Item::Vitamins];
+    pub const ALL: [Item; 8] =
+        [Item::FancyMeal, Item::Toy, Item::Salad, Item::Vitamins, Item::Cupcake, Item::Dumbbell, Item::PottyCharm, Item::MedKit];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -185,6 +194,10 @@ impl Item {
             Item::Toy => "Toy",
             Item::Salad => "Salad",
             Item::Vitamins => "Vitamins",
+            Item::Cupcake => "Cupcake",
+            Item::Dumbbell => "Dumbbell",
+            Item::PottyCharm => "Potty charm",
+            Item::MedKit => "Medicine kit",
         }
     }
 
@@ -194,6 +207,10 @@ impl Item {
             Item::Toy => 10,
             Item::Salad => 8,
             Item::Vitamins => 25,
+            Item::Cupcake => 20,
+            Item::Dumbbell => 18,
+            Item::PottyCharm => 22,
+            Item::MedKit => 20,
         }
     }
 
@@ -203,6 +220,10 @@ impl Item {
             Item::Toy => "+2 happy, burns weight",
             Item::Salad => "+1 hunger, lighter",
             Item::Vitamins => "no sickness for 3 hours",
+            Item::Cupcake => "+1 hunger, +1 happy, heavy",
+            Item::Dumbbell => "burns 5 weight",
+            Item::PottyCharm => "no toilet calls for 3 hours",
+            Item::MedKit => "cures sickness at once",
         }
     }
 }
@@ -250,6 +271,9 @@ pub struct Pet {
     /// The pet cannot fall sick until its `age` reaches this (set by vitamins).
     #[serde(default)]
     pub immune_until: u64,
+    /// No toilet calls until the pet's `age` reaches this (set by a potty charm).
+    #[serde(default)]
+    pub potty_until: u64,
     /// Pet's wall-clock time (unix seconds); advances one second per tick.
     #[serde(default)]
     pub clock: i64,
@@ -301,6 +325,7 @@ impl Pet {
             buried: false,
             quirk: Quirk::Easygoing,
             immune_until: 0,
+            potty_until: 0,
             clock: seed as i64,
             cfg: Config::default(),
             tz_offset: 0,
@@ -671,6 +696,11 @@ impl Pet {
         if self.skip_slow_tick() {
             return;
         }
+        if self.age < self.potty_until {
+            self.meal_urge = None;
+            self.urge = None;
+            return;
+        }
         if let Some(left) = self.meal_urge {
             self.meal_urge = (left > 1).then_some(left - 1);
             if self.meal_urge.is_none() {
@@ -846,6 +876,10 @@ impl Pet {
             Item::FancyMeal | Item::Salad if self.hunger >= MAX_HEARTS => Err("Not hungry.".into()),
             Item::Toy if self.happy >= MAX_HEARTS => Err("Too happy to play.".into()),
             Item::Vitamins if self.age < self.immune_until => Err("Already protected.".into()),
+            Item::Cupcake if self.hunger >= MAX_HEARTS && self.happy >= MAX_HEARTS => Err("Not hungry or sad.".into()),
+            Item::Dumbbell if self.weight <= DUMBBELL_WEIGHT => Err("Already fit.".into()),
+            Item::PottyCharm if self.age < self.potty_until => Err("Already protected.".into()),
+            Item::MedKit if !self.sick => Err("Not sick.".into()),
             Item::FancyMeal => {
                 self.hunger = (self.hunger + 2).min(MAX_HEARTS);
                 self.weight = self.weight.saturating_add(1).min(99);
@@ -872,6 +906,34 @@ impl Pet {
                 self.immune_until = self.age + VITAMIN_SECS;
                 self.note(Habit::ShopCare);
                 Ok("Vitamins! No sickness for 3 hours.".into())
+            }
+            Item::Cupcake => {
+                self.hunger = (self.hunger + 1).min(MAX_HEARTS);
+                self.happy = (self.happy + 1).min(MAX_HEARTS);
+                self.weight = self.weight.saturating_add(3).min(99);
+                self.note(Habit::ShopFood);
+                self.cared.push(Care::Meal);
+                self.ate_meal();
+                Ok("A cupcake! Hunger +1, Happy +1.".into())
+            }
+            Item::Dumbbell => {
+                self.weight = self.weight.saturating_sub(DUMBBELL_WEIGHT).max(1);
+                self.note(Habit::ShopCare);
+                Ok("A good workout! Weight -5.".into())
+            }
+            Item::PottyCharm => {
+                self.potty_until = self.age + CHARM_SECS;
+                self.urge = None;
+                self.meal_urge = None;
+                self.note(Habit::ShopCare);
+                Ok("A potty charm! No toilet calls for 3 hours.".into())
+            }
+            Item::MedKit => {
+                self.sick = false;
+                self.doses = 0;
+                self.sick_t = 0;
+                self.note(Habit::ShopCare);
+                Ok("All better!".into())
             }
         }
     }
@@ -1173,6 +1235,47 @@ mod tests {
         assert_eq!((p.happy, p.weight), (3, 10));
         p.use_item(Item::Salad).unwrap();
         assert_eq!((p.hunger, p.weight), (4, 8));
+    }
+
+    #[test]
+    fn the_treats_do_what_their_blurbs_say() {
+        let mut p = awake_adult();
+        p.hunger = 2;
+        p.happy = 2;
+        p.weight = 20;
+        p.use_item(Item::Cupcake).unwrap();
+        assert_eq!((p.hunger, p.happy, p.weight), (3, 3, 23));
+        p.use_item(Item::Dumbbell).unwrap();
+        assert_eq!(p.weight, 18);
+
+        assert!(p.use_item(Item::MedKit).is_err(), "not sick, so not used up");
+        p.dev_sick();
+        assert!(p.sick);
+        p.use_item(Item::MedKit).unwrap();
+        assert!(!p.sick && p.doses == 0);
+
+        p.urge = Some(5);
+        p.use_item(Item::PottyCharm).unwrap();
+        assert!(p.urge.is_none(), "an urge already building goes away");
+        assert!(p.use_item(Item::PottyCharm).is_err(), "already protected");
+        for _ in 0..3600 {
+            p.tick();
+            assert!(p.urge.is_none() && p.meal_urge.is_none(), "no calls while the charm lasts");
+        }
+        assert_eq!(p.habits[Habit::ShopFood as usize], 1);
+        assert_eq!(p.habits[Habit::ShopCare as usize], 3, "dumbbell, kit and charm are care items");
+    }
+
+    #[test]
+    fn treats_that_would_do_nothing_are_refused() {
+        let mut p = awake_adult();
+        p.hunger = MAX_HEARTS;
+        p.happy = MAX_HEARTS;
+        assert!(p.use_item(Item::Cupcake).is_err());
+        p.weight = 5;
+        assert!(p.use_item(Item::Dumbbell).is_err());
+        assert!(p.use_item(Item::MedKit).is_err());
+        assert_eq!(p.habits, [0; 5], "refused items do not count towards a form");
     }
 
     #[test]

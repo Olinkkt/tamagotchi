@@ -59,7 +59,17 @@ fn item_icon(item: pet::Item) -> Grid {
         pet::Item::Toy => icons::PLAY,
         pet::Item::Salad => icons::SALAD,
         pet::Item::Vitamins => icons::VITAMINS,
+        pet::Item::Cupcake => icons::CUPCAKE,
+        pet::Item::Dumbbell => icons::DUMBBELL,
+        pet::Item::PottyCharm => icons::CHARM,
+        pet::Item::MedKit => icons::MEDKIT,
     }
+}
+
+/// The four items on the care or treats shelf that is showing.
+fn shelf(app: &App) -> &'static [pet::Item] {
+    let from = (app.shop_tab * 4).min(pet::Item::ALL.len() - 4);
+    &pet::Item::ALL[from..from + 4]
 }
 
 fn shop_row_y(i: usize) -> i32 {
@@ -68,7 +78,7 @@ fn shop_row_y(i: usize) -> i32 {
 
 fn draw_shop(f: &mut Frame, app: &App) {
     f.grid(icons::COIN, ESC.0 - 10, ESC.1 + 3);
-    if app.shop_keep {
+    if app.shop_tab == crate::app::SHOP_ROOM {
         for (i, d) in decor::DECOR.iter().enumerate() {
             let y = shop_row_y(i);
             let can = app.profile.coins >= d.price && !app.profile.placed(d.id);
@@ -84,7 +94,7 @@ fn draw_shop(f: &mut Frame, app: &App) {
         }
         return;
     }
-    for (i, item) in pet::Item::ALL.iter().enumerate() {
+    for (i, item) in shelf(app).iter().enumerate() {
         let y = shop_row_y(i);
         let can = app.profile.coins >= item.price();
         f.boxed(CARD.0 + 4, y, CARD.2 - 8, SHOP_ROW - 3, if can { Pal::Dusk } else { Pal::Ink }, Pal::Night);
@@ -102,11 +112,12 @@ fn draw_shop(f: &mut Frame, app: &App) {
 fn shop_labels(app: &App) -> Vec<Label> {
     let mut v = vec![
         label("SHOP", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
-        label("care", CARD.0 as f32 + 40.0, TITLE_Y, if app.shop_keep { Pal::Slate } else { Pal::White }),
-        label("room", CARD.0 as f32 + 66.0, TITLE_Y, if app.shop_keep { Pal::White } else { Pal::Slate }),
+        label("care", CARD.0 as f32 + 40.0, TITLE_Y, if app.shop_tab == 0 { Pal::White } else { Pal::Slate }),
+        label("treats", CARD.0 as f32 + 66.0, TITLE_Y, if app.shop_tab == 1 { Pal::White } else { Pal::Slate }),
+        label("room", CARD.0 as f32 + 100.0, TITLE_Y, if app.shop_tab == 2 { Pal::White } else { Pal::Slate }),
         right(app.profile.coins.to_string(), (ESC.0 - 12) as f32, ESC.1 as f32 + 6.5, Pal::Yellow),
     ];
-    if app.shop_keep {
+    if app.shop_tab == crate::app::SHOP_ROOM {
         for (i, d) in decor::DECOR.iter().enumerate() {
             let y = shop_row_y(i) as f32;
             let placed = app.profile.placed(d.id);
@@ -119,7 +130,7 @@ fn shop_labels(app: &App) -> Vec<Label> {
         }
         return v;
     }
-    for (i, item) in pet::Item::ALL.iter().enumerate() {
+    for (i, item) in shelf(app).iter().enumerate() {
         let y = shop_row_y(i) as f32;
         let can = app.profile.coins >= item.price();
         let (name, blurb, price) = if can { (Pal::White, Pal::Mist, Pal::Yellow) } else { (Pal::Slate, Pal::Dusk, Pal::Slate) };
@@ -554,8 +565,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
 pub fn hint(app: &App) -> Option<(String, Pal)> {
     Some(match &app.mode {
         Mode::Chooser => ("PRESS 1 TO 6, OR CLICK A GAME".into(), Pal::Yellow),
-        Mode::Shop if app.shop_keep => ("PRESS 1-4 OR CLICK TO BUY  -  TAB: CARE ITEMS".into(), Pal::Yellow),
-        Mode::Shop => ("PRESS 1-4 OR CLICK TO BUY  -  TAB: FOR THE ROOM".into(), Pal::Yellow),
+        Mode::Shop => (format!("PRESS 1-4 OR CLICK TO BUY  -  TAB: {}", ["TREATS", "FOR THE ROOM", "CARE ITEMS"][app.shop_tab]), Pal::Yellow),
         Mode::Awards => match profile::ACHIEVEMENTS.iter().find(|a| !app.profile.has(a.id)) {
             Some(next) => (format!("NEXT: {} - {}", next.name.to_uppercase(), next.how.to_uppercase()), Pal::Mist),
             None => ("EVERY AWARD UNLOCKED!".into(), Pal::Yellow),
@@ -760,13 +770,19 @@ mod tests {
     }
 
     #[test]
-    fn the_shop_has_a_second_shelf_for_the_room_and_tab_flips_between_them() {
+    fn the_shop_has_three_shelves_and_tab_flips_between_them() {
         crate::save::with_temp_dir(|| {
             let mut app = app_with(Stage::Adult, |_| {});
             app.profile.coins = 50;
             app.mode = Mode::Shop;
             app.on_key(Key::Tab);
-            assert!(app.shop_keep);
+            let treats: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
+            for want in ["Cupcake", "Dumbbell", "Potty charm", "Medicine kit", "22"] {
+                assert!(treats.iter().any(|t| t == want), "missing {want}: {treats:?}");
+            }
+            assert!(hint(&app).unwrap().0.contains("TAB: FOR THE ROOM"));
+            app.on_key(Key::Tab);
+            assert_eq!(app.shop_tab, 2);
             let text: Vec<String> = labels(&app, Layout::MIN).into_iter().map(|l| l.text).collect();
             for want in ["Star poster", "Potted fern", "Floor lamp", "Teddy bear", "60"] {
                 assert!(text.iter().any(|t| t == want), "missing {want}: {text:?}");
@@ -779,8 +795,10 @@ mod tests {
             app.on_key(Key::Char('2'));
             assert_eq!(app.profile.coins, 10, "buying it again charges nothing");
             app.on_key(Key::Left);
-            assert!(!app.shop_keep);
-    
+            assert_eq!(app.shop_tab, 1, "left goes back a shelf");
+            app.on_key(Key::Right);
+            app.on_key(Key::Right);
+            assert_eq!(app.shop_tab, 0, "and the shelves wrap round");
         });
     }
 

@@ -24,6 +24,10 @@ pub enum Key {
     Tab,
 }
 
+/// The shop's shelves: care items, treats, then things for the room.
+pub const SHOP_TABS: usize = 3;
+pub const SHOP_ROOM: usize = 2;
+
 pub enum Mode {
     Normal,
     Chooser,
@@ -56,8 +60,8 @@ pub struct App {
     pub log: Vec<String>,
     pub cfg: Config,
     pub profile: Profile,
-    /// Which shelf of the shop is showing: the care items, or the things for the room.
-    pub shop_keep: bool,
+    /// Which shelf of the shop is showing: 0 care items, 1 treats, 2 things for the room.
+    pub shop_tab: usize,
     pub tz: i64,
     pub speed: f64,
     tick_acc: f64,
@@ -211,7 +215,7 @@ impl App {
             log: if message.is_empty() { Vec::new() } else { vec![message] },
             cfg,
             profile: Profile::default(),
-            shop_keep: false,
+            shop_tab: 0,
             tz,
             speed,
             tick_acc: 0.0,
@@ -257,7 +261,10 @@ impl App {
                     pet::Item::FancyMeal => scene::Fx::Meal,
                     pet::Item::Toy => scene::Fx::Toy,
                     pet::Item::Salad => scene::Fx::Salad,
-                    pet::Item::Vitamins => scene::Fx::Pill,
+                    pet::Item::Vitamins | pet::Item::PottyCharm => scene::Fx::Pill,
+                    pet::Item::Cupcake => scene::Fx::Meal,
+                    pet::Item::Dumbbell => scene::Fx::Toy,
+                    pet::Item::MedKit => scene::Fx::Heal,
                 });
             }
             Err(msg) => self.say(&msg),
@@ -534,9 +541,10 @@ impl App {
             }
             Mode::Shop => {
                 match code {
-                    Key::Char(c @ '1'..='4') if self.shop_keep => self.buy_decor((c as u8 - b'1') as usize),
-                    Key::Char(c @ '1'..='4') => self.buy(pet::Item::ALL[(c as u8 - b'1') as usize]),
-                    Key::Tab | Key::Left | Key::Right => self.shop_keep = !self.shop_keep,
+                    Key::Char(c @ '1'..='4') if self.shop_tab == SHOP_ROOM => self.buy_decor((c as u8 - b'1') as usize),
+                    Key::Char(c @ '1'..='4') => self.buy(pet::Item::ALL[self.shop_tab * 4 + (c as u8 - b'1') as usize]),
+                    Key::Tab | Key::Right => self.shop_tab = (self.shop_tab + 1) % SHOP_TABS,
+                    Key::Left => self.shop_tab = (self.shop_tab + SHOP_TABS - 1) % SHOP_TABS,
                     Key::Esc | Key::Char('q') | Key::Char('b') => self.mode = Mode::Normal,
                     _ => {}
                 }
