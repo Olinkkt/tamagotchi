@@ -355,7 +355,7 @@ mod tests {
     }
 
     #[test]
-    fn a_decoration_costs_coins_and_swaps_what_was_on_its_spot() {
+    fn a_decoration_costs_coins_and_each_has_its_own_spot() {
         let mut p = Profile { coins: 200, ..Profile::default() };
         let (lamp, teddy, fern) = (decor::by_id("lamp").unwrap(), decor::by_id("teddy").unwrap(), decor::by_id("fern").unwrap());
         assert!(p.buy_decor(lamp).is_ok());
@@ -363,7 +363,7 @@ mod tests {
         assert!(p.buy_decor(lamp).is_err(), "it is already there");
         assert!(p.buy_decor(fern).is_ok());
         assert!(p.buy_decor(teddy).is_ok());
-        assert!(p.placed("teddy") && !p.placed("lamp") && p.placed("fern"), "the teddy took the lamp's spot only");
+        assert!(p.placed("teddy") && p.placed("lamp") && p.placed("fern"), "the teddy sits on the rug, the lamp keeps its corner");
         let mut poor = Profile { coins: 5, ..Profile::default() };
         assert!(poor.buy_decor(fern).is_err() && poor.decor.is_empty() && poor.coins == 5);
     }

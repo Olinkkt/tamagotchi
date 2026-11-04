@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.9.2
+
+- The room decor is spread out: the star poster hangs left of the window, the memorial plaque sits
+  right of the shelf, and the teddy bear now sits on the rug beside your pet. The fern moved a
+  little closer to the rug. The teddy's shop line now reads "on the rug".
+
 ## 2.9.1
 
 - Room decorations sit better: the star poster hangs between the lamp and the clock instead of
