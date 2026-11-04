@@ -33,6 +33,9 @@ pub const SHOP_ROOM: usize = 2;
 /// The longest name a pet can have.
 pub const NAME_MAX: usize = 12;
 
+/// Seconds after hatching before the naming card opens, so the hatch gets to be seen.
+const NAME_ASK_AFTER: f32 = 3.0;
+
 pub enum Mode {
     Normal,
     Chooser,
@@ -81,6 +84,8 @@ pub struct App {
     pub(crate) wipe: Option<Wipe>,
     /// When the egg hatched, so its shell can lie on the floor for a while.
     shell_at: Option<Instant>,
+    /// Set when the egg hatches unnamed: the naming card opens once the hatch has played.
+    ask_name: bool,
     last_stage: Stage,
     confirm_reset: bool,
     pub dev: bool,
@@ -233,6 +238,7 @@ impl App {
             fx: None,
             wipe: None,
             shell_at: None,
+            ask_name: false,
             last_stage: Stage::Egg,
             confirm_reset: false,
             dev,
@@ -408,8 +414,13 @@ impl App {
             }
             if self.last_stage == Stage::Egg && self.pet.stage == Stage::Baby {
                 self.shell_at = Some(Instant::now());
+                self.ask_name = self.pet.name.is_empty();
             }
             self.last_stage = self.pet.stage;
+        }
+        if self.ask_name && self.wipe.is_none() && matches!(self.mode, Mode::Normal) && self.shell_at.is_some_and(|t| t.elapsed().as_secs_f32() >= NAME_ASK_AFTER) {
+            self.ask_name = false;
+            self.mode = Mode::Rename(String::new());
         }
         if matches!(self.mode, Mode::Game(_) | Mode::Chooser) && (self.pet.asleep || !self.pet.alive()) {
             self.mode = Mode::Normal;
@@ -624,6 +635,7 @@ impl App {
                 self.log.clear();
                 self.fx = None;
                 self.shell_at = None;
+                self.ask_name = false;
                 self.last_stage = Stage::Egg;
                 let _ = save::save(&self.pet);
             }
@@ -686,6 +698,7 @@ impl App {
             Key::Char('n') if !self.pet.alive() => {
                 self.pet = self.fresh_pet();
                 self.shell_at = None;
+                self.ask_name = false;
                 self.last_stage = Stage::Egg;
                 "A new egg appears!".into()
             }
@@ -958,6 +971,25 @@ pub(crate) mod tests {
             app.on_key(Key::Char('N'));
             app.on_key(Key::Esc);
             assert_eq!(app.pet.name, "Momo the gr", "escape keeps the old name");
+        });
+    }
+
+    #[test]
+    fn an_unnamed_pet_is_asked_for_a_name_once_it_has_hatched() {
+        save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Egg, |p| p.species = "Egg".into());
+            app.pet.dev_grow();
+            app.pet.tick();
+            app.update();
+            assert!(matches!(app.mode, Mode::Normal), "the hatch is seen first");
+            app.shell_at = Some(Instant::now() - Duration::from_secs_f32(NAME_ASK_AFTER + 0.1));
+            app.update();
+            assert!(matches!(app.mode, Mode::Rename(_)));
+            app.on_key(Key::Char('Z'));
+            app.on_key(Key::Enter);
+            app.shell_at = Some(Instant::now() - Duration::from_secs_f32(NAME_ASK_AFTER + 0.1));
+            app.update();
+            assert_eq!((app.pet.name.as_str(), matches!(app.mode, Mode::Normal)), ("Z", true), "asked only once");
         });
     }
 

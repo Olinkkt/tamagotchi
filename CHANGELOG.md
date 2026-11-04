@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.9.0
+
+- A newly hatched pet asks for its name: a few seconds after the egg cracks, a card opens with your
+  pet in it. Press Esc to skip; `N` names it any time later.
+- The naming card is pixel art: your pet smiles beside a chunky-letter name box with a blinking
+  cursor, and a row of twelve hearts fills up as you type.
+
 ## 2.8.0
 
 - You can name your pet: press `N`, type up to 12 letters, numbers, spaces or dashes, and press

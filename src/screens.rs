@@ -441,11 +441,38 @@ fn graveyard_labels(entries: &[String]) -> Vec<Label> {
     v
 }
 
-fn rename_labels(text: &str) -> Vec<Label> {
-    let mut v = vec![label("NAME YOUR PET", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink)];
-    v.push(centred(format!("{text}_"), 120.0, 64.0, Pal::White));
-    v.push(centred(format!("{}/{} LETTERS, NUMBERS, SPACE OR -", text.len(), crate::app::NAME_MAX), 120.0, 96.0, Pal::Mist));
-    v
+const NAME_FIELD: (i32, i32, i32, i32) = (76, 44, 152, 22);
+
+fn draw_rename(f: &mut Frame, app: &App, text: &str) {
+    // The pet on a little floor, happy to be asked.
+    let s = scene::posed(&app.pet, Expr::Happy);
+    f.rect(12, 104, 56, 2, Pal::Dusk);
+    f.sprite(&s, 40 - s.w / 2, 104 - s.h);
+    f.grid(icons::HEART_FULL, 64, 8);
+    f.grid(icons::HEART_FULL, 74, 8);
+    let (x, y, w, h) = NAME_FIELD;
+    f.boxed(x, y, w, h, Pal::Ink, Pal::Slate);
+    // Chunky pixel letters when the name fits, plain ones when it is long.
+    let k = if crate::font::width(text) * 2 <= w - 10 { 2 } else { 1 };
+    let ty = y + (h - 7 * k) / 2;
+    f.text(text, x + 5, ty, k, Pal::White);
+    if app.started.elapsed().as_millis() / 500 % 2 == 0 {
+        f.rect(x + 5 + crate::font::width(text) * k, ty, k, 7 * k, Pal::Yellow);
+    }
+    // One heart per free letter left.
+    let left = crate::app::NAME_MAX.saturating_sub(text.len());
+    for i in 0..crate::app::NAME_MAX {
+        f.grid(if i < left { icons::HEART_EMPTY } else { icons::HEART_FULL }, x + i as i32 * 12, y + h + 6);
+    }
+}
+
+fn rename_labels(app: &App) -> Vec<Label> {
+    let (x, y, w, h) = NAME_FIELD;
+    vec![
+        label("NAME YOUR PET", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink),
+        centred(app.pet.species.to_uppercase(), 40.0, 114.0, Pal::Mist),
+        centred("LETTERS, NUMBERS, SPACE OR -", (x + w / 2) as f32, (y + h + 24) as f32, Pal::Slate),
+    ]
 }
 
 fn game_card_w() -> i32 {
@@ -539,6 +566,7 @@ pub fn draw(f: &mut Frame, app: &App, lay: Layout) {
         Mode::Gifts(gifts) => draw_gifts(&mut local, gifts),
         Mode::Tree => draw_tree(&mut local, app),
         Mode::Graveyard(entries) => draw_graveyard(&mut local, entries),
+        Mode::Rename(text) => draw_rename(&mut local, app, text),
         _ => {}
     }
     let (ox, oy) = lay.centred_card();
@@ -555,7 +583,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         Mode::Gifts(gifts) => gifts_labels(gifts),
         Mode::Tree => tree_labels(app),
         Mode::Graveyard(entries) => graveyard_labels(entries),
-        Mode::Rename(text) => rename_labels(text),
+        Mode::Rename(_) => rename_labels(app),
         _ => Vec::new(),
     };
     if showing(app) {
