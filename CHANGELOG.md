@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.9.3
+
+- The teddy bear has a place of his own: he sits on a little pink cushion in the right-hand corner,
+  past the lamp, instead of on the rug. He no longer replaces the lamp, so you can have both.
+
 ## 2.9.2
 
 - The room decor is spread out: the star poster hangs left of the window, the memorial plaque sits

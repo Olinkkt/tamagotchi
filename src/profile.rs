@@ -363,7 +363,7 @@ mod tests {
         assert!(p.buy_decor(lamp).is_err(), "it is already there");
         assert!(p.buy_decor(fern).is_ok());
         assert!(p.buy_decor(teddy).is_ok());
-        assert!(p.placed("teddy") && p.placed("lamp") && p.placed("fern"), "the teddy sits on the rug, the lamp keeps its corner");
+        assert!(p.placed("teddy") && p.placed("lamp") && p.placed("fern"), "the teddy has its own corner, the lamp keeps its spot");
         let mut poor = Profile { coins: 5, ..Profile::default() };
         assert!(poor.buy_decor(fern).is_err() && poor.decor.is_empty() && poor.coins == 5);
     }

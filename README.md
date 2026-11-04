@@ -145,7 +145,7 @@ thing, and buying another for the same spot swaps them.
 | Star poster | 30 | the wall |
 | Potted fern | 40 | left of the rug |
 | Floor lamp | 60 | right of the rug |
-| Teddy bear | 45 | right of the rug (swaps with the lamp) |
+| Teddy bear | 45 | on its own cushion, far right |
 
 Two more things are not in the shop. In the graveyard (`g`), press `P` to hang a memorial plaque
 for the last pet you lost (20 coins, once per pet): a heart in the colour of its form and how long

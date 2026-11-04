@@ -13,8 +13,8 @@ pub enum Spot {
     Poster,
     FloorLeft,
     FloorRight,
-    /// On the right end of the rug, beside the pet.
-    Rug,
+    /// A corner of its own, past the lamp, in the floor the room shows beyond the stage.
+    Corner,
 }
 
 impl Spot {
@@ -23,7 +23,7 @@ impl Spot {
         match self {
             // Left of the window, in the wall the room shows beyond the 160-wide stage.
             Spot::Poster => (-18, 16),
-            Spot::Rug => (112, FLOOR - h),
+            Spot::Corner => (162, FLOOR - h),
             // The floor pieces stand on the same line, a little way in from the room's edge.
             Spot::FloorLeft => (12, FLOOR - h),
             Spot::FloorRight => (156 - w, FLOOR - h),
@@ -46,7 +46,7 @@ pub const DECOR: [Decor; 4] = [
     Decor { id: "poster", name: "Star poster", blurb: "for the wall", price: 30, spot: Spot::Poster, icon: POSTER },
     Decor { id: "fern", name: "Potted fern", blurb: "left of the rug", price: 40, spot: Spot::FloorLeft, icon: FERN },
     Decor { id: "lamp", name: "Floor lamp", blurb: "right of the rug", price: 60, spot: Spot::FloorRight, icon: LAMP },
-    Decor { id: "teddy", name: "Teddy bear", blurb: "on the rug", price: 45, spot: Spot::Rug, icon: TEDDY },
+    Decor { id: "teddy", name: "Teddy bear", blurb: "on its own cushion", price: 45, spot: Spot::Corner, icon: TEDDY },
 ];
 
 /// What the memorial plaque costs: cheap enough to buy after every pet.
@@ -179,7 +179,11 @@ const TEDDY: Grid = &[
     "..knnnttttnnnk..",
     "...knnttttnnk...",
     "....kknnnnkk....",
-    "......kkkk......",
+    "..kkkkkkkkkkkk..",
+    ".kbbppppppppppk.",
+    "kbppppppppppppvk",
+    "kppppppppppppvvk",
+    ".kkkkkkkkkkkkkk.",
 ];
 
 #[cfg(test)]
