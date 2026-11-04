@@ -134,7 +134,7 @@ impl Game {
             Game::Janken(g) => g.hint(),
             Game::Stop(g) => g.hint(),
             Game::Hop(g) => g.hint(),
-            Game::Pong(_) => "TAP ANY KEY OR CLICK TO FLIP THE PADDLE - RETURN IT 5 TIMES",
+            Game::Pong(_) => "UP / DOWN STEER THE PADDLE, OTHER KEYS FLIP IT - 5 RETURNS WIN",
         }
     }
 }
@@ -433,11 +433,17 @@ impl Pong {
         }
     }
 
-    /// Any key but the way out flips the paddle's direction.
+    /// Up and Down point the paddle that way (pressing the way it already goes changes nothing);
+    /// any other key but the way out, or a click, flips its direction.
     fn key(&mut self, code: Key) -> Outcome {
-        let flips = matches!(code, Key::Up | Key::Down | Key::Left | Key::Right | Key::Tab | Key::Char(_));
-        if flips && !self.missed {
-            self.dir = -self.dir;
+        if self.missed {
+            return Outcome::Continue;
+        }
+        match code {
+            Key::Up => self.dir = -1,
+            Key::Down => self.dir = 1,
+            Key::Left | Key::Right | Key::Tab | Key::Char(_) => self.dir = -self.dir,
+            _ => {}
         }
         Outcome::Continue
     }
@@ -709,6 +715,20 @@ mod tests {
     }
 
     #[test]
+    fn pong_up_and_down_set_the_direction_instead_of_flipping_it() {
+        let mut p = pet();
+        let mut g = Pong::new(&mut p);
+        g.key(Key::Up);
+        g.key(Key::Up);
+        assert_eq!(g.dir, -1);
+        g.key(Key::Down);
+        g.key(Key::Down);
+        assert_eq!(g.dir, 1);
+        g.key(Key::Char(' '));
+        assert_eq!(g.dir, -1);
+    }
+
+    #[test]
     fn pong_returns_get_faster_up_to_twice_the_start() {
         let mut speed = 1.0f32;
         for _ in 0..20 {
@@ -756,7 +776,7 @@ mod tests {
         assert!(matches!(g.key(Key::Char('q'), &mut p), Outcome::Quit));
         let Game::Pong(pong) = &mut g else { unreachable!() };
         let before = pong.dir;
-        g.key(Key::Up, &mut p);
+        g.key(Key::Char(' '), &mut p);
         let Game::Pong(pong) = &mut g else { unreachable!() };
         assert_eq!(pong.dir, -before);
     }

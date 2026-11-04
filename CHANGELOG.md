@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.9.4
+
+- Pong: the up arrow now points the paddle up and the down arrow points it down, so pressing the way it
+  already goes no longer reverses it. Other keys and clicks still flip it.
+
 ## 2.9.3
 
 - The teddy bear has a place of his own: he sits on a little pink cushion in the right-hand corner,
