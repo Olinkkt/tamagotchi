@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.9.1
+
+- Room decorations sit better: the star poster hangs between the lamp and the clock instead of
+  crowding the books, and the memorial plaque moves to the panelling so it no longer covers the
+  clock and the plant.
+
 ## 2.9.0
 
 - A newly hatched pet asks for its name: a few seconds after the egg cracks, a card opens with your

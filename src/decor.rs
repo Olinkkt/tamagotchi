@@ -19,7 +19,8 @@ impl Spot {
     /// The top-left corner of an item of this size on its spot.
     fn at(self, w: i32, h: i32) -> (i32, i32) {
         match self {
-            Spot::Poster => (96, 6),
+            // Hung between the lamp and the clock, just clear of the books on the shelf.
+            Spot::Poster => (97, 3),
             // The floor pieces stand on the same line, a little way in from the room's edge.
             Spot::FloorLeft => (4, FLOOR - h),
             Spot::FloorRight => (156 - w, FLOOR - h),
@@ -47,7 +48,8 @@ pub const DECOR: [Decor; 4] = [
 
 /// What the memorial plaque costs: cheap enough to buy after every pet.
 pub const PLAQUE_PRICE: u32 = 20;
-const PLAQUE: (i32, i32, i32, i32) = (134, 8, 26, 16);
+/// On the panelling at the right, clear of the clock, the shelf and the plant.
+const PLAQUE: (i32, i32, i32, i32) = (122, 62, 26, 16);
 /// The windowsill, where a keepsake stands: its middle and the line it rests on.
 const SILL: (i32, i32) = (34, 57);
 
