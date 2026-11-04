@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.8.0
+
+- You can name your pet: press `N`, type up to 12 letters, numbers, spaces or dashes, and press
+  Enter. The name shows in the header, `tama status`, the notifications and the graveyard.
+- Old saves load as before, with no name until you give one.
+
 ## 2.7.0
 
 - Hop is now an endless runner like the dinosaur game: the floor scrolls, crates rush at your pet

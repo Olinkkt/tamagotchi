@@ -22,11 +22,16 @@ pub enum Key {
     Right,
     Esc,
     Tab,
+    Enter,
+    Backspace,
 }
 
 /// The shop's shelves: care items, treats, then things for the room.
 pub const SHOP_TABS: usize = 3;
 pub const SHOP_ROOM: usize = 2;
+
+/// The longest name a pet can have.
+pub const NAME_MAX: usize = 12;
 
 pub enum Mode {
     Normal,
@@ -47,6 +52,8 @@ pub enum Mode {
     Tree,
     /// The pet in a washroom booth; nothing can be done until it comes out.
     Toilet(toilet::Visit),
+    /// Typing a new name for the pet.
+    Rename(String),
 }
 
 pub struct App {
@@ -589,6 +596,24 @@ impl App {
                 self.mode = Mode::Normal;
                 return;
             }
+            Mode::Rename(text) => {
+                match code {
+                    Key::Esc => self.mode = Mode::Normal,
+                    Key::Enter => {
+                        self.pet.name = text.trim().to_string();
+                        let _ = save::save(&self.pet);
+                        let msg = if self.pet.name.is_empty() { "Back to no name.".to_string() } else { format!("Hello, {}!", self.pet.name) };
+                        self.mode = Mode::Normal;
+                        self.say(&msg);
+                    }
+                    Key::Backspace => {
+                        text.pop();
+                    }
+                    Key::Char(c) if (c.is_ascii_alphanumeric() || c == ' ' || c == '-') && text.len() < NAME_MAX => text.push(c),
+                    _ => {}
+                }
+                return;
+            }
             Mode::Toilet(_) => return,
             Mode::Normal => {}
         }
@@ -640,6 +665,10 @@ impl App {
             }
             Key::Char('e') => {
                 self.mode = Mode::Tree;
+                return;
+            }
+            Key::Char('N') => {
+                self.mode = Mode::Rename(self.pet.name.clone());
                 return;
             }
             Key::Char('m') => self.pet.medicine(),
@@ -909,6 +938,26 @@ pub(crate) mod tests {
             assert_eq!(app.speed, 1.0, "1 goes straight back to normal speed");
             app.on_key(Key::Char('f'));
             assert_eq!(app.speed, 2.0);
+        });
+    }
+
+    #[test]
+    fn a_pet_can_be_named_and_the_name_is_kept_short_and_plain() {
+        crate::save::with_temp_dir(|| {
+            let mut app = app_with(Stage::Child, |_| {});
+            app.on_key(Key::Char('N'));
+            assert!(matches!(app.mode, Mode::Rename(_)));
+            for c in "Momo!? the great pet".chars() {
+                app.on_key(Key::Char(c));
+            }
+            app.on_key(Key::Backspace);
+            app.on_key(Key::Enter);
+            assert!(matches!(app.mode, Mode::Normal));
+            assert_eq!(app.pet.name, "Momo the gr");
+            assert_eq!(app.pet.title(), "Momo the gr");
+            app.on_key(Key::Char('N'));
+            app.on_key(Key::Esc);
+            assert_eq!(app.pet.name, "Momo the gr", "escape keeps the old name");
         });
     }
 

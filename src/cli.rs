@@ -64,10 +64,10 @@ fn action_word(key: char) -> &'static str {
 /// One compact line for a status bar, e.g. `(^_^) Mametchi ♥♥♥♡ ♥♥♥♥` or `(T_T) Marutchi ♥♡♡♡ ♥♥♡♡ ! feed`.
 pub fn status_line(p: &Pet) -> String {
     match p.stage {
-        Stage::Dead => format!("({}) {} has passed away", face(p), p.species),
+        Stage::Dead => format!("({}) {} has passed away", face(p), p.title()),
         Stage::Egg => "(.) egg".to_string(),
         _ => {
-            let mut s = format!("({}) {} {} {}", face(p), p.species, hearts(p.hunger), hearts(p.happy));
+            let mut s = format!("({}) {} {} {}", face(p), p.title(), hearts(p.hunger), hearts(p.happy));
             if let Some((key, _)) = p.top_need() {
                 s.push_str(&format!(" ! {}", action_word(key)));
             }
@@ -89,9 +89,9 @@ pub fn short_text(p: &Pet) -> String {
 /// The full details, shown as a hover tooltip.
 fn tooltip(p: &Pet) -> String {
     if !p.alive() {
-        return format!("{} has passed away", p.species);
+        return format!("{} has passed away", p.title());
     }
-    let mut s = format!("{} ({})", p.species, p.stage.label());
+    let mut s = format!("{} ({})", p.title(), p.stage.label());
     if p.stage != Stage::Egg {
         s.push_str(&format!("\nhunger {}   happy {}", hearts(p.hunger), hearts(p.happy)));
     }

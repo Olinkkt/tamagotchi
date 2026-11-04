@@ -40,7 +40,7 @@ fn centred(text: impl Into<String>, x: f32, y: f32, colour: Pal) -> Label {
 
 /// Whether one of the cards is up, hiding the room and the panel.
 pub fn showing(app: &App) -> bool {
-    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Keepsakes | Mode::Badges | Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_))
+    matches!(app.mode, Mode::Chooser | Mode::Shop | Mode::Awards | Mode::Keepsakes | Mode::Badges | Mode::Gifts(_) | Mode::Tree | Mode::Graveyard(_) | Mode::Rename(_))
 }
 
 fn card(f: &mut Frame) {
@@ -441,6 +441,13 @@ fn graveyard_labels(entries: &[String]) -> Vec<Label> {
     v
 }
 
+fn rename_labels(text: &str) -> Vec<Label> {
+    let mut v = vec![label("NAME YOUR PET", CARD.0 as f32 + 6.0, TITLE_Y, Pal::Pink)];
+    v.push(centred(format!("{text}_"), 120.0, 64.0, Pal::White));
+    v.push(centred(format!("{}/{} LETTERS, NUMBERS, SPACE OR -", text.len(), crate::app::NAME_MAX), 120.0, 96.0, Pal::Mist));
+    v
+}
+
 fn game_card_w() -> i32 {
     let n = crate::games::CHOICES.len() as i32;
     (CARD.2 - 2 * (GAME_CARD.0 - CARD.0) - GAME_CARD_GAP * (n - 1)) / n
@@ -548,6 +555,7 @@ pub fn labels(app: &App, lay: Layout) -> Vec<Label> {
         Mode::Gifts(gifts) => gifts_labels(gifts),
         Mode::Tree => tree_labels(app),
         Mode::Graveyard(entries) => graveyard_labels(entries),
+        Mode::Rename(text) => rename_labels(text),
         _ => Vec::new(),
     };
     if showing(app) {
@@ -576,6 +584,7 @@ pub fn hint(app: &App) -> Option<(String, Pal)> {
         },
         Mode::Keepsakes => ("PRESS 1-6 TO PUT ONE ON THE WINDOWSILL".into(), Pal::Mist),
         Mode::Gifts(_) => ("ANY KEY TO CONTINUE".into(), Pal::Yellow),
+        Mode::Rename(_) => ("TYPE A NAME  -  ENTER: SAVE  -  ESC: CANCEL".into(), Pal::Yellow),
         Mode::Tree => ("YELLOW: NOW  BLUE: NEXT  UNDER EACH: HABIT, PERSONALITY".into(), Pal::Mist),
         Mode::Graveyard(entries) if entries.is_empty() => ("ANY KEY TO GO BACK".into(), Pal::Mist),
         Mode::Graveyard(entries) if app.profile.plaque_pets >= entries.len() => ("ANY KEY TO GO BACK  -  THE LAST PET HAS ITS PLAQUE".into(), Pal::Mist),

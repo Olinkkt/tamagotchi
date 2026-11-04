@@ -69,7 +69,7 @@ impl Viewport {
 /// The keys pressed since the last frame, in the game's own terms.
 fn keys_pressed() -> Vec<Key> {
     let mut keys = Vec::new();
-    for (code, key) in [(KeyCode::Escape, Key::Esc), (KeyCode::Tab, Key::Tab), (KeyCode::Up, Key::Up), (KeyCode::Down, Key::Down), (KeyCode::Left, Key::Left), (KeyCode::Right, Key::Right)] {
+    for (code, key) in [(KeyCode::Escape, Key::Esc), (KeyCode::Tab, Key::Tab), (KeyCode::Up, Key::Up), (KeyCode::Down, Key::Down), (KeyCode::Left, Key::Left), (KeyCode::Right, Key::Right), (KeyCode::Enter, Key::Enter), (KeyCode::Backspace, Key::Backspace)] {
         if is_key_pressed(code) {
             keys.push(key);
         }

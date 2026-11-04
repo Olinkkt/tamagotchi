@@ -298,7 +298,11 @@ pub fn labels(app: &App, lay: Layout, ratio: f32) -> Vec<Label> {
     let (panel_x, hint_y) = (lay.panel_x(), lay.hint_y());
     // Games and cards cover the header and the panel.
     let in_game = !has_panel(app);
-    let mut head = format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age));
+    let mut head = if p.name.is_empty() {
+        format!("{} · {} · {}", p.species, p.stage.label(), fmt_age(p.age))
+    } else {
+        format!("{} · {} · {}", p.name, p.species, fmt_age(p.age))
+    };
     if app.dev {
         head.push_str(" · DEV");
     }

@@ -81,6 +81,7 @@ button (or, on a card, anywhere off it) to close them. F11 toggles fullscreen.
 | `b` | shop (see below) |
 | `a` | awards: achievements and the adults you have raised |
 | `e` | family tree: every form, what it takes to get there, and where your pet is |
+| `N` | name your pet (type, `Enter` to save, `Esc` to cancel; up to 12 letters, numbers, spaces or `-`) |
 | `g` | graveyard: the pets you have lost |
 | `q` | quit (the pet keeps living) |
 

@@ -243,6 +243,9 @@ pub const MAX_HEARTS: u8 = 4;
 #[derive(Serialize, Deserialize, Clone)]
 pub struct Pet {
     pub species: String,
+    /// The name the player gave; empty until they pick one.
+    #[serde(default)]
+    pub name: String,
     pub stage: Stage,
     pub age: u64,
     pub stage_age: u64,
@@ -303,9 +306,15 @@ pub struct Pet {
 }
 
 impl Pet {
+    /// The name if there is one, else the species.
+    pub fn title(&self) -> &str {
+        if self.name.is_empty() { &self.species } else { &self.name }
+    }
+
     pub fn new(seed: u64) -> Self {
         let mut pet = Pet {
             species: "Egg".into(),
+            name: String::new(),
             stage: Stage::Egg,
             age: 0,
             stage_age: 0,

@@ -186,7 +186,7 @@ pub fn bury(pet: &Pet) -> io::Result<()> {
         f,
         "{} | {} | lived {} | {} care mistakes | cause: {}",
         fmt_date(now()),
-        pet.species,
+        if pet.name.is_empty() { pet.species.clone() } else { format!("{} the {}", pet.name, pet.species) },
         crate::fmt_age(pet.age),
         pet.mistakes,
         pet.cause_of_death.as_deref().unwrap_or("unknown")
